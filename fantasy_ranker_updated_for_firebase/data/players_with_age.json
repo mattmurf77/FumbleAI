@@ -1,0 +1,42 @@
+[
+  {
+    "sleeperId": "josh_allen",
+    "name": "Josh Allen",
+    "position": "QB",
+    "team": "BUF",
+    "imageUrl": "https://sleepercdn.com/content/nfl/players/josh_allen.jpg",
+    "age": 28,
+    "adp": "12.3",
+    "defaultRank": 5
+  },
+  {
+    "sleeperId": "bijan_robinson",
+    "name": "Bijan Robinson",
+    "position": "RB",
+    "team": "ATL",
+    "imageUrl": "https://sleepercdn.com/content/nfl/players/bijan_robinson.jpg",
+    "age": 22,
+    "adp": "6.9",
+    "defaultRank": 4
+  },
+  {
+    "sleeperId": "justin_jefferson",
+    "name": "Justin Jefferson",
+    "position": "WR",
+    "team": "MIN",
+    "imageUrl": "https://sleepercdn.com/content/nfl/players/justin_jefferson.jpg",
+    "age": 25,
+    "adp": "2.1",
+    "defaultRank": 1
+  },
+  {
+    "sleeperId": "travis_kelce",
+    "name": "Travis Kelce",
+    "position": "TE",
+    "team": "KC",
+    "imageUrl": "https://sleepercdn.com/content/nfl/players/travis_kelce.jpg",
+    "age": 34,
+    "adp": "15.7",
+    "defaultRank": 8
+  }
+]
