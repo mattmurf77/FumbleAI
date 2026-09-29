@@ -54,6 +54,8 @@ jobs:
         working-directory: HomeApp
         run: |
           set -o pipefail
+          # Report every compile error in one run instead of stopping at the first failing file.
+          defaults write com.apple.dt.Xcode IDEBuildingContinueBuildingAfterErrors -bool YES
           xcodebuild \
             -project Home.xcodeproj \
             -scheme Home \
@@ -67,6 +69,7 @@ jobs:
       # Pure packages first (fast, no Apple frameworks), then the platform packages, whose macOS builds also
       # compile the CloudKit / EventKit / UserNotifications / MapKit / SwiftUI code paths.
       - name: Test Swift packages (macOS)
+        if: always()
         run: |
           set -euo pipefail
           for pkg in PlanKit HomeCore HomeStore HomeSync HomeSchedule HomeCapture HomeExterior PlanCanvas; do

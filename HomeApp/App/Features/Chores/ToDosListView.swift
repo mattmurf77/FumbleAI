@@ -46,7 +46,7 @@ struct ToDosListView: View {
     }
 
     private var summary: String {
-        let active = chores.filter { $0.isOpen && (personFilter.map { p in $0.assigneeId == p } ?? true) }
+        let active = chores.filter { chore in chore.isOpen && (personFilter.map { p in chore.assigneeId == p } ?? true) }
         let dueWeek = active.filter { $0.isDueThisWeek(today: today) }.count
         let overdue = active.filter { $0.isOverdue(today: today) }.count
         if dueWeek == 0 && overdue == 0 { return "Nothing due this week" }
