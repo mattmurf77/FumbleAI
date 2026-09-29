@@ -3,9 +3,40 @@ import Observation
 import PlanKit
 import HomeCore
 import HomeCoreTesting
+import HomeStore
+import HomeSync
+import HomeSchedule
+import HomeCapture
+import HomeExterior
 #if canImport(BackgroundTasks)
 import BackgroundTasks
 #endif
+#if canImport(UIKit)
+import UIKit
+#endif
+
+/// iCloud account situations the UI must resolve with the user (FR-SYN-32/33). App-level mirror of
+/// `HomeSync.SyncAccountEvent` so feature code never imports HomeSync.
+enum AccountPrompt: Hashable, Identifiable {
+    /// A different Apple ID signed in: offer "Erase and use the new account" (or keep the local data).
+    case switchedAccounts
+    /// The user deleted Home's iCloud data: ask before re-uploading this iPhone's copy.
+    case userDeletedZone(zoneName: String)
+
+    var id: String {
+        switch self {
+        case .switchedAccounts: return "switched"
+        case .userDeletedZone(let z): return "deleted:\(z)"
+        }
+    }
+}
+
+/// Hooks into the concrete sync coordinator that the `SyncServicing` protocol doesn't cover.
+struct AccountHooks {
+    var events: @Sendable () -> AsyncStream<AccountPrompt>
+    var eraseLocalDataForNewAccount: @Sendable () async throws -> Void
+    var confirmReupload: @Sendable (String) async throws -> Void
+}
 
 /// Every service the app uses, typed by its HomeCore protocol. Built once by `AppEnvironment` (the composition
 /// root). Feature code must depend on these protocols only — never on concrete HomeStore/HomeSync/etc. types.
@@ -55,6 +86,12 @@ struct AppDependencies {
     var yardSeeder: any YardSeeding
     var exteriorSeeder: any ExteriorSeeding
 
+    // Extras outside the HomeCore protocols (nil for in-memory wiring)
+    var account: AccountHooks? = nil
+    var setDeviceNickname: (@Sendable (String) -> Void)? = nil
+    /// Non-fatal problem while opening the real store (the app then runs on an in-memory store).
+    var startupError: String? = nil
+
     /// In-memory wiring (HomeCoreTesting). `sample: true` loads the SampleHome house; false starts empty (onboarding).
     static func inMemory(sample: Bool, config: AppConfig = .main, clock: any HomeClock = SystemClock()) -> AppDependencies {
         let home = sample ? InMemoryHome.sample(clock: clock) : InMemoryHome.empty(clock: clock)
@@ -71,6 +108,89 @@ struct AppDependencies {
             photoTrace: StubPhotoTraceCalibrator(), receipts: StubReceiptReader(),
             addresses: StubAddressResolver(), footprints: StubFootprintProvider(), snapshots: StubSatelliteSnapshotter(),
             yardSeeder: StubYardSeeder(), exteriorSeeder: StubExteriorSeeder())
+    }
+
+    /// Production wiring: GRDB store, CKSyncEngine, UserNotifications/EventKit, RoomPlan/Vision, MapKit/Overpass.
+    /// Order matters: HomeStore first (everything else takes the repositories from `d`), then HomeSchedule.
+    static func live(config: AppConfig = .main) -> AppDependencies {
+        var d = AppDependencies.inMemory(sample: false, config: config)
+
+        // INTEGRATION: HomeStore — Application Support/home.sqlite (WAL) + Application Support/Attachments/
+        let store: HomeStore
+        do {
+            let directory = HomeStore.defaultDirectory
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            store = try HomeStore.live(directory: directory, clock: d.clock, events: d.events)
+        } catch {
+            // Keep the app usable (in-memory) and tell the user; data would be lost on relaunch.
+            d.startupError = "Couldn’t open the Home database: \(error.localizedDescription)"
+            do {
+                store = try HomeStore.inMemory(clock: d.clock, events: d.events)
+            } catch {
+                return d   // in-memory HomeCoreTesting wiring as the last resort
+            }
+        }
+        d.events = store.database.bus
+        d.plan = store.plan;                 d.planCommitter = store.planCommitter
+        d.chores = store.chores;             d.projects = store.projects
+        d.things = store.things;             d.inventory = store.inventory
+        d.measurements = store.measurements; d.people = store.people
+        d.attachments = store.attachments;   d.settings = store.settings
+        d.recentlyDeleted = store.recentlyDeleted
+        d.search = store.search;             d.rollups = store.rollups
+        d.lensStats = store.lensStats;       d.export = store.export
+        d.diagnostics = store.diagnostics
+
+        // INTEGRATION: HomeSync — CKSyncEngine over iCloud.<bundle id>, private DB, zone property-<uuid>
+        if let sync = try? SyncCoordinator.live(store: store, containerIdentifier: config.cloudKitContainerIdentifier) {
+            d.sync = sync
+            d.account = AccountHooks(
+                events: {
+                    AsyncStream { continuation in
+                        let task = Task {
+                            for await e in sync.observeAccountEvents() {
+                                switch e {
+                                case .switchedAccounts: continuation.yield(.switchedAccounts)
+                                case .userDeletedZone(let zone): continuation.yield(.userDeletedZone(zoneName: zone))
+                                }
+                            }
+                            continuation.finish()
+                        }
+                        continuation.onTermination = { _ in task.cancel() }
+                    }
+                },
+                eraseLocalDataForNewAccount: { try await sync.eraseLocalDataForNewAccount() },
+                confirmReupload: { zone in try await sync.confirmReupload(zoneName: zone) })
+        } else if d.startupError == nil {
+            d.startupError = "iCloud sync couldn’t start. Your data stays on this iPhone."
+        }
+
+        // INTEGRATION: HomeSchedule — Keychain device id, UNUserNotificationCenter scheduler, EventKit calendar sync
+        let device = KeychainDeviceIdentity()
+        d.device = device
+        d.setDeviceNickname = { name in device.setNickname(name) }
+        let reminders = ReminderScheduler(chores: d.chores, plan: d.plan, inventory: d.inventory, people: d.people,
+                                          settings: d.settings, clock: d.clock)
+        d.reminders = reminders
+        d.notificationAuth = reminders
+        let calendarSync = CalendarSync(chores: d.chores, plan: d.plan, settings: d.settings, device: device, clock: d.clock)
+        d.calendar = calendarSync
+        Task { await calendarSync.startObservingStoreChanges() }
+
+        // INTEGRATION: HomeCapture
+        d.roomPlanImporter = RoomPlanImporter()
+        d.roughIn = RoughInGenerator()
+        d.blocks = BlockTemplates()
+        d.photoTrace = PhotoTraceCalibrator()
+        d.receipts = ReceiptReader(clock: d.clock)
+
+        // INTEGRATION: HomeExterior — Home server when AppConfig.usesServer, else Overpass directly
+        d.addresses = AddressResolver()
+        d.footprints = FootprintProvider(config: config)
+        d.snapshots = SatelliteSnapshotter()
+        d.yardSeeder = YardSeeder()
+        d.exteriorSeeder = ExteriorSeeder(footprints: d.footprints, seeder: d.yardSeeder)
+        return d
     }
 }
 
@@ -122,6 +242,9 @@ final class AppEnvironment {
     let fitChecker = FitChecker()
     let recurrence: RecurrenceEngine
 
+    @ObservationIgnored private let account: AccountHooks?
+    @ObservationIgnored private let nicknameWriter: (@Sendable (String) -> Void)?
+
     // MARK: App-wide UI state (observable)
 
     /// Set by `onOpenURL` / notification taps (`home://chore/<uuid>`); the Plan screen consumes and clears it.
@@ -129,9 +252,15 @@ final class AppEnvironment {
     /// Lens currently shown on the plan (persisted via SettingsRepository.lastLens).
     var selectedLens: LensID = .plan
     var syncStatus: SyncStatus = .upToDate(lastSync: nil)
+    /// iCloud account situation waiting for the user's decision (FR-SYN-32/33); RootView presents it.
+    var accountPrompt: AccountPrompt?
+    /// Non-fatal startup problem to show once (database could not be opened, sync unavailable).
+    var startupError: String?
 
     @ObservationIgnored private var eventTask: Task<Void, Never>?
     @ObservationIgnored private var syncStatusTask: Task<Void, Never>?
+    @ObservationIgnored private var accountTask: Task<Void, Never>?
+    @ObservationIgnored private var timeObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var started = false
 
     init(_ d: AppDependencies) {
@@ -144,38 +273,14 @@ final class AppEnvironment {
         roomPlanImporter = d.roomPlanImporter; roughIn = d.roughIn; blocks = d.blocks; photoTrace = d.photoTrace; receipts = d.receipts
         addresses = d.addresses; footprints = d.footprints; snapshots = d.snapshots; yardSeeder = d.yardSeeder; exteriorSeeder = d.exteriorSeeder
         recurrence = RecurrenceEngine(calendar: d.clock.calendar)
+        account = d.account
+        nicknameWriter = d.setDeviceNickname
+        startupError = d.startupError
     }
 
-    /// The running app. Until the real packages land, everything is in-memory with the sample house.
+    /// The running app: real store, sync, scheduling, capture and exterior services.
     static func live() -> AppEnvironment {
-        let config = AppConfig.main
-        // INTEGRATION: change `let d` to `var d` when the first real implementation is swapped in below.
-        let d = AppDependencies.inMemory(sample: true, config: config)
-
-        // INTEGRATION: HomeStore — open the database and swap every repository/query service:
-        //   let db = try AppDatabase.open(at: AppPaths.databaseURL)            // Application Support/home.sqlite
-        //   d.plan = PlanStore(db, events: d.events); d.planCommitter = PlanCommitter(db, events: d.events)
-        //   d.chores = ChoreStore(db, ...); d.projects = ...; d.things = ...; d.inventory = ...; d.measurements = ...
-        //   d.people = ...; d.attachments = AttachmentFileStore(...); d.recentlyDeleted = ...
-        //   d.search = FTSSearchService(db); d.rollups = RollupQueries(db); d.lensStats = LensStatsQueries(db)
-        //   d.export = CSVExporter(db); d.diagnostics = ...
-        //   d.settings = UserDefaultsSettingsRepository()
-
-        // INTEGRATION: HomeSync — d.sync = SyncCoordinator(db: db, containerIdentifier: config.cloudKitContainerIdentifier)
-
-        // INTEGRATION: HomeSchedule — d.reminders = ReminderScheduler(chores: d.chores, inventory: d.inventory, settings: d.settings, clock: d.clock)
-        //   d.notificationAuth = <same ReminderScheduler or a UNUserNotificationCenter wrapper>
-        //   d.calendar = CalendarSync(chores: d.chores, device: KeychainDeviceIdentity(), settings: d.settings)
-
-        // INTEGRATION: HomeCapture — d.roomPlanImporter = RoomPlanImporter(); d.roughIn = RoughInGenerator();
-        //   d.blocks = BlockTemplates(); d.photoTrace = PhotoTraceCalibrator(); d.receipts = ReceiptReader()
-
-        // INTEGRATION: HomeExterior — d.addresses = AddressResolver();
-        //   d.footprints = config.usesServer ? ServerFootprintProvider(config: config) : OverpassFootprintProvider()
-        //   d.snapshots = SatelliteSnapshotter(); d.yardSeeder = YardSeeder();
-        //   d.exteriorSeeder = ExteriorSeeder(footprints: d.footprints, seeder: d.yardSeeder)
-
-        return AppEnvironment(d)
+        AppEnvironment(.live(config: .main))
     }
 
     /// SwiftUI previews: in-memory sample house (or empty for onboarding previews).
@@ -200,7 +305,15 @@ final class AppEnvironment {
                 switch event {
                 case .choreCompleted(let id): await calendar.choreCompleted(id)
                 case .updated(.chore(let id)): await calendar.choreChanged(id)
+                case .restored(.chore(let id)): await calendar.choreChanged(id)
                 case .deleted(.chore(let id)): await calendar.disable(chore: id)
+                case .syncApplied(let types, _):
+                    // Edits made on another device: the owner device applies them to its calendar (AC-CHR-12).
+                    if types.contains(RecordType.chore.rawValue) || types.contains(RecordType.choreCalendarLink.rawValue) {
+                        await calendar.reconcileOwned()
+                    }
+                case .timeZoneChanged:
+                    await reminders.replan(reason: .timeZoneChanged)
                 default: break
                 }
             }
@@ -209,8 +322,28 @@ final class AppEnvironment {
         syncStatusTask = Task { [weak self] in
             for await s in statusStream { self?.syncStatus = s }
         }
+        if let account {
+            let prompts = account.events()
+            accountTask = Task { [weak self] in
+                for await p in prompts { self?.accountPrompt = p }
+            }
+        }
+        observeTimeChanges()
         await reminders.replan(reason: .launch)
         scheduleAppRefresh()
+    }
+
+    /// LLD §9.3 replan triggers: system time zone / significant time changes.
+    private func observeTimeChanges() {
+        guard timeObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        let handler: @Sendable (Notification) -> Void = { [weak self] _ in
+            Task { @MainActor in await self?.reminders.replan(reason: .timeZoneChanged) }
+        }
+        timeObservers.append(center.addObserver(forName: .NSSystemTimeZoneDidChange, object: nil, queue: .main, using: handler))
+        #if canImport(UIKit)
+        timeObservers.append(center.addObserver(forName: UIApplication.significantTimeChangeNotification, object: nil, queue: .main, using: handler))
+        #endif
     }
 
     func sceneBecameActive() async {
@@ -220,6 +353,26 @@ final class AppEnvironment {
     /// `home://chore/<uuid>` etc.
     func handle(url: URL) {
         if let ref = ItemRef(url: url) { pendingDeepLink = ref }
+    }
+
+    /// Settings › "This iPhone's name": stored in `AppSettings` and mirrored to the device identity used by
+    /// calendar ownership messages on other devices.
+    func setDeviceNickname(_ name: String) {
+        nicknameWriter?(name)
+    }
+
+    // MARK: iCloud account decisions (FR-SYN-32/33)
+
+    /// "Erase and use the new account": drops the local copy so the new Apple ID's data can come down.
+    func eraseLocalDataForNewAccount() async throws {
+        try await account?.eraseLocalDataForNewAccount()
+        accountPrompt = nil
+    }
+
+    /// "Upload this iPhone's copy again" after the user deleted Home's iCloud data.
+    func confirmReupload(zoneName: String) async throws {
+        try await account?.confirmReupload(zoneName)
+        accountPrompt = nil
     }
 
     // MARK: Background refresh (LLD §9.3)
@@ -232,11 +385,12 @@ final class AppEnvironment {
         #endif
     }
 
-    /// BGAppRefresh body: replan, reconcile calendar, purge > 30-day deletes, then reschedule.
+    /// BGAppRefresh body: replan, reconcile calendar, sync, purge > 30-day deletes, then reschedule.
     func runBackgroundRefresh() async {
         scheduleAppRefresh()
         await reminders.replan(reason: .backgroundRefresh)
         await calendar.reconcileOwned()
+        try? await sync.syncNow()
         let cutoff = clock.now.addingTimeInterval(-Double(DeletedEntry.retentionDays) * 86_400)
         _ = try? await recentlyDeleted.purgeExpired(before: cutoff)
     }

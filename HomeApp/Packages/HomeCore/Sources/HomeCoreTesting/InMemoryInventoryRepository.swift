@@ -195,7 +195,7 @@ public struct InMemoryRecentlyDeletedRepository: RecentlyDeletedRepository {
         for x in s.projects.values { add(.project, x.id, x.title, "Project", s.locationText(x.scope), x.deletedAt, x.propertyId) }
         for x in s.things.values { add(.thing, x.id, x.name, "Thing", s.locationText(x.scope), x.deletedAt, x.propertyId) }
         for x in s.inventory.values { add(.inventoryItem, x.id, x.name, "Item", s.locationText(x.scope), x.deletedAt, x.propertyId) }
-        for x in s.measurements.values { add(.measurement, x.id, x.label, "HomeMeasurement", s.spaceName(x.spaceId), x.deletedAt, x.propertyId) }
+        for x in s.measurements.values { add(.measurement, x.id, x.label, "Measurement", s.spaceName(x.spaceId), x.deletedAt, x.propertyId) }
         for x in s.people.values { add(.person, x.id, x.name, "Person", nil, x.deletedAt, x.propertyId) }
         return out.sorted { $0.deletedAt > $1.deletedAt }
     }

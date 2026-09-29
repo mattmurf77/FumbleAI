@@ -23,7 +23,7 @@ jobs:
   build:
     name: Build app and test packages
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       SPM_DIR: ${{ github.workspace }}/.spm
     steps:
@@ -60,11 +60,17 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -clonedSourcePackagesDirPath "$SPM_DIR" \
             -skipPackagePluginValidation \
-            build CODE_SIGNING_ALLOWED=NO \
+            -skipMacroValidation \
+            build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
             | if command -v xcbeautify >/dev/null; then xcbeautify --renderer github-actions; else cat; fi
 
-      - name: Test PlanKit (macOS)
-        run: swift test --package-path HomeApp/Packages/PlanKit
-
-      - name: Test HomeCore (macOS)
-        run: swift test --package-path HomeApp/Packages/HomeCore
+      # Pure packages first (fast, no Apple frameworks), then the platform packages, whose macOS builds also
+      # compile the CloudKit / EventKit / UserNotifications / MapKit / SwiftUI code paths.
+      - name: Test Swift packages (macOS)
+        run: |
+          set -euo pipefail
+          for pkg in PlanKit HomeCore HomeStore HomeSync HomeSchedule HomeCapture HomeExterior PlanCanvas; do
+            echo "::group::swift test $pkg"
+            swift test --package-path "HomeApp/Packages/$pkg"
+            echo "::endgroup::"
+          done

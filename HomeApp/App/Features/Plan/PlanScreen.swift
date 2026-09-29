@@ -338,7 +338,7 @@ struct PlanScreen: View {
         case .shoppingList: return { footerLink = .shoppingList }
         case .seasonalSwap: return { footerLink = .seasonalSwap }
         case .chores: return { footerLink = .chores }
-        case .budget: return nil   // INTEGRATION: Budget drill-down (spec 05) when the Budget feature lands.
+        case .budget: return { footerLink = .budget }
         }
     }
 
@@ -437,7 +437,7 @@ struct AddRequest: Identifiable, Hashable {
 }
 
 enum FooterLinkTarget: String, Identifiable, Hashable {
-    case shoppingList, seasonalSwap, chores
+    case shoppingList, seasonalSwap, chores, budget
     var id: String { rawValue }
 }
 
@@ -450,6 +450,7 @@ private struct FooterLinkDestination: View {
             case .shoppingList: ShoppingListView()
             case .seasonalSwap: SeasonalSwapView()
             case .chores: ToDosListView()
+            case .budget: BudgetDrillDown()
             }
         }
     }

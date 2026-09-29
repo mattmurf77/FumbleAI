@@ -1,52 +1,71 @@
 import SwiftUI
 import HomeCore
 
-/// Placeholder root. INTEGRATION: Features/Plan owns the real PlanScreen (pills + lens menu + canvas + footer);
-/// Features/Onboarding owns the no-property flow. Replace the body once those land.
+/// Root switch: onboarding while the home has no property (or until onboarding finishes), else the Plan screen.
+/// Observes the current property so both a local commit and an iCloud restore switch screens automatically.
+/// Also presents app-wide prompts: iCloud account changes (FR-SYN-32/33) and a one-time startup problem.
 struct RootView: View {
     @Environment(AppEnvironment.self) private var env
     @State private var property: Property?
-    @State private var levels: [Level] = []
     @State private var loaded = false
+    @State private var showOnboarding = false
+    @State private var accountError: String?
 
     var body: some View {
-        NavigationStack {
-            List {
-                if let property {
-                    Section("Home") {
-                        LabeledContent("Name", value: property.name)
-                        LabeledContent("Sync", value: env.syncStatus.displayText)
-                    }
-                    Section("Floors") {
-                        ForEach(levels) { level in
-                            Label(level.name, systemImage: level.kind == .exterior ? "tree" : "square.split.bottomrightquarter")
-                        }
-                    }
-                }
-                Section("Views") {
-                    ForEach(LensID.allCases, id: \.self) { lens in
-                        Label(lens.title, systemImage: lens.symbol)
-                    }
-                }
-            }
-            .navigationTitle("Home")
-            .overlay {
-                if loaded && property == nil {
-                    ContentUnavailableView("No home yet", systemImage: "house",
-                                           description: Text("Onboarding will start here."))
-                }
+        @Bindable var env = env
+        Group {
+            if !loaded {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if showOnboarding {
+                OnboardingFlow(onFinished: { showOnboarding = false })
+            } else {
+                PlanScreen()
             }
         }
-        .task { await load() }
+        .task {
+            for await p in env.plan.observeCurrentProperty() {
+                property = p
+                if p == nil { showOnboarding = true }
+                loaded = true
+            }
+        }
+        .alert(item: $env.accountPrompt) { prompt in
+            switch prompt {
+            case .switchedAccounts:
+                return Alert(title: Text("A different iCloud account is signed in"),
+                             message: Text("Keep this iPhone’s data, or erase it and use the home stored in the new account? Export a CSV from Settings first if you want a copy."),
+                             primaryButton: .destructive(Text("Erase and use new account")) {
+                                 Task { await erase() }
+                             },
+                             secondaryButton: .cancel(Text("Keep my data")) { env.accountPrompt = nil })
+            case .userDeletedZone(let zone):
+                return Alert(title: Text("Your iCloud data for Home was deleted"),
+                             message: Text("Upload this iPhone’s copy to iCloud again?"),
+                             primaryButton: .default(Text("Upload again")) {
+                                 Task { await reupload(zone) }
+                             },
+                             secondaryButton: .cancel(Text("Not now")) { env.accountPrompt = nil })
+            }
+        }
+        .alert("Something needs attention", isPresented: Binding(get: { env.startupError != nil }, set: { if !$0 { env.startupError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(env.startupError ?? "")
+        }
+        .alert("Couldn’t update iCloud", isPresented: Binding(get: { accountError != nil }, set: { if !$0 { accountError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(accountError ?? "")
+        }
     }
 
-    private func load() async {
-        property = try? await env.plan.currentProperty()
-        loaded = true
-        guard let id = property?.id else { return }
-        for await update in env.plan.observeLevels(property: id) {
-            levels = update
-        }
+    private func erase() async {
+        do { try await env.eraseLocalDataForNewAccount() } catch { accountError = error.localizedDescription }
+    }
+
+    private func reupload(_ zone: String) async {
+        do { try await env.confirmReupload(zoneName: zone) } catch { accountError = error.localizedDescription }
     }
 }
 

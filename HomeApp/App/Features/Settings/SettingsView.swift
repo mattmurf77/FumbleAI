@@ -263,6 +263,7 @@ struct SettingsView: View {
     private func commitNickname() {
         let n = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !n.isEmpty, n != settings.deviceNickname else { return }
+        env.setDeviceNickname(n)
         updateSettings { $0.deviceNickname = n }
     }
 

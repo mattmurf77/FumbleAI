@@ -52,8 +52,9 @@ public enum ChoreLogic {
     }
 
     /// "Turn into a project" (sets spawned_from_chore_id).
+    /// FR-CHR-32: the spawned project is titled "From: <chore title>" so its origin stays visible.
     public static func projectDraft(from chore: Chore) -> ProjectDraft {
-        ProjectDraft(propertyId: chore.propertyId, scope: chore.scope, title: chore.title, notes: chore.notes,
+        ProjectDraft(propertyId: chore.propertyId, scope: chore.scope, title: "From: " + chore.title, notes: chore.notes,
                      status: .idea, spawnedFromChoreId: chore.id)
     }
 }
