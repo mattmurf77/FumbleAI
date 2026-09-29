@@ -5,9 +5,11 @@ import HomeCore
 /// without it, Rough it in is marked "Suggested".
 struct PathChooser: View {
     @Bindable var model: OnboardingModel
-    var scanSupported: Bool = OnboardingModel.scanSupported
+    /// nil = detect (previews pass a value).
+    var scanSupported: Bool? = nil
 
     var body: some View {
+        let scanSupported = self.scanSupported ?? OnboardingModel.scanSupported
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 OnboardingStepLabel(step: 2)

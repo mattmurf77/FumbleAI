@@ -31,7 +31,7 @@ struct OnboardingFlow: View {
                 OnboardingStatusView(title: "Checking iCloud…", subtitle: "Looking for a home you already set up.")
             case .restoring:
                 OnboardingStatusView(title: "Restoring your home…", subtitle: "Your plan is coming down from iCloud.")
-            case .none:
+            case .ready:
                 NavigationStack(path: $model.routes) {
                     AddressStep(model: model)
                         .navigationDestination(for: OnboardingModel.Route.self) { route in

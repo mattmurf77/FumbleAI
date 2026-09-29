@@ -15,13 +15,13 @@ final class OnboardingModel {
 
     enum RestoreState: Equatable {
         case checking
-        case none
+        case ready
         /// A `property-*` zone exists in iCloud: "Restoring your home…" (FR-SYN-20).
         case restoring
     }
 
     /// Which path produced the current draft (review-screen copy and behavior).
-    enum Path: String, Hashable {
+    enum CreationPath: String, Hashable {
         case scan, blocks, trace, rough
     }
 
@@ -37,7 +37,7 @@ final class OnboardingModel {
     var isResolving = false
 
     // Draft
-    var path: Path?
+    var path: CreationPath?
     var draft: PlanDraft?
     /// Raw scan JSON, kept until commit so the review screen can re-import with a new story → floor mapping.
     var scanData: Data?
@@ -70,7 +70,7 @@ final class OnboardingModel {
                 return
             }
         case .noExistingHome, .unavailable:
-            restore = .none
+            restore = .ready
         }
     }
 
@@ -105,7 +105,7 @@ final class OnboardingModel {
 
     // MARK: Drafts
 
-    func useDraft(_ d: PlanDraft, path: Path, env: AppEnvironment) {
+    func useDraft(_ d: PlanDraft, path: CreationPath, env: AppEnvironment) {
         draft = d
         self.path = path
         acceptedSuggestions = []
