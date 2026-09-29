@@ -72,18 +72,6 @@ public final class AppDatabase: @unchecked Sendable {
         return result
     }
 
-    /// Synchronous variant for callers already off the main thread (sync engine callbacks).
-    func writeSync<T>(origin: WriteOrigin, _ body: (StoreTx) throws -> T) throws -> (T, [DomainEvent], Set<RecordRef>) {
-        let now = clock.now
-        let res = try writer.write { db -> (T, [DomainEvent], Set<RecordRef>) in
-            let tx = StoreTx(db: db, origin: origin, now: now, engine: engine, calendar: clock.calendar)
-            let r = try body(tx)
-            try tx.flush()
-            return (r, tx.events, tx.outboxTouched)
-        }
-        return res
-    }
-
     // MARK: Observation
 
     /// `AsyncStream` over a GRDB `ValueObservation`: yields the current value, then after every committed change

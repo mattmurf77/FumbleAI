@@ -6,8 +6,8 @@ import HomeStore
 /// (merge with pending local edits, orphan parking, unknown-value parking), and handles per-record send results.
 /// `SyncCoordinator` drives it from CKSyncEngine events; tests drive it with a fake cloud.
 public actor SyncProcessor {
-    public let store: SyncStore
-    public let mappers: RecordMapperRegistry
+    public nonisolated let store: SyncStore
+    public nonisolated let mappers: RecordMapperRegistry
     /// Outbox `local_version` of each record handed to the engine (send clears the outbox only if unchanged).
     private var inFlight: [RecordRef: Int64] = [:]
     /// Parked asset copies (attachments whose parent row hasn't arrived yet).
@@ -60,7 +60,8 @@ public actor SyncProcessor {
                     .union(["updated_at", "deleted_at", "property_id"])
                 fields = row.filter { cols.contains($0.key) }
             }
-            let rec = mapper.record(id: ref.id, row: fields, zoneName: zone, systemFields: system, assetURL: assetURL)
+            // The binary is immutable (LLD §5.6): upload it with the first save only.
+            let rec = mapper.record(id: ref.id, row: fields, zoneName: zone, systemFields: system, assetURL: system == nil ? assetURL : nil)
             return (rec, entry?.localVersion)
         }
         guard let (rec, version) = built else { return nil }

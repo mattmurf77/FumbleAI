@@ -208,6 +208,12 @@ public struct PlanCanvasView: View {
 
     private func configure(size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
+        if fittedLevel == nil, viewport.isConfigured, viewport.size == size, !model.bounds.isNull {
+            // A new canvas for the same level (e.g. entering edit mode): keep the caller's zoom and pan.
+            fittedLevel = model.levelId
+            fittedEmpty = false
+            return
+        }
         if fittedLevel != model.levelId || !viewport.isConfigured {
             refit(size: size)
         } else if viewport.size != size {

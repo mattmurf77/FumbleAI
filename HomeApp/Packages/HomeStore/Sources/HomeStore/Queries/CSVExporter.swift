@@ -208,8 +208,12 @@ public struct DiagnosticsStore: DiagnosticsService {
     /// `Application Support/Diagnostics` (MetricKit payloads written by the app), copied into the export when present.
     public let metricsDirectory: URL?
     public let outputDirectory: URL
-    public init(_ db: AppDatabase, metricsDirectory: URL? = nil, outputDirectory: URL = FileManager.default.temporaryDirectory) {
-        self.db = db; self.metricsDirectory = metricsDirectory; self.outputDirectory = outputDirectory
+    /// Extra files for the export, e.g. the app's 24-hour `OSLogStore` slice (written by the app, which owns
+    /// `OSLog`); called at export time. Must not contain user content.
+    public let additionalFiles: @Sendable () async -> [URL]
+    public init(_ db: AppDatabase, metricsDirectory: URL? = nil, outputDirectory: URL = FileManager.default.temporaryDirectory,
+                additionalFiles: @escaping @Sendable () async -> [URL] = { [] }) {
+        self.db = db; self.metricsDirectory = metricsDirectory; self.outputDirectory = outputDirectory; self.additionalFiles = additionalFiles
     }
 
     public func counts(property: UUID) async throws -> DiagnosticsCounts {
@@ -264,6 +268,9 @@ public struct DiagnosticsStore: DiagnosticsService {
         try HomeJSON.encoder().encode(meta).write(to: folder.appendingPathComponent("database.json"))
         if let m = metricsDirectory, FileManager.default.fileExists(atPath: m.path) {
             try? FileManager.default.copyItem(at: m, to: folder.appendingPathComponent("MetricKit", isDirectory: true))
+        }
+        for f in await additionalFiles() {
+            try? FileManager.default.copyItem(at: f, to: folder.appendingPathComponent(f.lastPathComponent))
         }
         return try CSVExporter.zip(folder: folder, name: name, into: work)
     }

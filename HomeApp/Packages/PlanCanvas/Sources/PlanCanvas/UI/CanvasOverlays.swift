@@ -55,21 +55,21 @@ public struct ChipView: View {
 
     public var body: some View {
         ThemeReader { theme in
-            let (bg, fg, line) = theme.chipColors(chip.style)
+            let colors = theme.chipColors(chip.style)
             HStack(spacing: 4) {
                 if let dot = chip.dot {
                     Circle().fill(dot == .warn ? theme.warn : theme.danger).frame(width: 6, height: 6)
                 }
                 Text(chip.text)
                     .font(.system(size: 11, weight: chip.emphasized ? .bold : .semibold).monospacedDigit())
-                    .foregroundColor(fg)
+                    .foregroundColor(colors.1)
                     .lineLimit(1)
                     .fixedSize()
             }
             .padding(.horizontal, 7)
             .frame(height: 18)
-            .background(Capsule().fill(bg))
-            .overlay(Capsule().strokeBorder(line ?? .clear, lineWidth: 0.6))
+            .background(Capsule().fill(colors.0))
+            .overlay(Capsule().strokeBorder(colors.2 ?? .clear, lineWidth: 0.6))
             .accessibilityHidden(true)
         }
     }

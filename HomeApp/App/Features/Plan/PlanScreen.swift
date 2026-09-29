@@ -61,6 +61,7 @@ struct PlanScreen: View {
         }
         .task { await model.run(env: env) }
         .onChange(of: env.selectedLens) { _, l in model.setLens(l, env: env) }
+        .onChange(of: model.levelId) { _, _ in viewport = .zero }
         .onChange(of: env.pendingDeepLink) { _, ref in if let ref { Task { await handleDeepLink(ref) } } }
         .onChange(of: model.loaded) { _, _ in if let ref = env.pendingDeepLink { Task { await handleDeepLink(ref) } } }
         .sheet(item: $roomSheet, onDismiss: { selection = nil; sheetDetent = .medium }) { target in
@@ -86,7 +87,7 @@ struct PlanScreen: View {
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showAddFloor) {
             if let p = model.property {
-                AddFloorSheet(property: p, levels: model.levels) { id in model.select(level: id, env: env) }
+                AddFloorSheet(property: p) { id in model.select(level: id, env: env) }
             }
         }
         .sheet(item: $footerLink) { link in FooterLinkDestination(target: link) }
@@ -290,6 +291,14 @@ struct PlanScreen: View {
     // MARK: Actions
 
     private func select(_ id: UUID?) {
+        // Exterior: tapping the house outline jumps to the default (ground) floor.
+        if let id, model.model.isExterior, model.model.geometry.space(id)?.spaceType == .footprint,
+           let ground = model.levels.filter({ !$0.isExterior }).defaultLevel(preferred: model.property?.defaultLevelId) {
+            selection = nil
+            roomSheet = nil
+            model.select(level: ground.id, env: env)
+            return
+        }
         selection = id
         if let id { roomSheet = .space(id) } else { roomSheet = nil }
     }

@@ -49,11 +49,11 @@ public enum SyncAccountEvent: Hashable, Sendable {
 /// column-overlay merge, orphan parking, account-change handling. All CloudKit specifics live in the driver
 /// (`CloudKitSyncEngine`, compiled only where CloudKit exists); without it the coordinator reports "iCloud off".
 public actor SyncCoordinator: SyncServicing {
-    public let store: HomeStore
-    public let processor: SyncProcessor
+    public nonisolated let store: HomeStore
+    public nonisolated let processor: SyncProcessor
     let driver: SyncEngineDriver?
 
-    private var started = false
+    private var startTask: Task<Void, Error>?
     private var knownZones: Set<String> = []
     private var account: SyncAccountStatus = .couldNotDetermine
     private var busy = 0
@@ -86,9 +86,15 @@ public actor SyncCoordinator: SyncServicing {
 
     // MARK: SyncServicing
 
+    /// Idempotent; concurrent callers await the same start.
     public func start() async throws {
-        guard !started else { return }
-        started = true
+        if let t = startTask { return try await t.value }
+        let t = Task { try await self.performStart() }
+        startTask = t
+        try await t.value
+    }
+
+    private func performStart() async throws {
         guard let driver else { account = .unsupported; publish(); return }
         account = await driver.accountStatus()
         let state = try await store.sync.state()
@@ -134,7 +140,7 @@ public actor SyncCoordinator: SyncServicing {
 
     public func syncNow() async throws {
         guard let driver else { return }
-        if !started { try await start() }
+        try await start()
         busy += 1; publish()
         defer { busy -= 1; publish() }
         do {
@@ -337,7 +343,7 @@ public actor SyncCoordinator: SyncServicing {
 
     private func publishNow() async {
         let s = await computeStatus()
-        guard s != lastStatus || statusContinuations.isEmpty == false else { return }
+        guard s != lastStatus else { return }
         lastStatus = s
         for c in statusContinuations.values { c.yield(s) }
     }

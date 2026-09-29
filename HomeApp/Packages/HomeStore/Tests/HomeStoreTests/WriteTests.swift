@@ -299,3 +299,23 @@ final class WriteTests: XCTestCase {
         XCTAssertEqual(detector?.scope, .property)
     }
 }
+
+final class FileDatabaseTests: XCTestCase {
+    func testLiveStoreUsesWALAndPersistsAcrossOpen() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("home-live-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let defaults = UserDefaults(suiteName: "homestore.live.\(UUID().uuidString)")!
+        do {
+            let store = try HomeStore.live(directory: dir, clock: clock, defaults: defaults)
+            let mode = try await store.database.read { try String.fetchOne($0, sql: "PRAGMA journal_mode") }
+            XCTAssertEqual(mode?.lowercased(), "wal")
+            try await store.plan.saveProperty(Property(id: SampleHome.propertyId, name: "Persisted", createdAt: clock.now, updatedAt: clock.now))
+        }
+        let reopened = try HomeStore.live(directory: dir, clock: clock, defaults: defaults)
+        let p = try await reopened.plan.currentProperty()
+        XCTAssertEqual(p?.name, "Persisted")
+        let pending = try await reopened.sync.outboxCount()
+        XCTAssertEqual(pending, 1, "the outbox survives an app kill (FR-SYN-02)")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dir.appendingPathComponent("home.sqlite").path))
+    }
+}

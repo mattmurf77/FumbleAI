@@ -122,7 +122,7 @@ public final class CloudKitSyncEngine: SyncEngineDriver, CKSyncEngineDelegate, @
                 syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(recordID)])
                 return nil
             }
-            return Self.ckRecord(rec)
+            return CloudKitSyncEngine.ckRecord(rec)
         }
     }
 
