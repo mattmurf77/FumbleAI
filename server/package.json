@@ -1,0 +1,16 @@
+{
+  "name": "home-server",
+  "version": "1.0.0",
+  "description": "Tiny stateless helper service for the Home iPhone app: OpenStreetMap footprint lookup and appliance templates. Stores no user data.",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "license": "UNLICENSED"
+}

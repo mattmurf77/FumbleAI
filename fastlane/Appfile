@@ -1,0 +1,3 @@
+# Values come from environment variables (GitHub secrets in CI). See docs/setup/TESTFLIGHT.md.
+app_identifier(ENV["HOME_BUNDLE_ID"] || "app.fumble.home")
+team_id(ENV["HOME_TEAM_ID"]) if ENV["HOME_TEAM_ID"] && !ENV["HOME_TEAM_ID"].empty?

@@ -1,0 +1,70 @@
+name: iOS build
+
+on:
+  pull_request:
+    paths:
+      - "HomeApp/**"
+      - ".github/workflows/ios-build.yml"
+  push:
+    branches: [main]
+    paths:
+      - "HomeApp/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build app and test packages
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      SPM_DIR: ${{ github.workspace }}/.spm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            .spm
+            HomeApp/Packages/*/.build
+          key: spm-${{ runner.os }}-${{ hashFiles('HomeApp/project.yml', 'HomeApp/**/Package.swift', 'HomeApp/**/Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Generate Xcode project
+        working-directory: HomeApp
+        run: xcodegen generate
+
+      - name: Build app (iOS Simulator, unsigned)
+        working-directory: HomeApp
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Home.xcodeproj \
+            -scheme Home \
+            -destination 'generic/platform=iOS Simulator' \
+            -clonedSourcePackagesDirPath "$SPM_DIR" \
+            -skipPackagePluginValidation \
+            build CODE_SIGNING_ALLOWED=NO \
+            | if command -v xcbeautify >/dev/null; then xcbeautify --renderer github-actions; else cat; fi
+
+      - name: Test PlanKit (macOS)
+        run: swift test --package-path HomeApp/Packages/PlanKit
+
+      - name: Test HomeCore (macOS)
+        run: swift test --package-path HomeApp/Packages/HomeCore
