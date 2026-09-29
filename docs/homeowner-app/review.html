@@ -1,0 +1,282 @@
+<title>Homeowner App Plan Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column like a listing sheet; each decision is a room card with Plan A / Plan B side by side and a pick row. */
+:root{
+  --bg:#f5f6f4; --paper:#ffffff; --ink:#1d2426; --muted:#5d686b; --line:#d4d9d8;
+  --a:#1f6f8b; --a-soft:#e3f0f4; --b:#9a6a12; --b-soft:#f6eddc; --ok:#2f7a4a; --ok-soft:#e2f1e7; --warn:#a4462f;
+  --grid:rgba(31,111,139,.06);
+  --display:"Archivo Narrow","Arial Narrow",Arial,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12181a; --paper:#1a2225; --ink:#e4e9ea; --muted:#98a4a7; --line:#2e3a3d;
+  --a:#6cc0dc; --a-soft:#173039; --b:#e0ad52; --b-soft:#35291a; --ok:#6fcf8f; --ok-soft:#183322; --warn:#ef8a6f;
+  --grid:rgba(108,192,220,.05); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#12181a; --paper:#1a2225; --ink:#e4e9ea; --muted:#98a4a7; --line:#2e3a3d;
+  --a:#6cc0dc; --a-soft:#173039; --b:#e0ad52; --b-soft:#35291a; --ok:#6fcf8f; --ok-soft:#183322; --warn:#ef8a6f;
+  --grid:rgba(108,192,220,.05); color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--body);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px}
+.wrap{max-width:880px;margin:0 auto;padding-inline:16px;padding-block:32px 120px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:2.3rem;line-height:1.1;letter-spacing:.01em}
+h2{font-size:1.45rem;letter-spacing:.02em;text-transform:uppercase}
+h3{font-size:1.15rem}
+.label{font-family:var(--display);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.dim{font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+p{margin:0}
+.intro{display:grid;gap:12px;margin-bottom:28px}
+.intro p{max-width:65ch;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.85rem}
+.chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem;padding:2px 8px;border-radius:3px}
+.chip.a{background:var(--a-soft);color:var(--a)} .chip.b{background:var(--b-soft);color:var(--b)} .chip.ok{background:var(--ok-soft);color:var(--ok)}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 32px}
+nav.toc a{font-family:var(--display);font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);text-decoration:none;border:1px solid var(--line);background:var(--paper);padding:6px 10px;border-radius:3px}
+nav.toc a:hover,nav.toc a:focus-visible{border-color:var(--a);outline:none}
+section{display:grid;gap:14px;margin-bottom:44px}
+section > header{display:grid;gap:4px;border-bottom:2px solid var(--ink);padding-bottom:8px}
+section > header p{color:var(--muted);font-size:.9rem;max-width:65ch}
+.room{background:var(--paper);border:2px solid var(--ink);padding:16px;display:grid;gap:12px}
+.room.done{border-color:var(--ok)}
+.room-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.room-head h3{text-transform:uppercase;letter-spacing:.04em}
+.status{font-size:.82rem;color:var(--muted);min-width:0}
+.sides{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:620px){.sides{grid-template-columns:1fr}}
+.side{padding:10px 12px;border-left:4px solid;min-width:0;display:grid;gap:4px}
+.side.a{border-color:var(--a);background:var(--a-soft)} .side.b{border-color:var(--b);background:var(--b-soft)}
+.side .chip{justify-self:start;padding:0}
+.review{font-size:.88rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px}
+.review strong{color:var(--ink);font-weight:600}
+.picks{display:flex;flex-wrap:wrap;gap:8px}
+.picks label{cursor:pointer}
+.picks input{position:absolute;opacity:0;pointer-events:none}
+.picks span{display:inline-block;font-family:var(--display);font-weight:600;font-size:.85rem;letter-spacing:.05em;text-transform:uppercase;padding:7px 12px;border:1.5px solid var(--line);border-radius:3px;background:var(--paper)}
+.picks input:focus-visible + span{outline:2px solid var(--a);outline-offset:2px}
+.picks input[value="A"]:checked + span{background:var(--a);border-color:var(--a);color:var(--paper)}
+.picks input[value="B"]:checked + span{background:var(--b);border-color:var(--b);color:var(--paper)}
+.picks input[value="Yes"]:checked + span,.picks input[value="Both"]:checked + span{background:var(--ok);border-color:var(--ok);color:var(--paper)}
+.picks input[value="No"]:checked + span{background:var(--warn);border-color:var(--warn);color:var(--paper)}
+.picks input[value="Discuss"]:checked + span{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+textarea,input[type=text]{width:100%;font:inherit;font-size:.9rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:8px 10px;resize:vertical}
+textarea:focus,input[type=text]:focus{outline:2px solid var(--a);outline-offset:0;border-color:transparent}
+ul.plain{margin:0;padding-left:1.1em;display:grid;gap:6px}
+.resolved{background:var(--paper);border:1px solid var(--line);padding:14px 16px}
+.resolved li{padding-left:2px}
+.resolved .who{font-family:var(--mono);font-size:.72rem;color:var(--ok);white-space:nowrap}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--paper);border-top:2px solid var(--ink);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.bar-in{max-width:880px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.meter{display:flex;align-items:center;gap:10px;font-variant-numeric:tabular-nums;font-size:.9rem}
+.track{width:120px;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.fill{height:100%;background:var(--ok);width:0;transition:width .2s}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+button{font-family:var(--display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.85rem;padding:9px 14px;border-radius:3px;border:2px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer}
+button.ghost{background:transparent;color:var(--ink)}
+button:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.btns{display:flex;gap:8px}
+#out{display:grid;gap:10px}
+#outText{font-family:var(--mono);font-size:.8rem;min-height:220px;background:var(--paper)}
+.toast{font-size:.85rem;color:var(--ok);min-height:1.2em}
+</style>
+
+<div class="wrap">
+  <div class="intro">
+    <span class="label">Homeowner app · planning review · 29 Sep 2026</span>
+    <h1>Homeowner App Plan Review</h1>
+    <p>Two planners wrote independent plans and then critiqued each other. Nothing below has been settled for you. Pick a side on each open disagreement, confirm or reject the places where both plans push back on your idea, and answer the open questions. Then tap <strong>Copy my decisions</strong> and paste the result back into the chat. I'll merge everything into one plan.</p>
+    <div class="legend"><span class="chip a">Plan A · "Hearth"</span><span class="chip b">Plan B · "House OS"</span><span class="chip ok">Settled in peer review</span></div>
+  </div>
+
+  <nav class="toc" aria-label="Sections">
+    <a href="#open">Open decisions</a><a href="#pushback">Pushback on your idea</a><a href="#questions">Your questions</a><a href="#resolved">Already settled</a><a href="#facts">Facts to verify</a><a href="#export">Export</a>
+  </nav>
+
+  <section id="open">
+    <header><span class="label">Section 1 · 12 items</span><h2>Open decisions</h2><p>These disagreements are still open after both peer reviews. Choose A, B, or Discuss, and add a note if you want to.</p></header>
+    <div id="openList"></div>
+  </section>
+
+  <section id="pushback">
+    <header><span class="label">Section 2 · 3 items</span><h2>Where both plans push back on your idea</h2><p>Both planners agreed on these points, but they differ from what you described. Confirm or reject each one.</p></header>
+    <div id="pushList"></div>
+  </section>
+
+  <section id="questions">
+    <header><span class="label">Section 3 · 5 items</span><h2>Questions only you can answer</h2><p>The planners raised these but can't decide them for you.</p></header>
+    <div id="qList"></div>
+  </section>
+
+  <section id="resolved">
+    <header><span class="label">Section 4 · for reference</span><h2>Already settled in peer review</h2><p>One planner conceded to the other on each of these. There's nothing to pick. Add a note only if you disagree.</p></header>
+    <div class="resolved">
+      <ul class="plain">
+        <li>Storage uses SQLite (GRDB) with CloudKit sync, not SwiftData. SwiftData couldn't support household sharing later. <span class="who">A → B</span></li>
+        <li>The floor plan opens on a plain "Plan" view with room names and dimensions, like a listing, before any other view is chosen. <span class="who">A → B</span></li>
+        <li>A 60-second "rough it in" option lets you start with approximate rooms and refine them later. <span class="who">B → A</span></li>
+        <li>Receipt scanning (on-device text recognition) ships in v1. <span class="who">B → A</span></li>
+        <li>An item can belong to a room, a whole floor, or the whole house. <span class="who">B → A</span></li>
+        <li>Items track time (hours) as well as money, since you said "time or money". <span class="who">A → B</span></li>
+        <li>The free tier includes unlimited to-dos, and there's a lifetime-purchase option. <span class="who">A → B</span></li>
+        <li>Doors and windows are display-only in v1, not editable. <span class="who">A → B</span></li>
+        <li>The "+" button sits at the true visual center of L-shaped rooms. There's a list view for VoiceOver users and a CSV export. <span class="who">both</span></li>
+      </ul>
+      <label class="label" for="resolvedNote" style="display:block;margin-top:12px">Disagree with any of these?</label>
+      <textarea id="resolvedNote" rows="2" placeholder="Optional"></textarea>
+    </div>
+  </section>
+
+  <section id="facts">
+    <header><span class="label">Section 5 · for reference</span><h2>Facts to verify before building</h2><p>The planners flagged each other's claims, but neither checked live sources.</p></header>
+    <div class="resolved">
+      <ul class="plain">
+        <li>Whether SwiftData can support shared (household) CloudKit data. B says no, and A agreed.</li>
+        <li>Plan A said Sign in with Apple is "implicit" with iCloud. B says they're separate, and CloudKit just needs no sign-in.</li>
+        <li>Whether Regrid (parcel data) has a free tier usable in a commercial app.</li>
+        <li>Apple's terms on storing Apple Maps satellite snapshots long-term. This affects B's yard plan.</li>
+        <li>The Microsoft Building Footprints license (ODbL) and the effort to host ~130M US outlines. This also affects B's yard plan.</li>
+        <li>Whether B's plan drawing can export straight to PDF. A says it needs an extra rendering step.</li>
+        <li>Bright MLS access rules, and how often listings include floor plans. Both plans rely on their own knowledge, not live sources.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="export">
+    <header><span class="label">Export</span><h2>Your decisions</h2><p>This text updates as you choose. Copy it and paste it into the chat.</p></header>
+    <div id="out">
+      <label class="label" for="outText">Summary to paste back</label>
+      <textarea id="outText" readonly></textarea>
+      <div class="btns"><button type="button" id="copy2">Copy my decisions</button><button type="button" class="ghost" id="reset">Clear all picks</button></div>
+      <div class="toast" id="toast2" role="status"></div>
+    </div>
+  </section>
+</div>
+
+<div class="bar"><div class="bar-in">
+  <div class="meter"><div class="track"><div class="fill" id="fill"></div></div><span id="count">0 of 20 answered</span></div>
+  <div class="btns"><button type="button" id="copy">Copy my decisions</button></div>
+</div></div>
+
+<script>
+const OPEN=[
+ {id:"layers",t:"How many views in the dropdown for v1",dim:"Core UI",
+  a:"5 views: To-Dos, Future Projects, Past Work, Inventory (includes appliances and systems), and Budget. Furniture, Yard Inventory and Landscaping come in v1.1.",
+  b:"9 views: Plan (default), To-dos, Planned, History, Budget, Furniture, Inventory, Appliances & Systems, and Plants & Landscaping.",
+  r:"<strong>Still split.</strong> A says five distinct views beat nine that look alike. B says you named furniture, yard and landscaping as \"the core of the product\"."},
+ {id:"convert",t:"Turning a to-do into a completed improvement",dim:"Data model",
+  a:"Two linked records: the original to-do, plus a separate \"past work\" entry that resolves it.",
+  b:"One record whose status changes from planned to in progress to done.",
+  r:"<strong>A tie.</strong> Each planner switched to the other's view in review. A now likes B's single record (simpler; photos and costs stay together). B now likes A's linked pair (keeps the audit trail)."},
+ {id:"yard",t:"Yard and exterior setup in v1",dim:"Onboarding",
+  a:"Template zones (front yard, backyard, side yards, driveway, sidewalk) around a gray house box. The satellite image and automatic house outline come in v1.1.",
+  b:"Place your house outline automatically from free Microsoft/OpenStreetMap data, over an Apple Maps satellite image of your address. You trace the lot on top.",
+  r:"<strong>Still split.</strong> B says this is what makes the yard look like <em>your</em> yard. A points to the data-hosting effort, license obligations, and unverified Apple terms on stored satellite images."},
+ {id:"server",t:"Does v1 need any server?",dim:"Infrastructure",
+  a:"No server at all. Everything lives on the phone and in the user's iCloud.",
+  b:"One small server with no user data, for the house-outline lookup and template updates.",
+  r:"This follows from the yard decision above."},
+ {id:"paywall",t:"Should budget totals be behind the paywall?",dim:"Pricing",
+  a:"No. Room, floor and property budget totals are the core value, so charge for storage, reminders, reports and sharing instead.",
+  b:"Budget drill-downs are part of Pro ($4.99/mo or $39.99/yr).",
+  r:"A raised this, and B didn't respond."},
+ {id:"timeline",t:"Timeline to v1 launch",dim:"Schedule",
+  a:"About 22 weeks.",b:"About 17 weeks, with a larger scope.",
+  r:"<strong>Both reviews</strong> say A's 22 weeks is more realistic. Your pick mostly signals how much scope you'd trade for speed."},
+ {id:"roomplan",t:"When to test the iPhone room scan",dim:"Risk",
+  a:"First a clickable Figma prototype tested with 5 homeowners. The room scan is built around weeks 14–17.",
+  b:"Build a working room-scan prototype in week 1, since it's the hardest technical risk.",
+  r:"B's review suggests doing both: Figma for the experience, plus an early scan prototype. Choose \"Both\" for that."},
+ {id:"ios",t:"Minimum iOS version",dim:"Tech",
+  a:"iOS 17. It reaches more phones, and nothing needs 18.",b:"iOS 18. There are fewer devices to test.",r:"Minor. Still split."},
+ {id:"sharing",t:"Household sharing (spouse or partner)",dim:"Roadmap",
+  a:"Second update after launch (v1.2).",b:"First update after launch (v1.1). Spouses co-own houses.",r:"You could also ask for it in v1. Put that in the note."},
+ {id:"ipad",t:"iPad support",dim:"Roadmap",
+  a:"Second update after launch (v1.2).",b:"At launch. It's nearly free with the same SwiftUI code.",r:"Minor."},
+ {id:"defaultfloor",t:"Which floor the app opens on",dim:"Core UI",
+  a:"The last floor you viewed.",b:"Always the ground floor.",r:"You said ground floor. B flagged A for drifting from that."},
+ {id:"swipe",t:"Swipe to change floors",dim:"Core UI",
+  a:"Pill tabs, plus swiping left or right on the plan.",b:"Pill tabs only. Swiping conflicts with dragging the plan around.",r:"Minor UX."}
+];
+const PUSH=[
+ {id:"mls",t:"No automatic floor plans from Bright MLS or public listings",
+  d:"MLS data is licensed to brokers, and listing floor plans are copyrighted by the photographer. Most homes don't have one anyway. Instead you create your plan by LiDAR room scan (Pro iPhones), drag-and-drop room blocks with typed dimensions, tracing a photo of a plan you already have, or a 60-second rough version. A later partnership where agents gift the app to buyers at closing is the only legitimate MLS route."},
+ {id:"pantry",t:"Pantry and clothing inventory get no dedicated screens",
+  d:"You can still log them as generic inventory items. Both planners call them a different, high-upkeep product that dilutes the house focus."},
+ {id:"iosonly",t:"iPhone only, with data in the user's iCloud",
+  d:"v1 has no Android, no web version and no account sign-up. Privacy is a selling point, but a web or Android version later means migrating the data."}
+];
+const QS=[
+ {id:"user",t:"Who is the target user?",h:"Both plans recommend new homebuyers in their first ~24 months, over long-time owners."},
+ {id:"accuracy",t:"Exact dimensions or recognizable?",h:"Should the v1 floor plan be accurate to the inch, or just look like your house, with dimensions editable later?"},
+ {id:"report",t:"Is a Home History Report a headline feature?",h:"A PDF of improvements, costs and systems for resale or insurance. It could be the main marketing hook or a side feature."},
+ {id:"brokers",t:"Open to real estate agent partnerships later?",h:"Agents gift the app to buyers at closing with the listing floor plan pre-loaded. It's also a distribution channel."},
+ {id:"ai",t:"OK with AI features that upload home photos?",h:"Features like photo-to-floor-plan or remodel planning need photos sent to a server. This affects the privacy positioning."}
+];
+const KEY="hoa-review-v1";let S={};
+try{S=JSON.parse(localStorage.getItem(KEY)||"{}")||{}}catch(e){S={}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function picks(id,opts){return `<div class="picks" role="radiogroup" aria-label="Your pick">${opts.map(o=>`<label><input type="radio" name="p-${id}" id="p-${id}-${o.v}" value="${o.v}"><span>${o.l}</span></label>`).join("")}</div>`}
+function note(id,ph){return `<textarea id="n-${id}" rows="2" placeholder="${ph||"Note (optional)"}"></textarea>`}
+document.getElementById("openList").innerHTML=OPEN.map((o,i)=>`
+ <article class="room" data-id="${o.id}">
+  <div class="room-head"><h3>${i+1}. ${o.t}</h3><span class="dim">${o.dim}</span></div>
+  <div class="sides"><div class="side a"><span class="chip a">Plan A</span><p>${o.a}</p></div><div class="side b"><span class="chip b">Plan B</span><p>${o.b}</p></div></div>
+  <p class="review">${o.r}</p>
+  ${picks(o.id,[{v:"A",l:"Go with A"},{v:"B",l:"Go with B"},...(o.id==="roomplan"?[{v:"Both",l:"Both"}]:[]),{v:"Discuss",l:"Discuss"}])}
+  ${note(o.id)}
+ </article>`).join("");
+document.getElementById("pushList").innerHTML=PUSH.map(o=>`
+ <article class="room" data-id="${o.id}">
+  <div class="room-head"><h3>${o.t}</h3><span class="chip ok">A + B agree</span></div>
+  <p>${o.d}</p>
+  ${picks(o.id,[{v:"Yes",l:"Agree"},{v:"No",l:"Disagree"},{v:"Discuss",l:"Discuss"}])}
+  ${note(o.id)}
+ </article>`).join("");
+document.getElementById("qList").innerHTML=QS.map(o=>`
+ <article class="room" data-id="${o.id}">
+  <div class="room-head"><h3>${o.t}</h3></div>
+  <p class="status">${o.h}</p>
+  <input type="text" id="n-${o.id}" placeholder="Your answer" aria-label="${esc(o.t)}">
+ </article>`).join("");
+
+function restore(){
+  document.querySelectorAll("input[type=radio]").forEach(r=>{const id=r.name.slice(2);r.checked=S[id]===r.value});
+  document.querySelectorAll("textarea[id^=n-],input[type=text][id^=n-]").forEach(t=>{t.value=S["n:"+t.id.slice(2)]||""});
+  const rn=document.getElementById("resolvedNote");rn.value=S["n:resolved"]||"";
+}
+function answered(){
+  let n=0;OPEN.concat(PUSH).forEach(o=>{if(S[o.id])n++});QS.forEach(q=>{if((S["n:"+q.id]||"").trim())n++});return n;
+}
+function render(){
+  const total=OPEN.length+PUSH.length+QS.length,n=answered();
+  document.getElementById("count").textContent=`${n} of ${total} answered`;
+  document.getElementById("fill").style.width=(n/total*100)+"%";
+  document.querySelectorAll(".room").forEach(el=>{const id=el.dataset.id;const q=QS.find(x=>x.id===id);
+    el.classList.toggle("done",q?!!(S["n:"+id]||"").trim():!!S[id])});
+  const lbl={A:"Plan A",B:"Plan B",Both:"Both",Discuss:"Discuss",Yes:"Agree",No:"Disagree"};
+  const line=(t,p,nt)=>`- ${t}: ${p?lbl[p]:"(no pick)"}${nt&&nt.trim()?` — ${nt.trim()}`:""}`;
+  let out="Homeowner app — my decisions\n\nOPEN DECISIONS\n"+OPEN.map((o,i)=>line(`${i+1}. ${o.t}`,S[o.id],S["n:"+o.id])).join("\n");
+  out+="\n\nPUSHBACK ON MY IDEA\n"+PUSH.map(o=>line(o.t,S[o.id],S["n:"+o.id])).join("\n");
+  out+="\n\nMY ANSWERS\n"+QS.map(q=>`- ${q.t} ${(S["n:"+q.id]||"").trim()||"(no answer)"}`).join("\n");
+  if((S["n:resolved"]||"").trim())out+="\n\nON THE SETTLED ITEMS\n"+S["n:resolved"].trim();
+  document.getElementById("outText").value=out;
+}
+document.addEventListener("change",e=>{if(e.target.type==="radio"){S[e.target.name.slice(2)]=e.target.value;save();render()}});
+document.addEventListener("input",e=>{const t=e.target;if(t.id==="resolvedNote"){S["n:resolved"]=t.value}else if(t.id&&t.id.startsWith("n-")){S["n:"+t.id.slice(2)]=t.value}else return;save();render()});
+async function copy(){const ta=document.getElementById("outText");const msg=document.getElementById("toast2");
+  try{await navigator.clipboard.writeText(ta.value);msg.textContent="Copied. Paste it into the chat."}
+  catch(e){ta.focus();ta.select();msg.textContent="Copy was blocked. The text is selected, so copy it manually."}
+  document.getElementById("export").scrollIntoView({behavior:"smooth",block:"start"})}
+document.getElementById("copy").addEventListener("click",copy);
+document.getElementById("copy2").addEventListener("click",copy);
+let armed=false;const rb=document.getElementById("reset");
+rb.addEventListener("click",()=>{if(!armed){armed=true;rb.textContent="Tap again to clear";setTimeout(()=>{armed=false;rb.textContent="Clear all picks"},3000);return}
+  S={};save();restore();render();armed=false;rb.textContent="Clear all picks"});
+restore();render();
+</script>
