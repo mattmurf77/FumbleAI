@@ -1,16 +1,14 @@
 import Foundation
 import HomeCore
-#if canImport(UserNotifications)
-import UserNotifications
-#endif
-#if canImport(EventKit)
-import EventKit
-#endif
 
-// HomeSchedule — reminders and calendar (LLD §9.3–9.5). Owner fills: ReminderScheduler (actor, conforms to
-// HomeCore.ReminderScheduling + NotificationAuthorizing; diffs NotificationPlanner output against pending
-// requests), NotificationCenterProtocol, NotificationActions (CHORE_DUE: DONE / SNOOZE_1H), CalendarSync
-// (actor, HomeCore.CalendarSyncing), CalendarStoreProtocol, RecurrenceToEK.
+// HomeSchedule — reminders and calendar (LLD §9.3–9.5).
+//
+// - `ReminderScheduler` (actor): `ReminderScheduling` + `NotificationAuthorizing`. Diffs `NotificationPlanner`
+//   output against pending requests (`NotificationCenterProtocol`; live `UserNotificationCenterClient`).
+// - `NotificationActions` / `NotificationActionHandler`: CHORE_DUE actions DONE / SNOOZE_1H and body taps.
+// - `CalendarSync` (actor): `CalendarSyncing` over `CalendarStoreProtocol` (live `EventKitCalendarStore`).
+// - `RecurrenceToEK`, `CalendarEventSpec`, `NotificationDiff`: pure mapping / diff logic (tested on Linux).
+// - `KeychainDeviceIdentity`: owner-device id for the calendar model.
 // Data access goes through HomeCore protocols (ChoreRepository etc.), injected by the app.
 
 public enum HomeScheduleModule {

@@ -1,0 +1,23 @@
+{
+ "error": "no_building",
+ "building": null,
+ "roads": [
+  {
+   "osmId": 2001,
+   "name": "Elm St",
+   "highway": "residential",
+   "distanceM": 17.2,
+   "polyline": [
+    [
+     40.00018087,
+     -75.00093813
+    ],
+    [
+     40.00018087,
+     -74.99906187
+    ]
+   ]
+  }
+ ],
+ "candidateCount": 0
+}

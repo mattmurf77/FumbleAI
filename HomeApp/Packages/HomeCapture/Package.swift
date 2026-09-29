@@ -15,7 +15,8 @@ let package = Package(
     ],
     targets: [
         .target(name: "HomeCapture", dependencies: [.product(name: "PlanKit", package: "PlanKit"), .product(name: "HomeCore", package: "HomeCore")]),
-        .testTarget(name: "HomeCaptureTests", dependencies: ["HomeCapture", .product(name: "HomeCoreTesting", package: "HomeCore")]),
+        .testTarget(name: "HomeCaptureTests", dependencies: ["HomeCapture", .product(name: "HomeCoreTesting", package: "HomeCore")],
+                    resources: [.copy("Fixtures")]),
     ],
     swiftLanguageVersions: [.v5]
 )
