@@ -40,6 +40,11 @@ public enum LensFormat {
         return "\(m) ’\(String(format: "%02d", d.year % 100))"
     }
 
+    /// "Oct 2".
+    public static func monthDay(_ d: LocalDate) -> String {
+        "\(monthNames[max(0, min(11, d.month - 1))]) \(d.day)"
+    }
+
     /// "1,240 sq ft" / "115 m²".
     public static func area(_ sqIn: Double, system: UnitSystem) -> String {
         HomeLengthFormatter.formatArea(squareInches: sqIn, system: system)

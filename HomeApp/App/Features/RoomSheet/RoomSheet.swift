@@ -2,6 +2,7 @@ import SwiftUI
 import PlanKit
 import HomeCore
 import PlanCanvas
+import HomeCoreTesting
 
 /// The sheet that slides up when a room is tapped (spec 02 FR-CNV-40…43, mockup 3.3). Its body follows the active
 /// view: Plan (details, measurements, counts), To-Dos (Overdue/Today/This week/Later with completion circles),
@@ -22,6 +23,7 @@ struct RoomSheet: View {
     @State private var renaming = false
     @State private var renameText = ""
     @State private var completeError: String?
+    @State private var openItem: ItemSheetRef?
 
     /// A room.
     init(spaceId: UUID, lens: LensID? = nil, onEditShape: ((UUID) -> Void)? = nil) {
@@ -79,7 +81,12 @@ struct RoomSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .navigationDestination(for: ItemRef.self) { ref in ItemDetailRouter(ref: ref) }
+            .navigationDestination(for: ItemRef.self) { ref in
+                switch ref {
+                case .chore(let id): ChoreDetailView(choreID: id)
+                default: ItemDetailRouter(ref: ref)
+                }
+            }
             .overlay {
                 if model.missing {
                     ContentUnavailableView("Room not found", systemImage: "questionmark.square.dashed",
@@ -88,6 +95,7 @@ struct RoomSheet: View {
             }
         }
         .task(id: spaceId ?? fixedScope?.levelId) { await model.run(env: env, spaceId: spaceId, scope: fixedScope) }
+        .sheet(item: $openItem) { item in ItemDetailRouter(ref: item.ref) }
         .sheet(item: $addRequest) { r in
             AddPicker(spaceID: r.spaceID, levelID: r.levelID, preselected: r.preselected, placeName: r.placeName)
         }
@@ -152,6 +160,24 @@ struct RoomSheet: View {
         Task { try? await env.plan.renameSpace(id, to: name) }
     }
 
+    /// Chores push their detail screen; other items open their (self-contained, modal) edit form.
+    @ViewBuilder
+    private func itemLink<Content: View>(_ ref: ItemRef, @ViewBuilder _ content: () -> Content) -> some View {
+        switch ref {
+        case .chore:
+            NavigationLink(value: ref) { content() }
+        default:
+            Button { openItem = ItemSheetRef(ref: ref) } label: {
+                HStack(spacing: 6) {
+                    content()
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private func empty(_ text: String) -> some View {
         Text(text).font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 6)
     }
@@ -179,7 +205,7 @@ struct RoomSheet: View {
                     empty("No measurements. Measure openings, walls and doors for fit checks.")
                 } else {
                     ForEach(model.measurements) { m in
-                        NavigationLink(value: ItemRef.measurement(m.id)) {
+                        itemLink(.measurement(m.id)) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(m.label)
                                 Text(measurementLine(m)).font(.subheadline).foregroundStyle(.secondary)
@@ -258,7 +284,7 @@ struct RoomSheet: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Complete \(c.title)")
-            NavigationLink(value: ItemRef.chore(c.id)) {
+            itemLink(.chore(c.id)) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(c.title).lineLimit(2)
@@ -297,7 +323,7 @@ struct RoomSheet: View {
         if d == 1 { return "Tomorrow" }
         let names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
         if d < 7 { return "\(names[(due.weekday - 1) % 7]) \(due.day)" }
-        return "\(LensFormat.monthNamesShort[due.month - 1]) \(due.day)"
+        return LensFormat.monthDay(due)
     }
 
     private func complete(_ c: Chore) {
@@ -316,7 +342,7 @@ struct RoomSheet: View {
                 empty("No planned projects. Add an idea with a rough estimate. You can refine it later.")
             } else {
                 ForEach(ps) { p in
-                    NavigationLink(value: ItemRef.project(p.id)) {
+                    itemLink(.project(p.id)) {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(p.title)
@@ -354,7 +380,7 @@ struct RoomSheet: View {
                 empty("No past work logged. Log finished work with its cost, date and receipt.")
             } else {
                 ForEach(ps) { p in
-                    NavigationLink(value: ItemRef.project(p.id)) {
+                    itemLink(.project(p.id)) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(p.title)
@@ -381,10 +407,10 @@ struct RoomSheet: View {
         if model.things.isEmpty {
             Section { empty("Nothing tracked here. Add appliances, bulbs, filters or furniture.") }
         }
-        ForEach(model.thingsByCategory, id: \.0) { cat, list in
-            Section(categoryTitle(cat)) {
-                ForEach(list) { t in
-                    NavigationLink(value: ItemRef.thing(t.id)) {
+        ForEach(model.thingsByCategory) { group in
+            Section(categoryTitle(group.category)) {
+                ForEach(group.things) { t in
+                    itemLink(.thing(t.id)) {
                         HStack(spacing: 12) {
                             Image(systemName: planSymbolName(t.symbol)).foregroundStyle(theme.accent).frame(width: 26)
                             VStack(alignment: .leading, spacing: 2) {
@@ -438,7 +464,7 @@ struct RoomSheet: View {
     }
 
     private func itemRow(_ item: InventoryItem) -> some View {
-        NavigationLink(value: ItemRef.inventory(item.id)) {
+        itemLink(.inventory(item.id)) {
             HStack {
                 Text(item.name)
                 Spacer()
@@ -480,7 +506,7 @@ struct RoomSheet: View {
             }
             Section("Projects") {
                 ForEach(model.projects.sorted { $0.title < $1.title }) { p in
-                    NavigationLink(value: ItemRef.project(p.id)) {
+                    itemLink(.project(p.id)) {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) { Text(p.title); statusTag(p.status) }
                             Spacer()
@@ -531,13 +557,18 @@ private struct SpotTreeRow: View {
     }
 }
 
-/// Opens an item from a room-sheet row. INTEGRATION: swap the edit forms for dedicated detail screens as the
-/// owning features add them (only chores have one today).
+struct ItemSheetRef: Identifiable, Hashable {
+    let ref: ItemRef
+    var id: ItemRef { ref }
+}
+
+/// Opens a non-chore item from a room-sheet row, modally. INTEGRATION: swap the edit forms for dedicated detail
+/// screens as the owning features add them (only chores have a pushable detail screen today).
 struct ItemDetailRouter: View {
     let ref: ItemRef
     var body: some View {
         switch ref {
-        case .chore(let id): ChoreDetailView(choreID: id)
+        case .chore(let id): NavigationStack { ChoreDetailView(choreID: id) }
         case .project(let id): ProjectForm(projectID: id)
         case .thing(let id): ThingForm(thingID: id)
         case .inventory(let id): InventoryForm(itemID: id)
@@ -547,9 +578,7 @@ struct ItemDetailRouter: View {
 }
 
 #Preview("Kitchen · To-Dos") {
-    let env = AppEnvironment.preview()
-    env.selectedLens = .todos
-    return RoomSheet(spaceId: SampleHome.kitchenId).environment(env)
+    RoomSheet(spaceId: SampleHome.kitchenId, lens: .todos).environment(AppEnvironment.preview())
 }
 
 #Preview("Kitchen · Plan") {

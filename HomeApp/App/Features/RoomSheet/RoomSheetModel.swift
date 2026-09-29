@@ -130,10 +130,16 @@ final class RoomSheetModel {
 
     var lifetimeCents: Int64 { rollup?.lifetimeCents ?? 0 }
 
-    var thingsByCategory: [(Thing.Category, [Thing])] {
+    struct ThingGroup: Identifiable {
+        let category: Thing.Category
+        let things: [Thing]
+        var id: String { category.rawValue }
+    }
+
+    var thingsByCategory: [ThingGroup] {
         let order: [Thing.Category] = [.appliance, .electronic, .furniture, .fixture, .system, .unknown]
         let grouped = Dictionary(grouping: things, by: \.category)
-        return order.compactMap { c in grouped[c].map { (c, $0.sorted { $0.name < $1.name }) } }
+        return order.compactMap { c in grouped[c].map { ThingGroup(category: c, things: $0.sorted { $0.name < $1.name }) } }
     }
 
     var looseItems: [InventoryItem] { items.filter { $0.storageSpotId == nil } }
