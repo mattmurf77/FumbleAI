@@ -96,7 +96,8 @@ public struct Painter {
 
     // MARK: Pieces
 
-    func path(_ poly: Polygon, _ v: Viewport) -> Path {
+    // `PlanKit.` qualified: on macOS, SwiftUI pulls in Quickdraw whose C typedefs `Polygon`/`Rect` clash.
+    func path(_ poly: PlanKit.Polygon, _ v: Viewport) -> Path {
         var p = Path()
         let pts = poly.vertices.map { v.toScreen($0) }
         guard let first = pts.first else { return p }
@@ -106,7 +107,7 @@ public struct Painter {
         return p
     }
 
-    func segmentBounds(_ s: Segment) -> Rect { Rect(points: [s.a, s.b]).expanded(by: 12) }
+    func segmentBounds(_ s: Segment) -> PlanKit.Rect { PlanKit.Rect(points: [s.a, s.b]).expanded(by: 12) }
 
     /// A wall as filled quads between opening gaps; the outer ends extend by half the width so corners join.
     func drawWall(_ ctx: inout GraphicsContext, _ w: WallSegment, _ v: Viewport, width: Double, dashed: Bool) {

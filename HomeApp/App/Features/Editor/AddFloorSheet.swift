@@ -96,7 +96,7 @@ struct AddFloorSheet: View {
         if startWithRoom {
             let exterior = kind == .exterior
             spaces = [SpaceDraft(name: exterior ? "Zone" : "Room", spaceType: exterior ? .customZone : .room, isExterior: exterior,
-                                 polygon: Polygon(rect: Rect(x: 0, y: 0, width: 144, height: 144)), source: .manual)]
+                                 polygon: PlanKit.Polygon(rect: PlanKit.Rect(x: 0, y: 0, width: 144, height: 144)), source: .manual)]
         }
         let draft = PlanDraft(levels: [LevelDraft(name: levelName, kind: kind, sortOrder: sortOrder, spaces: spaces)], source: .manual)
         do {

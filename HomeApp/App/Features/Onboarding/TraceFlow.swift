@@ -415,15 +415,15 @@ struct TraceRoomsView: View {
     }
 
     static func snap(_ v: Vec2) -> Vec2 { Vec2(Geometry.snap(v.x, to: grid), Geometry.snap(v.y, to: grid)) }
-    static func rect(_ a: Vec2, _ b: Vec2) -> Rect {
-        Rect(minX: min(a.x, b.x), minY: min(a.y, b.y), maxX: max(a.x, b.x), maxY: max(a.y, b.y))
+    static func rect(_ a: Vec2, _ b: Vec2) -> PlanKit.Rect {
+        PlanKit.Rect(minX: min(a.x, b.x), minY: min(a.y, b.y), maxX: max(a.x, b.x), maxY: max(a.y, b.y))
     }
 
     private func addRoom() {
         defer { dragStart = nil; dragEnd = nil }
         guard let a = dragStart, let b = dragEnd else { return }
         let r = Self.rect(a, b)
-        guard r.width >= 24, r.height >= 24, let poly = try? Polygon(r.corners) else {
+        guard r.width >= 24, r.height >= 24, let poly = try? PlanKit.Polygon(r.corners) else {
             message = "That's too small for a room."; return
         }
         if trace.rooms.contains(where: { Clip.intersectionArea($0.polygon, poly) > Tolerance.maxInteriorOverlap }) {
