@@ -33,6 +33,8 @@
 | — | Platform | iPhone only, with data in iCloud | Founder agreed |
 | — | Measurements | **Exact measurements are a first-class feature**: appliance openings, doors, and yard beds | Founder (new) |
 | — | Target user | New homebuyers first, but useful to existing owners | Founder |
+| — | Chore reminders | Push notifications plus calendar events (Apple and Google Calendar) | Founder |
+| — | Public records | Parked | Founder |
 | — | Home History Report | A headline feature, but **not in v1** | Founder |
 | — | AI with home photos | Allowed, but after v1 | Founder |
 
@@ -76,6 +78,13 @@ The founder separated two ideas the planners had merged.
   - Each has an optional **assignee** (a housemate) and a **room**.
   - Completing one logs the completion and schedules the next due date. There is no cost, and chores never enter Budget.
   - A chore can **link to an appliance**. For example, "Change filter" links to the furnace, so the app knows the filter size and when it was last done.
+- **Reminders and calendar (founder decision):**
+  - Every chore can send a **push notification** when it's due. These are local notifications scheduled by the phone, so no server is needed. Each chore has its own on/off switch and time. When a chore is completed, the next reminder is scheduled.
+  - Every chore can also be **added to a calendar** as an event, which repeats if the chore repeats.
+    - **Apple Calendar:** uses Apple's built-in calendar access (EventKit) on the phone.
+    - **Google Calendar:** if the user's Google account is already added in iPhone Settings › Calendar › Accounts, the same EventKit path writes straight into their Google calendar. There's no Google sign-in and no server. This covers v1.
+    - **Direct Google sign-in** (for people who haven't added Google to the iPhone) would need Google's OAuth approval process and is deferred.
+  - Users choose which calendar to use (a "Home" calendar is suggested). Editing or deleting the chore updates or removes the event, and completing it doesn't delete past occurrences.
 - **Improvements go from Future Projects to Past Work.** This is **one record with a status**: Idea → Planned → In Progress → Done. Marking it Done moves it from Future Projects to Past Work and asks for the actual cost, date and receipt.
   - *Why one record:* the peer review tied on this. Now that to-dos are a separate kind, the "linked pair" argument (keep the to-do that led to the work) mostly goes away.
   - The estimate is kept alongside the actual, so the Home History Report can later show "planned $4k, spent $4.6k".
@@ -101,13 +110,9 @@ Four ways, all producing the same editable geometry:
 
 **For 2–5 users:** query OpenStreetMap's free Overpass API directly from the phone. There is no need to host 130M footprints. Hosting the Microsoft dataset only matters at public scale.
 
-### "Wait and see on public record data"
+### Public records: parked
 
-The founder wants to see how good public records are before deciding between exact and recognizable plans.
-
-- **Expectation:** county assessor records give total square footage, number of stories, bedrooms and bathrooms, year built, and sometimes an exterior sketch with wall lengths. They almost never give room dimensions.
-- **So:** the plan doesn't depend on them. Assessor square footage is used as a check ("your drawn plan totals 1,950 sq ft, the county says 2,100").
-- **Planning action:** look up the 2–5 test homes on their county assessor sites and record what each one actually offers. See the open questions in §9.
+The founder parked the public-record search (2026-09-29). Plans are built only from the four creation paths above. Assessor data can come back later as a square-footage sanity check.
 
 ---
 
@@ -202,7 +207,7 @@ Four tables with a shared `Attachment` and search index are clearer than one tab
 - **Plan drawing:** SwiftUI `Canvas`, redrawn from the model at every zoom level so lines and text stay sharp. Buttons and chips sit on top as SwiftUI views.
 - **Storage:** SQLite via GRDB on the phone, synced through `CKSyncEngine` to the user's private iCloud database. No sign-in screen. Each person's data lives in their own iCloud.
 - **Server:** none required for v1. Keep the **Render account in reserve** for these later features, all stateless:
-  1. a footprint or public-record lookup proxy, if calling Overpass directly becomes a problem
+  1. a footprint lookup proxy, if calling Overpass directly becomes a problem
   2. AI features (photo-to-plan, remodel ideas), which the founder has approved
   3. the Home History Report web link
 - **Distribution:** TestFlight for 2–5 testers.
@@ -210,7 +215,8 @@ Four tables with a shared `Attachment` and search index are clearer than one tab
   - RoomPlan (scan)
   - MapKit (satellite snapshot)
   - VisionKit and Vision (plan photos, receipt text)
-  - UserNotifications (chore and filter reminders)
+  - UserNotifications (chore and filter reminders, scheduled on the phone, so no server needed)
+  - EventKit (adding chores to the calendars on the phone, which can include Google Calendar)
 
 ---
 
@@ -218,9 +224,9 @@ Four tables with a shared `Attachment` and search index are clearer than one tab
 
 | Phase | Contents |
 |---|---|
-| **0. Design** | Figma mockups of the canvas, the seven views, the "+" flow, the room sheet, measurements and storage locations. Walk the 2–5 testers through them. Check assessor records for the test homes. |
+| **0. Design** | Figma mockups of the canvas, the seven views, the "+" flow, the room sheet, measurements and storage locations. Walk the 2–5 testers through them. |
 | **1. Plan core** | Geometry model; the four creation paths; floor pills; exterior auto-seed on satellite; room rename; Settings (default floor). |
-| **2. Tracking core** | Chores with repeats; Projects with status and costs; Things with templates (bulbs, filters, appliances); Measurements with fit check; Budget rollups; receipt scanning; search; CSV export. |
+| **2. Tracking core** | Chores with repeats, push reminders and Apple/Google calendar events; Projects with status and costs; Things with templates (bulbs, filters, appliances); Measurements with fit check; Budget rollups; receipt scanning; search; CSV export. |
 | **3. Inventory** | Storage spots, housemates, clothing with the seasonal swap view, pantry with the shopping list. |
 | **4. TestFlight** | iCloud sync hardening, then 2–5 testers. Then test swipe-to-change-floors (decision #12). |
 | **v1.2** | Household sharing across devices, iPad. |
@@ -234,15 +240,16 @@ Four tables with a shared `Attachment` and search index are clearer than one tab
 
 ---
 
-## 10. Still open (need the founder)
+## 10. Founder answers (2026-09-29, round 2)
 
-1. **Which counties** are the 2–5 test homes in? This is needed for the public-record check in §4.
-2. **Chore reminders:** should repeating chores send push notifications, or only show up in the To-Dos view?
-3. **Housemates without accounts:** v1 treats housemates as labels on one person's phone. Is it OK that only the phone owner can check things off until sharing arrives in v1.2? For a 2–5 person test, sharing could move up if it matters.
-4. **Where do bulbs and filters live?** They are listed under Appliances, Electronics & Furniture, but a stock of spare bulbs is arguably Inventory. The proposal is that the fixture spec lives with Things and spare stock is an Inventory item linked to it. Confirm.
+1. **Public-record search:** parked (see §4).
+2. **Chore reminders:** push notifications **and** calendar events for Apple and Google Calendar (see §3).
+3. **Housemates as labels until sharing in v1.2:** OK.
+4. **Bulbs and filters:** the fixture or appliance spec lives with Appliances/Electronics/Furniture; spare stock is an Inventory item linked to it. Confirmed.
+
+Nothing is open for the founder right now.
 
 ## 11. Facts still to verify before building
 
 - Apple's terms for storing Apple Maps satellite snapshots long-term. This is low risk for 5 testers; check before any public release.
 - OpenStreetMap Overpass usage policy. It's fine for a handful of users; public scale needs the hosted Microsoft dataset or a paid API.
-- What assessor data exists for the test homes (§4).
