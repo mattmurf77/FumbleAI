@@ -59,12 +59,14 @@ public struct Dims3: Hashable, Codable, Sendable {
     public var known: [Double] { [width, depth, height].compactMap { $0 } }
     /// "32 × 40 in" style text (known dims only).
     public func formatted(system: UnitSystem = .imperial) -> String {
-        known.map { LengthFormatter.formatInches($0, system: system) }.joined(separator: " × ")
+        known.map { HomeLengthFormatter.formatInches($0, system: system) }.joined(separator: " × ")
     }
 }
 
 /// A measurement: an opening, wall, door, window, zone or general spot. LLD §3.2 `measurement`.
-public struct Measurement: SyncedModel {
+/// Named `Measurement` in the LLD; renamed because `Foundation.Measurement` makes the bare name ambiguous in every
+/// module that imports both Foundation and HomeCore.
+public struct HomeMeasurement: SyncedModel {
     public static let recordType = RecordType.measurement
     public enum Kind: String, ForwardCompatibleEnum {
         case opening, wall, door, window, zone, general, unknown

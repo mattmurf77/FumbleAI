@@ -7,7 +7,7 @@ public enum UnitSystem: String, ForwardCompatibleEnum {
 }
 
 /// Formats and parses lengths/areas. Storage is always inches (LLD §1); display follows `UnitSystem`.
-public enum LengthFormatter {
+public enum HomeLengthFormatter {
     public static let inchesPerMeter = 39.3701
 
     /// `12'4"` (imperial, nearest inch) or `3.76 m` / `85 cm` (metric).

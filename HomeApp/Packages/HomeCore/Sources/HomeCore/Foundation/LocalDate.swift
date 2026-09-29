@@ -103,7 +103,7 @@ public struct LocalDate: Hashable, Comparable, Sendable, CustomStringConvertible
         DateComponents(year: year, month: month, day: day, hour: minutes / 60, minute: minutes % 60)
     }
 
-    public static func today(_ clock: Clock) -> LocalDate { LocalDate(clock.now, calendar: clock.calendar) }
+    public static func today(_ clock: HomeClock) -> LocalDate { LocalDate(clock.now, calendar: clock.calendar) }
 
     public var description: String {
         let y = String(format: "%04d", year), m = String(format: "%02d", month), d = String(format: "%02d", day)

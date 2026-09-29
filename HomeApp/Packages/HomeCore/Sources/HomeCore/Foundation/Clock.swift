@@ -1,17 +1,17 @@
 import Foundation
 
 /// Injected time source. LLD §14.
-public protocol Clock: Sendable {
+public protocol HomeClock: Sendable {
     var now: Date { get }
     var calendar: Calendar { get }
 }
 
-public extension Clock {
+public extension HomeClock {
     var today: LocalDate { LocalDate(now, calendar: calendar) }
 }
 
 /// Wall clock with the user's current Gregorian calendar.
-public struct SystemClock: Clock {
+public struct SystemClock: HomeClock {
     public init() {}
     public var now: Date { Date() }
     public var calendar: Calendar {
@@ -23,7 +23,7 @@ public struct SystemClock: Clock {
 }
 
 /// Fixed clock for tests and previews.
-public struct FixedClock: Clock {
+public struct FixedClock: HomeClock {
     public var now: Date
     public var calendar: Calendar
     public init(now: Date, timeZone: TimeZone = TimeZone(identifier: "America/New_York")!, firstWeekday: Int = 1) {

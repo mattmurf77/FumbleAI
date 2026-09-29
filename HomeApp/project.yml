@@ -1,0 +1,182 @@
+# XcodeGen spec for the Home iPhone app.  Generate with:  cd HomeApp && xcodegen generate
+# Produces HomeApp/Home.xcodeproj (git-ignored) with scheme "Home".
+#
+# Overridable build settings (xcodebuild KEY=value, an xcconfig, or CI env):
+#   HOME_BUNDLE_ID           bundle id (default app.fumble.home); CloudKit container is iCloud.$(HOME_BUNDLE_ID)
+#   HOME_TEAM_ID             Apple developer team id (DEVELOPMENT_TEAM)
+#   HOME_SERVER_URL          Home server base URL → Info.plist HomeServerURL (empty = call Overpass directly)
+#                            NOTE: in .xcconfig files write https:/$()/host — "//" starts a comment there.
+#   HOME_API_KEY             sent as X-Home-Key → Info.plist HomeAPIKey (empty = no header)
+#   MARKETING_VERSION        CFBundleShortVersionString
+#   CURRENT_PROJECT_VERSION  CFBundleVersion (CI sets the build number)
+name: Home
+
+options:
+  bundleIdPrefix: app.fumble
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  groupSortPosition: top
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    HOME_BUNDLE_ID: app.fumble.home
+    HOME_TEAM_ID: ""
+    HOME_SERVER_URL: ""
+    HOME_API_KEY: ""
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.0.0
+  PlanKit:
+    path: Packages/PlanKit
+  HomeCore:
+    path: Packages/HomeCore
+  HomeStore:
+    path: Packages/HomeStore
+  HomeSync:
+    path: Packages/HomeSync
+  HomeSchedule:
+    path: Packages/HomeSchedule
+  HomeCapture:
+    path: Packages/HomeCapture
+  HomeExterior:
+    path: Packages/HomeExterior
+  PlanCanvas:
+    path: Packages/PlanCanvas
+
+targets:
+  Home:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: App
+        excludes:
+          - "**/.gitkeep"
+          - "Info.plist"
+          - "Home.entitlements"
+          - "PrivacyInfo.xcprivacy"
+      - path: App/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: PlanKit
+      - package: HomeCore
+        product: HomeCore
+      - package: HomeCore
+        product: HomeCoreTesting
+      - package: HomeStore
+      - package: HomeSync
+      - package: HomeSchedule
+      - package: HomeCapture
+      - package: HomeExterior
+      - package: PlanCanvas
+      - package: GRDB
+        product: GRDB
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: $(DEVELOPMENT_LANGUAGE)
+        CFBundleDisplayName: Home
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundlePackageType: $(PRODUCT_BUNDLE_PACKAGE_TYPE)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities: [arm64]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIBackgroundModes: [remote-notification, fetch, processing]
+        BGTaskSchedulerPermittedIdentifiers:
+          - app.fumble.home.refresh
+          - app.fumble.home.maintenance
+        CFBundleURLTypes:
+          - CFBundleURLName: $(PRODUCT_BUNDLE_IDENTIFIER)
+            CFBundleURLSchemes: [home]
+        NSCameraUsageDescription: "Home uses the camera to scan rooms into a floor plan, capture a paper floor plan, and scan receipts and item photos."
+        NSCalendarsFullAccessUsageDescription: "Home adds your chores to the calendar you choose, including Google calendars added to this iPhone, and updates or removes those events when you edit or delete a chore."
+        NSCalendarsUsageDescription: "Home adds your chores to the calendar you choose, including Google calendars added to this iPhone, and updates or removes those events when you edit or delete a chore."
+        ITSAppUsesNonExemptEncryption: false
+        HomeServerURL: $(HOME_SERVER_URL)
+        HomeAPIKey: $(HOME_API_KEY)
+    entitlements:
+      path: App/Home.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.$(HOME_BUNDLE_ID)
+        com.apple.developer.icloud-services:
+          - CloudKit
+        aps-environment: development
+    settings:
+      base:
+        PRODUCT_NAME: Home
+        PRODUCT_BUNDLE_IDENTIFIER: $(HOME_BUNDLE_ID)
+        DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+        CURRENT_PROJECT_VERSION: $(inherited)
+        MARKETING_VERSION: $(inherited)
+
+  HomeTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Tests/HomeTests
+    dependencies:
+      - target: Home
+      - package: HomeCore
+        product: HomeCore
+        link: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HOME_BUNDLE_ID).tests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
+        CODE_SIGN_STYLE: Automatic
+
+schemes:
+  Home:
+    build:
+      targets:
+        Home: all
+        HomeTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - HomeTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

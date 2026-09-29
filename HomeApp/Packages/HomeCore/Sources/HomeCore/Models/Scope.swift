@@ -75,7 +75,7 @@ public extension SyncedModel {
 /// The 15 synced record types (CloudKit record type == PascalCase table name). LLD §5.1.
 public enum RecordType: String, Codable, Hashable, Sendable, CaseIterable {
     case property = "Property", level = "Level", space = "Space", opening = "Opening", person = "Person"
-    case storageSpot = "StorageSpot", measurement = "Measurement", thing = "Thing", chore = "Chore"
+    case storageSpot = "StorageSpot", measurement = "HomeMeasurement", thing = "Thing", chore = "Chore"
     case choreCompletion = "ChoreCompletion", choreCalendarLink = "ChoreCalendarLink", project = "Project"
     case costLineItem = "CostLineItem", inventoryItem = "InventoryItem", attachment = "Attachment"
 
