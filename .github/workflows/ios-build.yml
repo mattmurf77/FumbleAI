@@ -1,0 +1,79 @@
+name: iOS build
+
+on:
+  pull_request:
+    paths:
+      - "HomeApp/**"
+      - ".github/workflows/ios-build.yml"
+  push:
+    branches: [main]
+    paths:
+      - "HomeApp/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build app and test packages
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      SPM_DIR: ${{ github.workspace }}/.spm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            .spm
+            HomeApp/Packages/*/.build
+          key: spm-${{ runner.os }}-${{ hashFiles('HomeApp/project.yml', 'HomeApp/**/Package.swift', 'HomeApp/**/Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Generate Xcode project
+        working-directory: HomeApp
+        run: xcodegen generate
+
+      - name: Build app (iOS Simulator, unsigned)
+        working-directory: HomeApp
+        run: |
+          set -o pipefail
+          # Report every compile error in one run instead of stopping at the first failing file.
+          defaults write com.apple.dt.Xcode IDEBuildingContinueBuildingAfterErrors -bool YES
+          xcodebuild \
+            -project Home.xcodeproj \
+            -scheme Home \
+            -destination 'generic/platform=iOS Simulator' \
+            -clonedSourcePackagesDirPath "$SPM_DIR" \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
+            | if command -v xcbeautify >/dev/null; then xcbeautify --renderer github-actions; else cat; fi
+
+      # Pure packages first (fast, no Apple frameworks), then the platform packages, whose macOS builds also
+      # compile the CloudKit / EventKit / UserNotifications / MapKit / SwiftUI code paths.
+      - name: Test Swift packages (macOS)
+        if: always()
+        run: |
+          set -euo pipefail
+          for pkg in PlanKit HomeCore HomeStore HomeSync HomeSchedule HomeCapture HomeExterior PlanCanvas; do
+            echo "::group::swift test $pkg"
+            swift test --package-path "HomeApp/Packages/$pkg"
+            echo "::endgroup::"
+          done

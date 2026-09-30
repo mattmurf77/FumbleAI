@@ -1,0 +1,772 @@
+{
+  "schemaVersion": 1,
+  "version": "2026-09-29.1",
+  "source": "docs/homeowner-app/product/features/06-appliances-electronics-furniture.md (FR-THG-10, FR-THG-13, FR-THG-20); clearances from 07-measurements-and-fit-check.md FR-MSR-22",
+  "categories": [
+    "appliance",
+    "electronic",
+    "furniture",
+    "fixture",
+    "system"
+  ],
+  "fieldTypes": {
+    "text": "Free text (string).",
+    "integer": "Whole number; optional min/max.",
+    "number": "Decimal number; optional unit/min/max.",
+    "boolean": "Yes/no.",
+    "enum": "One of options (string). The app may offer \"other\" free text when the option list includes \"other\".",
+    "date": "Local date YYYY-MM-DD.",
+    "filterSize": "String W x H x D in inches, lower-case x, e.g. \"16x25x1\"; matches pattern."
+  },
+  "notes": "All fields are optional (FR-THG-11). Field keys are the attributes_json keys stored on thing rows. suggestedChore.repeatRule uses the RepeatRule JSON of LLD §9.1. clearanceIn is the default fit-check clearance in inches (FR-MSR-22). category \"any\" means the user picks one.",
+  "templates": [
+    {
+      "key": "light_fixture",
+      "name": "Light fixture",
+      "category": "fixture",
+      "icon": "lightbulb",
+      "defaultName": "Light fixture",
+      "fields": [
+        {
+          "key": "bulbBase",
+          "label": "Bulb base",
+          "type": "enum",
+          "options": [
+            "E26",
+            "E12",
+            "GU10",
+            "GU24",
+            "BR30",
+            "PAR38",
+            "T8",
+            "other"
+          ]
+        },
+        {
+          "key": "bulbCount",
+          "label": "Bulb count",
+          "type": "integer",
+          "min": 1,
+          "max": 50
+        },
+        {
+          "key": "wattage",
+          "label": "Wattage (or equivalent)",
+          "type": "number",
+          "unit": "W",
+          "min": 0
+        },
+        {
+          "key": "colorTemperature",
+          "label": "Color temperature",
+          "type": "enum",
+          "options": [
+            "2700K",
+            "3000K",
+            "4000K",
+            "5000K"
+          ]
+        },
+        {
+          "key": "dimmable",
+          "label": "Dimmable",
+          "type": "boolean"
+        },
+        {
+          "key": "smart",
+          "label": "Smart bulb",
+          "type": "boolean"
+        }
+      ],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": {
+        "nameFormat": "{bulbBase} bulb",
+        "unit": "ea",
+        "lowThreshold": 1
+      },
+      "aliases": [
+        "light bulb",
+        "bulb",
+        "lamp"
+      ]
+    },
+    {
+      "key": "hvac_furnace",
+      "name": "HVAC furnace / air handler",
+      "category": "system",
+      "icon": "flame",
+      "defaultName": "Furnace",
+      "fields": [
+        {
+          "key": "filterSize",
+          "label": "Filter size (W×H×D)",
+          "type": "filterSize",
+          "pattern": "^\\d+(\\.\\d+)?x\\d+(\\.\\d+)?x\\d+(\\.\\d+)?$",
+          "placeholder": "16x25x1",
+          "unit": "in"
+        },
+        {
+          "key": "merv",
+          "label": "MERV rating",
+          "type": "integer",
+          "min": 1,
+          "max": 16,
+          "placeholder": "11"
+        },
+        {
+          "key": "filterLocation",
+          "label": "Filter location note",
+          "type": "text",
+          "placeholder": "Slot above the blower door"
+        },
+        {
+          "key": "fuel",
+          "label": "Fuel",
+          "type": "enum",
+          "options": [
+            "gas",
+            "electric",
+            "oil",
+            "heat pump"
+          ]
+        }
+      ],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": {
+        "title": "Change HVAC filter",
+        "repeatRule": {
+          "freq": "everyNDays",
+          "interval": 90,
+          "anchor": "completion"
+        }
+      },
+      "spareStock": {
+        "nameFormat": "Furnace filter {filterSize} MERV {merv}",
+        "unit": "ea",
+        "lowThreshold": 1
+      },
+      "aliases": [
+        "furnace",
+        "hvac",
+        "air handler",
+        "heat pump"
+      ]
+    },
+    {
+      "key": "hvac_filter",
+      "name": "HVAC filter (return grille)",
+      "category": "fixture",
+      "icon": "aqi.medium",
+      "defaultName": "Return air filter",
+      "fields": [
+        {
+          "key": "filterSize",
+          "label": "Filter size (W×H×D)",
+          "type": "filterSize",
+          "pattern": "^\\d+(\\.\\d+)?x\\d+(\\.\\d+)?x\\d+(\\.\\d+)?$",
+          "placeholder": "16x25x1",
+          "unit": "in"
+        },
+        {
+          "key": "merv",
+          "label": "MERV rating",
+          "type": "integer",
+          "min": 1,
+          "max": 16,
+          "placeholder": "11"
+        }
+      ],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": {
+        "title": "Change air filter",
+        "repeatRule": {
+          "freq": "everyNDays",
+          "interval": 90,
+          "anchor": "completion"
+        }
+      },
+      "spareStock": {
+        "nameFormat": "Air filter {filterSize} MERV {merv}",
+        "unit": "ea",
+        "lowThreshold": 1
+      },
+      "aliases": [
+        "air filter",
+        "filter"
+      ]
+    },
+    {
+      "key": "water_heater",
+      "name": "Water heater",
+      "category": "system",
+      "icon": "heater.vertical",
+      "defaultName": "Water heater",
+      "fields": [
+        {
+          "key": "type",
+          "label": "Type",
+          "type": "enum",
+          "options": [
+            "tank",
+            "tankless"
+          ]
+        },
+        {
+          "key": "fuel",
+          "label": "Fuel",
+          "type": "enum",
+          "options": [
+            "gas",
+            "electric",
+            "propane",
+            "heat pump"
+          ]
+        },
+        {
+          "key": "capacityGal",
+          "label": "Capacity",
+          "type": "number",
+          "unit": "gal",
+          "min": 0
+        }
+      ],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "water_filter",
+      "name": "Water filter",
+      "category": "fixture",
+      "icon": "drop",
+      "defaultName": "Water filter",
+      "fields": [
+        {
+          "key": "filterModel",
+          "label": "Filter model",
+          "type": "text",
+          "placeholder": "e.g. 3M AP easy"
+        }
+      ],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": {
+        "title": "Replace water filter",
+        "repeatRule": {
+          "freq": "monthly",
+          "interval": 6,
+          "dayOfMonth": 1,
+          "anchor": "schedule"
+        }
+      },
+      "spareStock": {
+        "nameFormat": "Water filter {filterModel}",
+        "unit": "ea",
+        "lowThreshold": 1
+      },
+      "aliases": [
+        "under-sink filter",
+        "whole-house filter"
+      ]
+    },
+    {
+      "key": "fridge_water_filter",
+      "name": "Fridge water filter",
+      "category": "fixture",
+      "icon": "drop.fill",
+      "defaultName": "Fridge water filter",
+      "fields": [
+        {
+          "key": "filterModel",
+          "label": "Filter model",
+          "type": "text",
+          "placeholder": "e.g. EveryDrop 1"
+        }
+      ],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": {
+        "title": "Replace fridge water filter",
+        "repeatRule": {
+          "freq": "monthly",
+          "interval": 6,
+          "dayOfMonth": 1,
+          "anchor": "schedule"
+        }
+      },
+      "spareStock": {
+        "nameFormat": "Fridge filter {filterModel}",
+        "unit": "ea",
+        "lowThreshold": 1
+      }
+    },
+    {
+      "key": "smoke_detector",
+      "name": "Smoke / CO detector",
+      "category": "fixture",
+      "icon": "sensor",
+      "defaultName": "Smoke detector",
+      "fields": [
+        {
+          "key": "type",
+          "label": "Type",
+          "type": "enum",
+          "options": [
+            "smoke",
+            "CO",
+            "combo"
+          ]
+        },
+        {
+          "key": "batteryType",
+          "label": "Battery",
+          "type": "enum",
+          "options": [
+            "9V",
+            "AA",
+            "sealed 10-yr"
+          ]
+        },
+        {
+          "key": "hardwired",
+          "label": "Hardwired",
+          "type": "boolean"
+        },
+        {
+          "key": "installDate",
+          "label": "Install date",
+          "type": "date"
+        }
+      ],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": {
+        "title": "Replace detector battery",
+        "repeatRule": {
+          "freq": "monthly",
+          "interval": 12,
+          "dayOfMonth": 1,
+          "anchor": "schedule"
+        }
+      },
+      "spareStock": null,
+      "aliases": [
+        "co detector",
+        "carbon monoxide",
+        "smoke alarm"
+      ]
+    },
+    {
+      "key": "refrigerator",
+      "name": "Refrigerator",
+      "category": "appliance",
+      "icon": "refrigerator",
+      "defaultName": "Fridge",
+      "fields": [
+        {
+          "key": "style",
+          "label": "Style",
+          "type": "enum",
+          "options": [
+            "French door",
+            "side-by-side",
+            "top freezer",
+            "bottom freezer"
+          ]
+        },
+        {
+          "key": "waterLine",
+          "label": "Water line",
+          "type": "boolean"
+        }
+      ],
+      "clearanceIn": {
+        "width": 1,
+        "depth": 1,
+        "height": 1
+      },
+      "suggestedChore": null,
+      "spareStock": null,
+      "aliases": [
+        "fridge"
+      ]
+    },
+    {
+      "key": "range",
+      "name": "Range / wall oven / cooktop",
+      "category": "appliance",
+      "icon": "stove",
+      "defaultName": "Range",
+      "fields": [
+        {
+          "key": "fuel",
+          "label": "Fuel",
+          "type": "enum",
+          "options": [
+            "gas",
+            "electric",
+            "induction"
+          ]
+        }
+      ],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null,
+      "aliases": [
+        "stove",
+        "oven",
+        "cooktop"
+      ]
+    },
+    {
+      "key": "dishwasher",
+      "name": "Dishwasher",
+      "category": "appliance",
+      "icon": "dishwasher",
+      "defaultName": "Dishwasher",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0.25,
+        "depth": 0,
+        "height": 0.25
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "washer",
+      "name": "Washer",
+      "category": "appliance",
+      "icon": "washer",
+      "defaultName": "Washing machine",
+      "fields": [],
+      "clearanceIn": {
+        "width": 1,
+        "depth": 4,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "dryer",
+      "name": "Dryer",
+      "category": "appliance",
+      "icon": "dryer",
+      "defaultName": "Dryer",
+      "fields": [
+        {
+          "key": "ventType",
+          "label": "Vent type",
+          "type": "enum",
+          "options": [
+            "rigid metal",
+            "semi-rigid",
+            "flexible foil",
+            "ventless"
+          ]
+        },
+        {
+          "key": "fuel",
+          "label": "Fuel",
+          "type": "enum",
+          "options": [
+            "gas",
+            "electric"
+          ]
+        }
+      ],
+      "clearanceIn": {
+        "width": 1,
+        "depth": 4,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "tv",
+      "name": "TV",
+      "category": "electronic",
+      "icon": "tv",
+      "defaultName": "TV",
+      "fields": [
+        {
+          "key": "screenSizeIn",
+          "label": "Screen size",
+          "type": "integer",
+          "unit": "in",
+          "min": 1,
+          "max": 150
+        },
+        {
+          "key": "mount",
+          "label": "Mount",
+          "type": "enum",
+          "options": [
+            "wall",
+            "stand"
+          ]
+        }
+      ],
+      "clearanceIn": {
+        "width": 2,
+        "depth": 0,
+        "height": 2
+      },
+      "suggestedChore": null,
+      "spareStock": null,
+      "aliases": [
+        "television"
+      ],
+      "clearanceNote": "Applies when mounted on the wall."
+    },
+    {
+      "key": "router",
+      "name": "Router",
+      "category": "electronic",
+      "icon": "wifi.router",
+      "defaultName": "Router",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "thermostat",
+      "name": "Thermostat",
+      "category": "electronic",
+      "icon": "thermometer.medium",
+      "defaultName": "Thermostat",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "sofa",
+      "name": "Sofa",
+      "category": "furniture",
+      "icon": "sofa",
+      "defaultName": "Sofa",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null,
+      "aliases": [
+        "couch"
+      ]
+    },
+    {
+      "key": "bed",
+      "name": "Bed",
+      "category": "furniture",
+      "icon": "bed.double",
+      "defaultName": "Bed",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "table",
+      "name": "Table",
+      "category": "furniture",
+      "icon": "table.furniture",
+      "defaultName": "Table",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "dresser",
+      "name": "Dresser",
+      "category": "furniture",
+      "icon": "cabinet",
+      "defaultName": "Dresser",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "chair",
+      "name": "Chair",
+      "category": "furniture",
+      "icon": "chair",
+      "defaultName": "Chair",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "desk",
+      "name": "Desk",
+      "category": "furniture",
+      "icon": "studentdesk",
+      "defaultName": "Desk",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "shelf",
+      "name": "Shelf",
+      "category": "furniture",
+      "icon": "books.vertical",
+      "defaultName": "Shelf",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "sump_pump",
+      "name": "Sump pump",
+      "category": "system",
+      "icon": "water.waves",
+      "defaultName": "Sump pump",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "dehumidifier",
+      "name": "Dehumidifier",
+      "category": "system",
+      "icon": "humidity",
+      "defaultName": "Dehumidifier",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "garage_door_opener",
+      "name": "Garage door opener",
+      "category": "system",
+      "icon": "door.garage.closed",
+      "defaultName": "Garage door opener",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "fireplace",
+      "name": "Fireplace",
+      "category": "system",
+      "icon": "fireplace",
+      "defaultName": "Fireplace",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null
+    },
+    {
+      "key": "custom",
+      "name": "Custom",
+      "category": "any",
+      "icon": "shippingbox",
+      "defaultName": "",
+      "fields": [],
+      "clearanceIn": {
+        "width": 0,
+        "depth": 0,
+        "height": 0
+      },
+      "suggestedChore": null,
+      "spareStock": null,
+      "aliases": [
+        "generic",
+        "other"
+      ]
+    }
+  ]
+}

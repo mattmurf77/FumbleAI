@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homeowner App Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ui:-apple-system,"SF Pro Text","Inter",system-ui,sans-serif;
+  --arch:"Archivo Narrow","Arial Narrow",sans-serif;
+  --page:#E8EAED;--page-ink:#1B1E22;--page-ink-2:#59606A;--page-line:#D2D6DB;--card:#FFFFFF;
+  --screen:#FFFFFF;--grp:#F2F2F7;--surface:#FFFFFF;--surface-2:#F1F2F4;--ink:#16181B;--ink-2:#5E646B;--ink-3:#979DA5;--sep:rgba(60,60,67,.16);
+  --paper:#F3F4F5;--wall:#26292E;--room:#FFFFFF;--room-alt:#F1F1EF;--hatch:#C6C9CD;--dim:#6B7078;--grid:rgba(30,90,168,.10);
+  --accent:#1E5AA8;--on-accent:#FFFFFF;--accent-soft:rgba(30,90,168,.11);
+  --tint-1:rgba(30,90,168,.07);--tint-2:rgba(30,90,168,.16);--tint-3:rgba(30,90,168,.30);
+  --danger:#C23A2E;--danger-soft:rgba(194,58,46,.11);--warn:#A2670F;--warn-soft:rgba(190,125,20,.13);--ok:#2B7A4B;--ok-soft:rgba(43,122,75,.12);
+  --scrim:rgba(15,17,20,.30);--bezel:#0E0F11;--sheet:#FFFFFF;--menu:rgba(250,250,251,.97);--sat:1;
+  --matt:#2F6DB5;--sam:#1F8A78;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#0B0C0E;--page-ink:#E8EAED;--page-ink-2:#9AA1A9;--page-line:#25292E;--card:#15171A;
+    --screen:#0E0F11;--grp:#000000;--surface:#1C1C1E;--surface-2:#26272A;--ink:#F2F3F5;--ink-2:#A1A7AE;--ink-3:#6C737B;--sep:rgba(120,120,128,.32);
+    --paper:#0A0B0D;--wall:#D6D9DD;--room:#141619;--room-alt:#1A1D21;--hatch:#353A40;--dim:#9AA0A8;--grid:rgba(110,162,236,.10);
+    --accent:#6EA2EC;--on-accent:#08182C;--accent-soft:rgba(110,162,236,.16);
+    --tint-1:rgba(110,162,236,.10);--tint-2:rgba(110,162,236,.22);--tint-3:rgba(110,162,236,.38);
+    --danger:#FF6B5E;--danger-soft:rgba(255,107,94,.16);--warn:#E8A544;--warn-soft:rgba(232,165,68,.16);--ok:#5CC98A;--ok-soft:rgba(92,201,138,.15);
+    --scrim:rgba(0,0,0,.5);--bezel:#2B2E33;--sheet:#1C1C1E;--menu:rgba(40,40,43,.97);--sat:.72;
+    --matt:#6EA2EC;--sam:#4FC3AE;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#0B0C0E;--page-ink:#E8EAED;--page-ink-2:#9AA1A9;--page-line:#25292E;--card:#15171A;
+  --screen:#0E0F11;--grp:#000000;--surface:#1C1C1E;--surface-2:#26272A;--ink:#F2F3F5;--ink-2:#A1A7AE;--ink-3:#6C737B;--sep:rgba(120,120,128,.32);
+  --paper:#0A0B0D;--wall:#D6D9DD;--room:#141619;--room-alt:#1A1D21;--hatch:#353A40;--dim:#9AA0A8;--grid:rgba(110,162,236,.10);
+  --accent:#6EA2EC;--on-accent:#08182C;--accent-soft:rgba(110,162,236,.16);
+  --tint-1:rgba(110,162,236,.10);--tint-2:rgba(110,162,236,.22);--tint-3:rgba(110,162,236,.38);
+  --danger:#FF6B5E;--danger-soft:rgba(255,107,94,.16);--warn:#E8A544;--warn-soft:rgba(232,165,68,.16);--ok:#5CC98A;--ok-soft:rgba(92,201,138,.15);
+  --scrim:rgba(0,0,0,.5);--bezel:#2B2E33;--sheet:#1C1C1E;--menu:rgba(40,40,43,.97);--sat:.72;
+  --matt:#6EA2EC;--sam:#4FC3AE;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--page-ink);font:15px/1.5 var(--ui);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.page{max-width:1320px;margin:0 auto;padding:40px 16px 80px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--page-line);padding-bottom:22px}
+.top h1{font:700 30px/1.15 var(--ui);letter-spacing:-.02em;margin:0 0 6px}
+.top p{margin:0;color:var(--page-ink-2);max-width:720px}
+.theme{display:flex;border:1px solid var(--page-line);border-radius:10px;overflow:hidden;background:var(--card)}
+.theme button{padding:7px 12px;font-size:13px;color:var(--page-ink-2)}
+.theme button[aria-pressed="true"]{background:var(--page-ink);color:var(--page)}
+.sec{margin-top:44px}
+.sec h2{font:600 13px/1 var(--ui);letter-spacing:.09em;text-transform:uppercase;color:var(--page-ink-2);margin:0 0 18px;display:flex;gap:10px;align-items:center}
+.sec h2 span{color:var(--page-ink-2);opacity:.6;font-variant-numeric:tabular-nums}
+.live{display:grid;grid-template-columns:minmax(0,393px) minmax(0,1fr);gap:40px;align-items:start}
+.notes{background:var(--card);border:1px solid var(--page-line);border-radius:14px;padding:22px}
+.notes h3{font:600 17px/1.3 var(--ui);margin:0 0 10px}
+.notes p,.notes li{color:var(--page-ink-2);font-size:14px}
+.notes ul{padding-left:18px;margin:8px 0 16px}
+.legend{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center;font-size:13.5px;margin-top:6px}
+.legend b{font-weight:600;color:var(--page-ink)}
+.sw{width:30px;height:18px;border-radius:4px;border:1px solid var(--page-line);display:inline-block;vertical-align:middle}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:36px 28px}
+.frame{min-width:0}
+.wrap{width:min(393px,100%);aspect-ratio:393/852;position:relative;margin:0 auto}
+.phone{position:absolute;top:0;left:0;width:393px;height:852px;transform-origin:0 0;border-radius:55px;box-shadow:0 0 0 7px var(--bezel),0 18px 40px rgba(0,0,0,.18);overflow:hidden;background:var(--screen)}
+.cap{max-width:393px;margin:16px auto 0;font-size:13.5px;color:var(--page-ink-2)}
+.cap b{display:block;color:var(--page-ink);font-weight:600;font-size:14.5px;margin-bottom:2px}
+.cap i{font-style:normal;font-variant-numeric:tabular-nums;color:var(--page-ink-2);margin-right:6px}
+@media (max-width:820px){.live{grid-template-columns:1fr}.page{padding-top:24px}}
+
+/* ---------- inside the phone ---------- */
+.scr{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--screen);color:var(--ink);font:15px/1.3 var(--ui);overflow:hidden;text-align:left;letter-spacing:-.01em}
+.scr.g{background:var(--grp)}
+.scr.cv-scr{background:var(--paper)}
+.sb{height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 30px 0 46px;font:600 16px/1 var(--ui);position:relative}
+.sb .isl{position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000}
+.sb .si{display:flex;gap:6px;align-items:center}
+.hi{height:30px;flex:none;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px}
+.hi:after{content:"";width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.9}
+.ic{flex:none;display:block}
+.c-head{padding:2px 16px 0;flex:none}
+.c-top{display:flex;justify-content:space-between;align-items:center}
+.prop{font:700 22px/1.15 var(--ui);letter-spacing:-.02em}
+.prop-sub{font-size:13px;color:var(--ink-2);margin-top:2px}
+.c-act{display:flex;gap:8px}
+.cb{width:36px;height:36px;border-radius:18px;background:var(--surface);display:grid;place-items:center;color:var(--ink);box-shadow:0 0 0 .5px var(--sep)}
+.vbtn{margin-top:12px;display:inline-flex;white-space:nowrap;overflow:hidden;align-items:center;gap:7px;height:36px;padding:0 12px 0 11px;border-radius:10px;background:var(--surface);box-shadow:0 0 0 .5px var(--sep);font-weight:600;font-size:15px;max-width:100%}
+.vbtn .k{color:var(--ink-2);font-weight:500}
+.vbtn .ic{color:var(--accent)}
+.vbtn .cd{color:var(--ink-2)}
+.pills{display:flex;gap:6px;padding:12px 16px 0;flex:none}
+.pill{height:32px;padding:0 13px;border-radius:16px;font-size:14px;font-weight:500;background:var(--surface);box-shadow:0 0 0 .5px var(--sep);color:var(--ink)}
+.pill.on{background:var(--ink);color:var(--screen);box-shadow:none;font-weight:600}
+.cv{flex:1;min-height:0;position:relative;margin:6px 10px 0}
+.cv svg.plan{width:100%;height:100%;display:block}
+.meta{position:absolute;left:8px;bottom:4px;display:flex;gap:10px;align-items:center;font:600 10px/1 var(--arch);letter-spacing:.08em;color:var(--dim);pointer-events:none}
+.meta .sc{display:flex;align-items:center;gap:5px}
+.meta .sc i{display:block;width:33px;height:5px;border:1.2px solid var(--dim);border-top:0}
+.meta.ext{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.meta.ext .sc i{border-color:#fff}
+.strip{margin:8px 16px 0;flex:none;background:var(--surface);border-radius:14px;box-shadow:0 0 0 .5px var(--sep),0 4px 14px rgba(0,0,0,.06);padding:11px 14px;display:flex;align-items:center;gap:12px;min-height:66px}
+.strip .t{flex:1;min-width:0}
+.strip .a{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .b{font-size:13px;color:var(--ink-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .ic{color:var(--ink-3)}
+.bar{height:6px;border-radius:3px;background:var(--surface-2);margin-top:7px;position:relative;overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+.red{color:var(--danger)}.acc{color:var(--accent)}.mut{color:var(--ink-2)}.okc{color:var(--ok)}.wrn{color:var(--warn)}
+/* svg plan */
+.rm{fill:var(--room)}.rm.u{fill:url(#hatch)}.rm.alt{fill:var(--room-alt)}
+.wl{fill:none;stroke:var(--wall);stroke-width:1.3}
+.ow{fill:none;stroke:var(--wall);stroke-width:4.6}
+.gap{stroke:var(--room);stroke-width:5.4}
+.dr{fill:none;stroke:var(--wall);stroke-width:.7}
+.win{fill:var(--room);stroke:var(--wall);stroke-width:.7}
+.tr{stroke:var(--wall);stroke-width:.6}
+.rl{font-family:var(--arch);font-weight:600;letter-spacing:.07em;fill:var(--ink);text-anchor:middle}
+.rl.q{fill:var(--ink-3)}
+.rd{font-family:var(--arch);font-weight:500;fill:var(--dim);text-anchor:middle;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.rd.a{fill:var(--accent);font-weight:600}
+.pl circle{fill:var(--room);stroke:var(--accent);stroke-width:1}
+.pl path{stroke:var(--accent);stroke-width:1.3;stroke-linecap:round}
+.pl{cursor:pointer}
+.pl.q circle{stroke:var(--ink-3)}.pl.q path{stroke:var(--ink-3)}
+.hit{fill:transparent;cursor:pointer}
+.edge{fill:none;stroke:var(--danger);stroke-width:2.4}
+.selr{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2}
+.t1{fill:var(--tint-1)}.t2{fill:var(--tint-2)}.t3{fill:var(--tint-3)}
+.ch rect{fill:var(--accent)}.ch text{fill:var(--on-accent)}
+.ch.d rect{fill:var(--danger)}
+.ch.n rect{fill:var(--room);stroke:var(--wall);stroke-width:.6}.ch.n text{fill:var(--ink)}
+.ch.s rect{fill:var(--accent-soft);stroke:var(--accent);stroke-width:.6}.ch.s text{fill:var(--accent)}
+.ch text{font-family:var(--ui);font-weight:600;text-anchor:middle;dominant-baseline:central;font-variant-numeric:tabular-nums;letter-spacing:0}
+.gl{fill:none;stroke:var(--accent);stroke-width:.9;stroke-linejoin:round}
+.gl .gb{fill:var(--room);stroke:none}
+.ed-h{fill:var(--room);stroke:var(--accent);stroke-width:1.4}
+/* exterior */
+.sat{filter:brightness(var(--sat))}
+.zn{fill:rgba(255,255,255,.05);stroke:#fff;stroke-width:3;stroke-dasharray:14 9;opacity:.9}
+.ext .rl{fill:#fff;stroke:rgba(0,0,0,.55);stroke-width:5px;paint-order:stroke;stroke-linejoin:round}
+.ext .rl.q{fill:rgba(255,255,255,.72)}
+.ext .rd{fill:#fff;stroke:rgba(0,0,0,.5);stroke-width:4px;paint-order:stroke}
+.ext .pl circle{fill:#fff;stroke:none}
+.ext .ch.n rect{fill:#fff;stroke:none}.ext .ch.n text{fill:#16181B}
+.ext .gl .gb{fill:#fff}
+.ext .t1{fill:rgba(110,162,236,.25)}.ext .t2{fill:rgba(110,162,236,.42)}.ext .t3{fill:rgba(110,162,236,.6)}
+.ext .edge{stroke:#FF6B5E;stroke-width:7}
+/* menu, sheets */
+.menu{position:absolute;left:16px;top:150px;width:340px;white-space:nowrap;background:var(--menu);border-radius:14px;box-shadow:0 0 0 .5px var(--sep),0 18px 50px rgba(0,0,0,.22);overflow:hidden;z-index:6}
+.menu .mh{padding:10px 16px 8px;font-size:13px;color:var(--ink-2)}
+.mi{display:flex;align-items:center;gap:12px;height:44px;padding:0 16px;border-top:.5px solid var(--sep);width:100%;text-align:left;font-size:16px}
+.mi .ck{width:18px;color:var(--accent)}
+.mi .ic{color:var(--ink-2);margin-left:auto}
+.scrim{position:absolute;inset:0;background:var(--scrim);z-index:5}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--sheet);border-radius:14px 14px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.14);z-index:7;display:flex;flex-direction:column}
+.grab{width:36px;height:5px;border-radius:3px;background:var(--ink-3);opacity:.5;margin:6px auto 4px;flex:none}
+.sh-h{display:flex;align-items:flex-start;gap:10px;padding:8px 16px 10px;flex:none}
+.sh-h .tt{flex:1}
+.sh-h h3{margin:0;font:700 22px/1.2 var(--ui);letter-spacing:-.02em}
+.sh-h .st{font-size:13px;color:var(--ink-2);margin-top:2px}
+.xb{width:30px;height:30px;border-radius:15px;background:var(--surface-2);display:grid;place-items:center;color:var(--ink-2)}
+.sh-b{flex:1;overflow:hidden;padding:0 16px}
+.sh-f{padding:10px 16px 0;flex:none}
+.tag{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:12px;font-size:12.5px;font-weight:600;background:var(--surface-2);color:var(--ink-2)}
+.tag.a{background:var(--accent-soft);color:var(--accent)}.tag.d{background:var(--danger-soft);color:var(--danger)}.tag.w{background:var(--warn-soft);color:var(--warn)}.tag.o{background:var(--ok-soft);color:var(--ok)}
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;height:50px;border-radius:14px;background:var(--accent);color:var(--on-accent);font-weight:600;font-size:17px;width:100%}
+.btn.s{background:var(--accent-soft);color:var(--accent)}
+.btn.sm{height:36px;font-size:15px;border-radius:10px;width:auto;padding:0 14px}
+.lh{font-size:13px;font-weight:600;color:var(--ink-2);margin:14px 0 6px;display:flex;justify-content:space-between}
+.lh.red{color:var(--danger)}
+.li{display:flex;align-items:center;gap:12px;min-height:52px;padding:6px 0;border-bottom:.5px solid var(--sep)}
+.li .m{flex:1;min-width:0}
+.li .m b{display:block;font-weight:500;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li .m small{display:block;font-size:13px;color:var(--ink-2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li .r{font-size:13.5px;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cir{width:22px;height:22px;border-radius:11px;border:1.6px solid var(--ink-3);flex:none}
+.dot{width:8px;height:8px;border-radius:4px;display:inline-block;flex:none}
+.av{width:22px;height:22px;border-radius:11px;color:#fff;font-size:11px;font-weight:700;display:inline-grid;place-items:center;flex:none}
+.ib{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:none}
+.ib.n{background:var(--surface-2);color:var(--ink-2)}
+/* grouped lists */
+.nav{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:17px}
+.nav .bk{display:flex;align-items:center;gap:2px;color:var(--accent);margin-left:-8px}
+.nav .tl{font-weight:600}
+.nav .ac{color:var(--accent)}
+.body{flex:1;overflow:hidden;padding-bottom:8px}
+.lt{font:700 30px/1.15 var(--ui);letter-spacing:-.025em;margin:4px 16px 4px}
+.lsub{margin:0 16px 14px;color:var(--ink-2);font-size:14px}
+.gh{font-size:13px;color:var(--ink-2);margin:15px 32px 6px;text-transform:uppercase;letter-spacing:.02em}
+.gf{font-size:12.5px;color:var(--ink-2);margin:7px 32px 0;line-height:1.35}
+.grp{margin:0 16px;background:var(--surface);border-radius:12px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;min-height:46px;padding:7px 16px;position:relative}
+.row+.row:before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.row .lb{flex:1;min-width:0}
+.row .lb small{display:block;font-size:13px;color:var(--ink-2)}
+.row .vl{color:var(--ink-2);display:flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums}
+.row .ic.cv2{color:var(--ink-3)}
+.tg{width:51px;height:31px;border-radius:16px;background:var(--surface-2);position:relative;flex:none;box-shadow:inset 0 0 0 .5px var(--sep)}
+.tg:after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:14px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.2)}
+.tg.on{background:#34C759}.tg.on:after{left:22px}
+.seg{display:flex;background:var(--surface-2);border-radius:9px;padding:2px;gap:2px}
+.seg span{flex:1;text-align:center;font-size:13.5px;font-weight:500;padding:6px 8px;border-radius:7px;display:flex;align-items:center;justify-content:center;gap:6px}
+.seg span.on{background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600}
+.card{margin:0 16px;background:var(--surface);border-radius:14px;padding:14px 16px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.srch{margin:0 16px 4px;height:38px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;gap:8px;padding:0 10px;color:var(--ink-2);font-size:16px}
+.srch b{color:var(--ink);font-weight:400}
+.steps{display:flex;align-items:center;margin:4px 0 2px}
+.steps .n{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2);width:64px;text-align:center}
+.steps .n i{width:14px;height:14px;border-radius:7px;border:2px solid var(--ink-3);background:var(--surface)}
+.steps .n.d i{background:var(--accent);border-color:var(--accent)}
+.steps .n.c i{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.steps .n.c{color:var(--accent);font-weight:600}
+.steps .ln{flex:1;height:2px;background:var(--ink-3);opacity:.4;margin-top:-18px}
+.steps .ln.d{background:var(--accent);opacity:1}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kv .k{font-size:12.5px;color:var(--ink-2)}
+.kv .v{font:700 22px/1.2 var(--ui);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kv .v small{font-size:13px;font-weight:500;color:var(--ink-2)}
+.thumb{width:44px;height:52px;border-radius:6px;background:repeating-linear-gradient(0deg,var(--surface-2) 0 6px,var(--surface) 6px 9px);box-shadow:inset 0 0 0 .5px var(--sep);flex:none}
+.opt{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border-radius:14px;padding:14px;margin:0 16px 10px;box-shadow:0 0 0 .5px var(--sep)}
+.opt.on{box-shadow:0 0 0 2px var(--accent)}
+.opt .ib{width:44px;height:44px;border-radius:11px}
+.opt b{display:block;font-size:16px;font-weight:600;margin-bottom:2px}
+.opt p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.35}
+.tree .row{min-height:42px}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 6px;background:var(--surface-2)}
+.kp span{height:44px;border-radius:7px;background:var(--surface);display:grid;place-items:center;font-size:22px;box-shadow:0 1px 0 rgba(0,0,0,.15)}
+.kp span.x{background:transparent;box-shadow:none;font-size:16px}
+.fld{display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums}
+.fld b{font-size:17px;font-weight:600}
+.fld.on{background:var(--accent-soft);border-radius:6px;padding:2px 8px;box-shadow:inset 0 0 0 1.5px var(--accent)}
+.warnc{border-radius:14px;margin:0 16px;background:var(--surface);box-shadow:inset 0 0 0 1.5px var(--warn);overflow:hidden}
+.warnc .wh{display:flex;gap:10px;align-items:center;padding:12px 14px;background:var(--warn-soft);color:var(--warn);font-weight:600}
+.edbar{margin:8px 16px 0;flex:none;display:flex;justify-content:space-between;background:var(--surface);border-radius:14px;padding:8px 6px;box-shadow:0 0 0 .5px var(--sep)}
+.edbar span{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--ink-2);width:60px}
+.edbar .ic{color:var(--ink)}
+.insp{margin:8px 16px 0;flex:none;background:var(--surface);border-radius:14px;padding:10px 14px;box-shadow:0 0 0 .5px var(--sep);display:flex;align-items:center;gap:10px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="6" height="6" style="fill:var(--room)"/><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--hatch);stroke-width:.8"/>
+    </pattern>
+    <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+      <path d="M10 0H0V10" fill="none" style="stroke:var(--grid);stroke-width:.6"/>
+    </pattern>
+    <filter id="noise" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="3" seed="7"/>
+      <feColorMatrix values="0 0 0 0 .22  0 0 0 0 .27  0 0 0 0 .17  0 0 0 .55 0"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    <radialGradient id="tree"><stop offset="0" stop-color="#5E6E4F"/><stop offset=".75" stop-color="#445238"/><stop offset="1" stop-color="#34402B"/></radialGradient>
+  </defs>
+</svg>
+
+<div class="page">
+  <header class="top">
+    <div>
+      <h1>Homeowner App Mockups</h1>
+      <p>High-fidelity iPhone mockups (393×852 pt) for the merged plan v1. The first phone is clickable: change floors with the pills, switch among the seven views with the dropdown, tap a room to open its sheet, tap “+” to add, and tap the pencil for edit mode. Sample house: 14 Linden Ct, three levels plus the exterior, with housemates Matt and Sam. The mockups are dated Tuesday, Sep 29, 2026.</p>
+    </div>
+    <div class="theme" role="group" aria-label="Theme">
+      <button data-theme-set="auto" aria-pressed="true">Auto</button><button data-theme-set="light" aria-pressed="false">Light</button><button data-theme-set="dark" aria-pressed="false">Dark</button>
+    </div>
+  </header>
+
+  <section class="sec">
+    <h2><span>01</span>Interactive canvas</h2>
+    <div class="live">
+      <div class="frame"><div class="wrap"><div class="phone" id="live"></div></div>
+        <p class="cap"><b>Home canvas</b>It opens on Ground with the Plan view. Try Kitchen in To-Dos, Primary Bath in Future Projects, and Exterior in Budget.</p></div>
+      <div class="notes">
+        <h3>How the canvas reads</h3>
+        <p>One floor at a time. The dropdown changes only what is drawn on the rooms and what the room sheet lists. The walls stay the same in every view.</p>
+        <div class="legend">
+          <span class="sw" style="background:var(--room);box-shadow:inset 0 0 0 1.3px var(--wall)"></span><span><b>Plan</b>: small-caps room name plus width × depth.</span>
+          <span class="sw" style="background:var(--room);box-shadow:inset 0 0 0 2.4px var(--danger)"></span><span><b>To-Dos</b>: a chip counts chores due within 7 days. A red inner edge means at least one is overdue.</span>
+          <span class="sw" style="background:linear-gradient(90deg,var(--tint-1) 0 33%,var(--tint-2) 33% 66%,var(--tint-3) 66%)"></span><span><b>Future Projects</b>: the tint steps at under $1k, $1k–$5k and $5k or more planned. A chip shows the total.</span>
+          <span class="sw" style="background:var(--room);box-shadow:inset 0 0 0 .6px var(--wall)"></span><span><b>Past Work</b>: lifetime spend chip plus the month of the last work.</span>
+          <span class="sw" style="background:var(--accent-soft)"></span><span><b>Appliances, Electronics &amp; Furniture</b>: plan-symbol icons at each item’s pin, with a count in the corner.</span>
+          <span class="sw" style="background:var(--surface-2)"></span><span><b>Inventory</b>: item count and number of storage spots.</span>
+          <span class="sw" style="background:var(--accent)"></span><span><b>Budget</b>: planned vs. spent per room. Floor and property totals appear in the bottom strip.</span>
+        </div>
+        <ul>
+          <li>Floors change with the pills only (decision #12). Swipe is tested after TestFlight.</li>
+          <li>Pinch to zoom and drag to pan inside the canvas. A room tap opens its sheet at half height. A “+” tap opens the add picker, which defaults to the active view.</li>
+          <li>Rooms with nothing in the current view fade their label to grey, so the rooms that matter stand out.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec"><h2><span>02</span>The seven views and the other levels</h2><div class="grid" id="g-views"></div></section>
+  <section class="sec"><h2><span>03</span>Menus and sheets</h2><div class="grid" id="g-sheets"></div></section>
+  <section class="sec"><h2><span>04</span>Detail screens</h2><div class="grid" id="g-detail"></div></section>
+  <section class="sec"><h2><span>05</span>Inventory: storage, seasons, shopping</h2><div class="grid" id="g-inv"></div></section>
+  <section class="sec"><h2><span>06</span>Setup, editing, settings</h2><div class="grid" id="g-setup"></div></section>
+</div>
+
+<script>
+/* ================= data ================= */
+const TODAY=new Date('2026-09-29T12:00:00');
+const D=s=>new Date(s+'T12:00:00');
+const days=s=>Math.round((D(s)-TODAY)/864e5);
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WK=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const fd=s=>MON[D(s).getMonth()]+' '+D(s).getDate();
+const fdy=s=>fd(s)+', '+D(s).getFullYear();
+const fmy=s=>MON[D(s).getMonth()]+' ’'+String(D(s).getFullYear()).slice(2);
+const usd=n=>'$'+Math.round(n).toLocaleString('en-US');
+const kd=n=>n>=1000?'$'+(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':'$'+Math.round(n);
+const ftin=u=>{const i=Math.round(u*1.2);return Math.floor(i/12)+'′'+(i%12)+'″'};
+const sum=(a,f)=>a.reduce((t,x)=>t+(f?f(x):x),0);
+const PPL={Matt:'var(--matt)',Sam:'var(--sam)'};
+
+const LEVELS=[['basement','Basement'],['ground','Ground'],['upstairs','Upstairs'],['exterior','Exterior']];
+const LVN=Object.fromEntries(LEVELS);
+const VIEWS=[['plan','Plan','layers'],['todo','To-Dos','checks'],['future','Future Projects','wrench'],['past','Past Work','hist'],['things','Appliances, Electronics & Furniture','sofa'],['inv','Inventory','box'],['budget','Budget','dollar']];
+const VN=Object.fromEntries(VIEWS.map(v=>[v[0],v[1]]));
+/* spaces: id, name, short, x, y, w, h (units = 0.1 ft), flag s=stairs c=closet u=unfinished */
+const RAW={
+ ground:[['kit','Kitchen','',0,0,132,115],['pan','Pantry','Pantry',0,115,50,55],['lau','Laundry','Laundry',50,115,82,55],['din','Dining Room','',0,170,132,120],['off','Office','',0,290,132,110],['fam','Family Room','',132,0,168,140],['hb','Half Bath','½ Bath',132,140,40,60],['st1','Stairs','',132,200,40,130,'s'],['coat','Coat Closet','Cl.',132,330,40,70,'c'],['liv','Living Room','',172,140,128,170],['foy','Foyer','',172,310,128,90]],
+ upstairs:[['br2','Bedroom 2','',0,0,132,130],['hba','Hall Bath','',0,130,80,80],['lin','Linen','Linen',80,130,52,80,'c'],['br3','Bedroom 3','',0,210,132,110],['att','Attic','',0,320,132,80,'c'],['pbr','Primary Bedroom','',132,0,168,150],['hall','Hall','Hall',132,150,40,50],['st2','Stairs','',132,200,40,130,'s'],['clo','Closet','Cl.',132,330,40,70,'c'],['pba','Primary Bath','',172,150,128,100],['wic','Walk-in Closet','',172,250,128,60,'c'],['gst','Guest Room','',172,310,128,90]],
+ basement:[['utl','Utility','',0,0,132,120,'u'],['sto','Storage','',0,120,132,140,'u'],['wsh','Workshop','',0,260,132,140,'u'],['rec','Rec Room','',132,0,168,200],['st0','Stairs','',132,200,40,130,'s'],['bclo','Closet','Cl.',132,330,40,70,'c'],['fba','Full Bath','',172,200,128,80],['gbr','Guest Bedroom','',172,280,128,120]],
+ exterior:[['by','Backyard','',0,0,700,440,'',{cy:190}],['pat','Patio','',300,320,170,120],['syl','Side Yard L','',0,440,230,400],['syr','Side Yard R','',530,440,170,300],['drv','Driveway','',540,740,160,410],['fy','Front Yard','',0,840,540,310,'',{cx:180,cy:1010}],['bed','Front Bed','',215,848,240,40,'',{cx:240,lx:350,ly:875,bx:340,by:918}],['sdw','Sidewalk','',0,1150,700,50,'',{cx:650,lx:330,ly:1183,bx:520,by:1175}]]
+};
+const SP={};
+for(const lv in RAW)RAW[lv]=RAW[lv].map(a=>{const s=Object.assign({id:a[0],name:a[1],short:a[2]||a[1],x:a[3],y:a[4],w:a[5],h:a[6],f:a[7]||'',lv},a[8]||{});s.cx=s.cx??s.x+s.w/2;s.cy=s.cy??s.y+s.h/2;SP[s.id]=s;return s});
+
+/* chores: id,title,room,who,repeat,due,link */
+const CH=[
+ ['c1','Do the dishes','kit','Sam','Daily','2026-09-29'],['c2','Wipe counters','kit','Matt','Daily','2026-09-29'],
+ ['c3','Clean fridge coils','kit','Matt','Every 6 months','2026-09-20','Fridge'],['c4','Run dishwasher cleaner','kit','Sam','Monthly on the 1st','2026-10-01','Dishwasher'],
+ ['c5','Take out recycling','kit','Matt','Weekly on Thu','2026-10-01'],['c6','Replace fridge water filter','kit','Matt','Every 6 months','2026-10-15','Fridge'],
+ ['c7','Fold laundry','lau','Sam','Every 3 days','2026-09-29'],['c8','Clean dryer vent','lau','Matt','Every 3 months','2026-09-25','Dryer'],
+ ['c9','Change HVAC filter','utl','Matt','Every 90 days','2026-10-02','Furnace'],['c10','Test sump pump','utl','Matt','Monthly on the 15th','2026-10-15','Sump pump'],
+ ['c11','Flush water heater','utl','Matt','Yearly','2026-11-03','Water heater'],['c12','Vacuum living room','liv','Sam','Weekly on Sat','2026-10-03'],
+ ['c13','Water plants','fam','Sam','Every 4 days','2026-09-29'],['c14','Clean half bath','hb','Matt','Weekly on Sun','2026-09-27'],
+ ['c15','Clean primary bath','pba','Sam','Weekly on Sun','2026-10-04'],['c16','Change sheets','pbr','Matt','Weekly on Sat','2026-10-03'],
+ ['c17','Test smoke detectors','hall','Matt','Monthly on the 1st','2026-10-01','Smoke detector'],['c18','Clean gutters','by','Matt','Every 6 months','2026-10-10'],
+ ['c19','Mow lawn','fy','Matt','Weekly on Sat','2026-10-03'],['c20','Blow out sprinklers','fy','Matt','Yearly','2026-10-24'],
+ ['c21','Dust dining table','din','Sam','Every 2 weeks','2026-10-02'],['c22','Empty shredder','off','Matt','Monthly on the 12th','2026-10-12'],
+ ['c23','Vacuum rec room','rec','Sam','Weekly on Fri','2026-10-02'],['c24','Clean hall bath','hba','Sam','Weekly on Sun','2026-10-04'],
+ ['c25','Sweep entry','foy','Sam','Every 3 days','2026-09-30'],['c26','Pull weeds in bed','bed','Sam','Every 2 weeks','2026-09-26']
+].map(a=>({id:a[0],t:a[1],room:a[2],who:a[3],rep:a[4],due:a[5],link:a[6],d:days(a[5])}));
+/* projects: id,title,room,status,est,act,date */
+const PJ=[
+ ['f1','Replace fridge — 36 in French door','kit','planned',2400,0],['f2','Tile backsplash','kit','idea',1150,0],
+ ['f3','Regrout + new vanity','hba','planned',1800,0],['f4','Walk-in shower conversion','pba','planned',9500,0],
+ ['f5','LVP flooring','rec','prog',4200,3180],['f6','Replace water heater (50 gal)','utl','idea',1900,0],
+ ['f7','Paint living room','liv','prog',380,214],['f8','Built-in desk + shelves','off','idea',1600,0],
+ ['f9','Paver patio extension','pat','planned',6800,0],['f10','Re-mulch + steel edging','bed','planned',420,0],
+ ['f11','Seal driveway','drv','idea',250,0],['f12','Fix gutter leak — NE corner','by','planned',350,0],
+ ['f13','Closet organizer','br2','idea',650,0],['f14','Replace foyer light fixture','foy','planned',280,0],
+ ['d1','Dishwasher replacement','kit','done',950,1040,'2026-03-14'],['d2','Recessed lighting (6 cans)','kit','done',1500,1450,'2025-11-08'],
+ ['d3','New kitchen faucet','kit','done',300,310,'2025-06-21'],['d4','Ceiling fan install','fam','done',400,420,'2026-02-07'],
+ ['d5','Refinish hardwood floors','liv','done',2800,3200,'2026-01-17'],['d6','New toilet','hb','done',400,385,'2026-04-11'],
+ ['d7','Furnace tune-up + humidifier','utl','done',600,640,'2026-08-22'],['d8','Sump pump replacement','utl','done',700,780,'2026-09-12'],
+ ['d9','Blackout shades','pbr','done',500,560,'2026-05-03'],['d10','Washer & dryer','lau','done',2000,1980,'2025-07-19'],
+ ['d11','Fence repair — 3 panels','by','done',1000,1150,'2026-06-13'],['d12','Replace front door','foy','done',2400,2650,'2026-04-25'],
+ ['d13','Paint + new carpet','gbr','done',2000,2100,'2025-10-04'],['d14','Aerate + overseed','fy','done',250,240,'2026-09-19']
+].map(a=>({id:a[0],t:a[1],room:a[2],st:a[3],est:a[4],act:a[5],date:a[6]}));
+const STN={idea:'Idea',planned:'Planned',prog:'In Progress',done:'Done'};
+/* things: room,type,name,fx,fy,spec */
+const TH=[
+ ['kit','fridge','Refrigerator',.13,.2,'Whirlpool WRS325 · 30½ in wide'],['kit','range','Gas range',.5,.12,'GE JGB735 · 30 in'],['kit','dw','Dishwasher',.78,.12,'Bosch 300 · installed Mar 2026'],['kit','light','Pendants (3)',.5,.8,'E26 A19 LED 2700K · 1 out'],
+ ['lau','washer','Washer',.3,.4,'LG WM4000 · warranty to Jul 2027'],['lau','washer','Dryer',.68,.4,'LG DLEX4000 · vent 4 in'],
+ ['din','table','Dining table',.5,.78,'Walnut 72 × 40 in'],['din','light','Chandelier',.22,.28,'6× E12 LED 2700K'],
+ ['off','desk','Desk',.3,.75,'60 × 30 in'],['off','router','Router',.82,.2,'eero 6+'],
+ ['fam','tv','TV',.5,.07,'Sony 65 in X90L · 57¼ in wide'],['fam','sofa','Sectional',.5,.84,'112 × 64 in'],['fam','fan','Ceiling fan',.2,.3,'Hunter 52 in · 2026'],
+ ['liv','sofa','Sofa',.5,.86,'84 × 38 in'],['liv','chair','Armchair',.2,.25,'32 × 34 in'],['liv','light','Floor lamp',.82,.22,'E26 LED 3000K'],
+ ['foy','smoke','Smoke/CO detector',.82,.25,'Kidde · expires 2031'],['foy','light','Flush mount',.25,.3,'2× E26'],
+ ['pbr','bed','King bed',.5,.18,'76 × 80 in'],['pbr','tv','TV',.5,.95,'LG 55 in'],['pbr','smoke','Smoke detector',.88,.1,'Kidde · expires 2031'],['pbr','fan','Ceiling fan',.2,.72,'Minka 52 in'],
+ ['br2','bed','Queen bed',.3,.24,'60 × 80 in'],['br2','desk','Desk',.75,.82,'48 × 24 in'],['br2','smoke','Smoke detector',.88,.1,''],
+ ['br3','bed','Full bed',.28,.3,'54 × 75 in'],['br3','smoke','Smoke detector',.88,.12,''],['gst','bed','Queen bed',.25,.52,''],['hall','smoke','Smoke detector',.5,.25,''],['pba','fan','Exhaust fan',.2,.25,'Panasonic 80 CFM'],
+ ['utl','furnace','Furnace',.28,.28,'Carrier 59SC5 · filter 16×25×1 MERV 11'],['utl','wh','Water heater',.72,.28,'Rheem 50 gal · 2017'],['utl','sump','Sump pump',.25,.8,'Zoeller M53 · Sep 2026'],['utl','box','Dehumidifier',.75,.8,'Frigidaire 50 pt'],
+ ['rec','tv','TV',.5,.05,'TCL 75 in'],['rec','sofa','Sofa',.5,.78,''],['rec','smoke','Smoke detector',.9,.08,''],['wsh','desk','Workbench',.5,.12,'96 × 30 in'],['wsh','fridge','Garage fridge',.86,.82,''],['gbr','bed','Queen bed',.28,.5,''],['fba','fan','Exhaust fan',.2,.3,''],
+ ['syl','furnace','AC condenser',.62,.3,'Carrier 24ACC6 · 3 ton'],['syl','router','Irrigation controller',.7,.72,'Rachio 3'],['pat','grill','Grill',.2,.4,'Weber Genesis'],['syr','box','Trash + recycling bins',.5,.3,'']
+].map(a=>({room:a[0],ty:a[1],n:a[2],fx:a[3],fy:a[4],spec:a[5]}));
+/* inventory: storage spots per space */
+const INV={
+ pan:[['Top shelf',18],['Middle shelf',26,'4 low'],['Floor bins',20,'2 low']],kit:[['Upper cabinets',22],['Fridge',16,'1 low']],lau:[['Shelf above washer',14]],
+ coat:[['Hooks',9],['Top shelf',9]],off:[['File drawer',22]],din:[['Buffet',11]],
+ wic:[['Matt — left rail',58],['Sam — right rail',71],['Top shelf',17]],br2:[['Closet',61]],br3:[['Closet',12]],
+ att:[['Shelf 1',22],['Shelf 2',39],['Shelf 3',25]],lin:[['Shelves',34]],hba:[['Vanity',21]],pba:[['Vanity',19],['Linen tower',8]],
+ sto:[['Shelf A',24],['Shelf B',30],['Shelf C',18]],utl:[['Filter shelf',9]],wsh:[['Pegboard',28],['Bins',12]],bclo:[['Shelves',15]],
+ syr:[['Shed',23]]
+};
+const LOWN=7;
+/* aggregates */
+const AG={};
+for(const id in SP){
+ const ch=CH.filter(c=>c.room===id),pj=PJ.filter(p=>p.room===id),fu=pj.filter(p=>p.st!=='done'),pa=pj.filter(p=>p.st==='done'),iv=INV[id]||[];
+ AG[id]={ch,due:ch.filter(c=>c.d<=7).length,od:ch.filter(c=>c.d<0).length,fu,plan:sum(fu,p=>p.est),pa,life:sum(pa,p=>p.act),
+  last:pa.map(p=>p.date).sort().pop(),spent:sum(pj,p=>p.act),th:TH.filter(t=>t.room===id),iv,n:sum(iv,s=>s[1])};
+}
+const lvRooms=lv=>RAW[lv].filter(s=>s.f!=='s');
+const lvAgg=lv=>{const r=lvRooms(lv).map(s=>AG[s.id]);return{due:sum(r,a=>a.due),od:sum(r,a=>a.od),today:sum(r,a=>a.ch.filter(c=>c.d===0).length),plan:sum(r,a=>a.plan),np:sum(r,a=>a.fu.length),life:sum(r,a=>a.life),spent:sum(r,a=>a.spent),th:sum(r,a=>a.th.length),n:sum(r,a=>a.n),spots:sum(r,a=>a.iv.length),last:r.map(a=>a.last).filter(Boolean).sort().pop()}};
+const PROP=(()=>{const a=LEVELS.map(l=>lvAgg(l[0]));return{plan:sum(a,x=>x.plan),spent:sum(a,x=>x.spent),life:sum(a,x=>x.life),np:sum(a,x=>x.np),n:sum(a,x=>x.n),th:sum(a,x=>x.th)}})();
+
+/* ================= icons ================= */
+const IP={
+ cd:'M6 9l6 6 6-6',cr:'M9 6l6 6-6 6',cl:'M15 5l-7 7 7 7',plus:'M12 5v14M5 12h14',search:'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14M20 20l-4-4',
+ gear:'M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1',
+ pencil:'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',check:'M5 12.5l4.5 4.5L19 7',x:'M6 6l12 12M18 6L6 18',
+ bell:'M6 16v-5a6 6 0 0 1 12 0v5l2 2H4l2-2zM10 20.5a2 2 0 0 0 4 0',cal:'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5',person:'M12 12a4 4 0 1 0 0-8a4 4 0 1 0 0 8M4 21c0-4 4-6 8-6s8 2 8 6',
+ repeat:'M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4',camera:'M4 8h4l2-3h4l2 3h4v11H4zM12 11a3 3 0 1 0 0 6a3 3 0 1 0 0-6',
+ ruler:'M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2',box:'M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10',
+ checks:'M10 6h10M10 12h10M10 18h10M4 6l1.3 1.3L7.5 5M4 12l1.3 1.3L7.5 11M4 18l1.3 1.3L7.5 17',
+ wrench:'M14.5 5.5a4 4 0 0 0 5 5L11 19a2.1 2.1 0 0 1-3-3l8.5-8.5a4 4 0 0 1-2-2z',hist:'M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3 4v5h5M12 8v4l3 2',
+ sofa:'M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3M3 12a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v6H3zM5 18v2M19 18v2',
+ dollar:'M12 3v18M16.5 7c-1-1.4-2.5-2-4.5-2-2.5 0-4 1.3-4 3s1.5 2.6 4 3 4 1.3 4 3-1.5 3-4 3c-1.9 0-3.4-.7-4.3-2',
+ layers:'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',warn:'M12 3.5L22 20H2zM12 10v5M12 17.8v.2',receipt:'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h4',
+ cart:'M3 4h2l2.2 11h10.6L20 8H6.2M9 20a1 1 0 1 0 0-.01M17 20a1 1 0 1 0 0-.01',scan:'M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M4 12h16',
+ blocks:'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z',photo:'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M16 9.5a1 1 0 1 0 0-.01',
+ rough:'M4 4h16v16H4zM4 13h9V4M13 13v7',link:'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+ share:'M12 3v12M7 8l5-5 5 5M5 13v7h14v-7',users:'M9 11a4 4 0 1 0 0-8a4 4 0 1 0 0 8M2 21c0-3.5 3-6 7-6s7 2.5 7 6M16 3.5a4 4 0 0 1 0 7.5M22 21c0-3-2-5-4.5-5.7',
+ home:'M3 11l9-8 9 8v10H3zM9 21v-6h6v6',cloud:'M7 18a5 5 0 0 1-.5-10A6 6 0 0 1 18 8.5a4.5 4.5 0 0 1 0 9.5z',
+ move:'M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3',split:'M12 3v18M3 3h18v18H3z',
+ door:'M5 21V3h11v18M16 21h3M12.5 12v.2',win:'M4 4h16v16H4zM12 4v16M4 12h16',undo:'M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3',
+ filter:'M3 4h18l-7 8v7l-4 2v-9z',clock:'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 7v5l3 2',more:'M5 12h.01M12 12h.01M19 12h.01',
+ pin:'M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 7a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5',tshirt:'M8 3l-5 3 2 4 3-1v12h8V9l3 1 2-4-5-3a4 4 0 0 1-8 0z',
+ fridge:'M6 2h12v20H6zM6 9h12M9 5v2M9 12v3',bulb:'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z'
+};
+const ic=(n,s=18,w=1.8)=>`<svg class="ic" viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IP[n]}"/></svg>`;
+/* plan-symbol glyphs, drawn in a 14-unit box */
+const GL={
+ fridge:'<path d="M-3.5-5h7v10h-7zM-3.5-1h7M2-3.3v1M2 .8v1.8"/>',
+ range:'<rect x="-5" y="-5" width="10" height="10"/><circle cx="-2.3" cy="-2.3" r="1.2"/><circle cx="2.3" cy="-2.3" r="1.2"/><circle cx="-2.3" cy="2.3" r="1.2"/><circle cx="2.3" cy="2.3" r="1.2"/>',
+ dw:'<rect x="-5" y="-5" width="10" height="10"/><path d="M-5-2.5h10M-2-3.8h4"/>',
+ washer:'<rect x="-5" y="-5" width="10" height="10"/><circle cy="1" r="2.8"/><path d="M-3.5-3.6h2"/>',
+ tv:'<rect x="-6" y="-1.2" width="12" height="2.4"/>',
+ sofa:'<rect x="-6" y="-3.5" width="12" height="7" rx="1"/><path d="M-6-1.2h12M-4.3-1.2v4.7M4.3-1.2v4.7M0-1.2v4.7"/>',
+ chair:'<rect x="-3.5" y="-3.5" width="7" height="7" rx="1"/><path d="M-3.5-1.6h7"/>',
+ bed:'<rect x="-4.5" y="-6" width="9" height="12" rx=".8"/><path d="M-4.5-2.4h9"/><rect x="-3.6" y="-5.2" width="3" height="2" rx=".5"/><rect x=".6" y="-5.2" width="3" height="2" rx=".5"/>',
+ table:'<rect x="-4" y="-2.4" width="8" height="4.8" rx=".6"/><circle cx="-2" cy="-4.3" r="1"/><circle cx="2" cy="-4.3" r="1"/><circle cx="-2" cy="4.3" r="1"/><circle cx="2" cy="4.3" r="1"/>',
+ light:'<circle r="3.2"/><path d="M-2.3-2.3l4.6 4.6M2.3-2.3l-4.6 4.6"/>',
+ fan:'<circle r="1.2"/><path d="M1.2 0h4.3M-.6-1l-2.2-3.8M-.6 1l-2.2 3.8"/>',
+ smoke:'<circle r="3.6"/><circle r="1.3"/>',
+ furnace:'<rect x="-5" y="-5" width="10" height="10"/><path d="M-5 5l10-10M-5 0l5-5M0 5l5-5"/>',
+ wh:'<circle r="4.6"/><path d="M-1.8-1.8v3.6M1.8-1.8v3.6M-1.8 0h3.6"/>',
+ sump:'<circle r="4.6" stroke-dasharray="1.6 1.2"/><circle r="1.5"/>',
+ desk:'<rect x="-6" y="-3" width="12" height="5"/><circle cy="4.5" r="1.3"/>',
+ router:'<rect x="-4" y="-1" width="8" height="3.6" rx="1"/><path d="M-2.5-1v-3M2.5-1v-3"/>',
+ box:'<rect x="-4.5" y="-4.5" width="9" height="9"/><path d="M-4.5-4.5l9 9M4.5-4.5l-9 9"/>',
+ grill:'<circle r="4.5"/><path d="M-3-1.4h6M-3 1.4h6"/>'
+};
+
+/* ================= plan rendering ================= */
+function chip(x,y,t,cls,fs){const w=t.length*fs*.6+fs*1.3,h=fs*1.75;return `<g class="ch ${cls}"><rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="${h/2}"/><text x="${x}" y="${y+.5}" font-size="${fs}">${t}</text></g>`}
+function glyph(t,x,y,k){return `<g class="gl" transform="translate(${x} ${y}) scale(${.95*k})"><rect class="gb" x="-7" y="-7" width="14" height="14" rx="3"/>${GL[t]||GL.box}</g>`}
+function plus(s,k,quiet){return `<g class="pl${quiet?' q':''}" data-act="add" data-room="${s.id}" transform="translate(${s.cx} ${s.cy}) scale(${k})"><circle r="7.4"/><path d="M-3.3 0h6.6M0-3.3v6.6"/></g>`}
+function roomLayer(s,view,k,o){
+ const a=AG[s.id],big=s.w>=70*k&&s.h>=80*k,ext=s.lv==='exterior';
+ let g='',nm=(s.w<55*k?s.short:s.name).toUpperCase(),fs=8.1*k,cf=6.8*k;
+ let lx=s.lx??s.cx,ly=s.ly??(big?s.cy-24*k:s.y+11*k);
+ let sub='',subc='',ch=null,quiet=false;
+ const bx=s.bx??s.cx,by=s.by??(big?s.cy+19*k:s.y+s.h-9*k);
+ if(view==='plan'){sub=big||ext?ftin(s.w)+' × '+ftin(s.h):'';}
+ else if(view==='todo'){if(a.due)ch=[a.due+' due',a.od?'d':''];else quiet=true;if(a.od)g+=`<rect class="edge" x="${s.x+2*k}" y="${s.y+2*k}" width="${s.w-4*k}" height="${s.h-4*k}"/>`}
+ else if(view==='future'){if(a.plan){ch=[kd(a.plan)+(a.fu.length>1?' · '+a.fu.length:''),''];if(big)sub=a.fu.length+(a.fu.length>1?' projects':' project')}else quiet=true}
+ else if(view==='past'){if(a.life){ch=[kd(a.life),'n'];sub=big?'last '+fmy(a.last):''}else quiet=true}
+ else if(view==='things'){if(!a.th.length)quiet=true}
+ else if(view==='inv'){if(a.n){ch=[a.n+' items','n'];if(big)sub=a.iv.length+(a.iv.length>1?' spots':' spot')}else quiet=true}
+ else if(view==='budget'){if(a.plan||a.spent){if(big){sub='';ch=null;g+=`<text class="rd a" x="${s.cx}" y="${s.cy+17*k}" font-size="${7.3*k}">${kd(a.plan)} planned</text><text class="rd" x="${s.cx}" y="${s.cy+26*k}" font-size="${7.3*k}">${kd(a.spent)} spent</text>`}else ch=[kd(a.plan)+' / '+kd(a.spent),'s']}else quiet=true}
+ if(view==='things')a.th.forEach(t=>{g+=glyph(t.ty,s.x+t.fx*s.w,s.y+t.fy*s.h,k)});
+ g+=`<text class="rl${quiet?' q':''}" x="${lx}" y="${ly}" font-size="${fs}">${nm}</text>`;
+ if(sub)g+=`<text class="rd" x="${lx}" y="${ly+9.5*k}" font-size="${7.2*k}">${sub}</text>`;
+ if(view==='things'&&a.th.length)g+=chip(s.x+s.w-10*k,s.y+10*k,String(a.th.length),'n',cf);
+ if(ch)g+=chip(bx,by,ch[0],ch[1],cf);
+ if(!o.edit)g+=plus(s,k,quiet);
+ return g;
+}
+function tintOf(s,view){const a=AG[s.id];if(view!=='future'||!a.plan)return '';return a.plan<1000?'t1':a.plan<5000?'t2':'t3'}
+const DOORS={
+ ground:[['h',10,115,25,-1],['h',75,115,25,-1],['v',172,150,24,-1],['h',100,290,28,1],['v',172,345,24,-1],['h',232,400,32,-1,1],['h',256,0,30,1,1]],
+ upstairs:[['h',137,150,30,-1],['v',172,158,28,1],['v',132,160,26,-1],['v',80,140,24,-1],['h',100,210,26,1],['v',172,318,26,1],['h',30,320,26,1]],
+ basement:[['v',132,60,26,-1],['v',132,150,26,-1],['h',200,200,26,1],['v',172,290,26,1],['h',60,260,26,1]]
+};
+const WINS={
+ ground:[['h',0,30,95],['h',0,170,230],['h',400,25,105],['h',400,190,222],['v',0,25,90],['v',0,200,262],['v',300,30,105],['v',300,180,270]],
+ upstairs:[['h',0,25,105],['h',0,190,260],['h',400,40,95],['h',400,205,270],['v',0,30,95],['v',0,240,295],['v',300,40,110],['v',300,335,380]],
+ basement:[['h',0,180,240],['v',300,60,120],['v',300,320,370]]
+};
+function planSVG(lv,view,o={}){
+ if(lv==='exterior')return extSVG(view,o);
+ const rs=RAW[lv];let fill='',wal='',lab='',det='';
+ for(const s of rs){
+  const cls=s.f==='u'?'rm u':(s.f==='s'||s.f==='c')?'rm alt':'rm';
+  fill+=`<rect class="${cls}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"/>`;
+  const t=tintOf(s,view);if(t)fill+=`<rect class="${t}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"/>`;
+  if(o.sel===s.id)fill+=`<rect class="selr" x="${s.x+1.5}" y="${s.y+1.5}" width="${s.w-3}" height="${s.h-3}"/>`;
+  wal+=`<rect class="wl" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"/>`;
+  if(s.f==='s'){for(let y=s.y+10;y<s.y+s.h;y+=10)det+=`<line class="tr" x1="${s.x}" y1="${y}" x2="${s.x+s.w}" y2="${y}"/>`;
+   det+=`<path class="dr" d="M${s.cx} ${s.y+s.h-8}V${s.y+14}M${s.cx-4} ${s.y+20}l4-6 4 6"/><text class="rd" x="${s.cx}" y="${s.y+s.h+ -14}" font-size="6.5" style="paint-order:stroke;stroke:var(--room-alt);stroke-width:3px">${lv==='upstairs'?'DN':'UP'}</text>`;
+   lab+=`<rect class="hit" data-act="room" data-room="${s.id}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"/>`;continue}
+  lab+=`<rect class="hit" data-act="room" data-room="${s.id}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"/>`;
+  lab+=roomLayer(s,view,1,o);
+ }
+ for(const w of WINS[lv]){if(w[0]==='h')det+=`<rect class="win" x="${w[2]}" y="${w[1]-2.3}" width="${w[3]-w[2]}" height="4.6"/><line class="tr" x1="${w[2]}" y1="${w[1]}" x2="${w[3]}" y2="${w[1]}"/>`;else det+=`<rect class="win" x="${w[1]-2.3}" y="${w[2]}" width="4.6" height="${w[3]-w[2]}"/><line class="tr" x1="${w[1]}" y1="${w[2]}" x2="${w[1]}" y2="${w[3]}"/>`}
+ for(const d of DOORS[lv]){const[t,a,b,L,sg,ext]=d;const gw=ext?'stroke-width:6':'';
+  if(t==='h'){const x=a,y=b;det+=`<line class="gap" style="${gw}" x1="${x}" y1="${y}" x2="${x+L}" y2="${y}"/><path class="dr" d="M${x} ${y}V${y+sg*L}A${L} ${L} 0 0 ${sg>0?0:1} ${x+L} ${y}"/>`}
+  else{const x=a,y=b;det+=`<line class="gap" x1="${x}" y1="${y}" x2="${x}" y2="${y+L}"/><path class="dr" d="M${x} ${y}H${x+sg*L}A${L} ${L} 0 0 ${sg>0?1:0} ${x} ${y+L}"/>`}}
+ let ed='';
+ if(o.edit&&o.sel){const s=SP[o.sel];const pts=[[s.x,s.y],[s.cx,s.y],[s.x+s.w,s.y],[s.x+s.w,s.cy],[s.x+s.w,s.y+s.h],[s.cx,s.y+s.h],[s.x,s.y+s.h],[s.x,s.cy]];
+  ed+=pts.map(p=>`<rect class="ed-h" x="${p[0]-3.6}" y="${p[1]-3.6}" width="7.2" height="7.2" rx="1.5"/>`).join('');
+  ed+=chip(s.cx,s.y+s.h-11,ftin(s.w),'',7)+`<g transform="rotate(-90 ${s.x+s.w-11} ${s.cy})">${chip(s.x+s.w-11,s.cy,ftin(s.h),'',7)}</g>`}
+ const bg=o.edit?`<rect x="-14" y="-14" width="328" height="428" fill="url(#grid)"/>`:'';
+ return `<svg class="plan" viewBox="-14 -12 328 426" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${LVN[lv]} floor plan, ${VN[view]} view">${bg}${fill}${wal}<rect class="ow" x="0" y="0" width="300" height="400"/>${det}${lab}${ed}</svg>`;
+}
+function extSVG(view,o){
+ const k=2.9;let z='',lab='';
+ const trees=[[70,90,72],[630,80,64],[150,300,46],[610,330,40],[100,1010,58],[40,700,50],[660,560,44],[350,1236,40]].map(t=>`<circle cx="${t[0]}" cy="${t[1]}" r="${t[2]}" fill="url(#tree)"/>`).join('');
+ const sat=`<g class="sat"><rect x="-60" y="-40" width="820" height="1320" fill="#7E8B6C"/><rect x="-60" y="-40" width="820" height="1320" fill="#7E8B6C" filter="url(#noise)"/>
+ <rect x="-60" y="-40" width="42" height="560" fill="#8E9094"/><rect x="-60" y="620" width="48" height="400" fill="#96918A"/><rect x="738" y="80" width="30" height="520" fill="#8E9094"/><rect x="742" y="700" width="30" height="380" fill="#999A9E"/>
+ <rect x="540" y="740" width="160" height="410" fill="#B8B5AD"/><path d="M540 1000h160M540 870h160" stroke="#A9A69E" stroke-width="2"/>
+ <rect x="300" y="320" width="170" height="120" fill="#A79E93"/><path d="M300 350h170M300 380h170M300 410h170M345 320v120M390 320v120M435 320v120" stroke="#978E83" stroke-width="1.5"/>
+ <rect x="215" y="848" width="240" height="40" fill="#6A5646"/><rect x="462" y="888" width="32" height="262" fill="#C5C1B8"/>
+ <rect x="-60" y="1150" width="820" height="50" fill="#C9C6BE"/><path d="M-60 1175h820" stroke="#BAB6AE" stroke-width="1" stroke-dasharray="1 48"/><rect x="-60" y="1200" width="820" height="100" fill="#5E6166"/><path d="M-60 1262h820" stroke="#C9B26A" stroke-width="3" stroke-dasharray="40 30"/>
+ ${trees}
+ <rect x="230" y="440" width="300" height="400" fill="#85878B"/><path d="M230 440l150 150v220L230 840M530 440l-150 150M530 840l-150-30M380 810v0" stroke="#74767A" stroke-width="3" fill="none"/><path d="M230 440L380 590L530 440M380 590V690L230 840M380 690L530 840" stroke="#707276" stroke-width="3" fill="none"/>
+ </g>`;
+ const outline=`<rect x="0" y="0" width="700" height="1150" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 10" opacity=".6"/>`;
+ for(const s of RAW.exterior){
+  const t=tintOf(s,view);if(t)z+=`<rect class="${t}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"/>`;
+  if(o.sel===s.id)z+=`<rect class="selr" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"/>`;
+  z+=`<rect class="zn" x="${s.x+3}" y="${s.y+3}" width="${s.w-6}" height="${s.h-6}"/>`;
+  lab+=`<rect class="hit" data-act="room" data-room="${s.id}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"/>`;
+ }
+ lab+=`<g data-act="house" style="cursor:pointer"><rect class="hit" x="232" y="442" width="296" height="396"/><text class="rl" x="380" y="650" font-size="${8.1*k}" style="fill:#fff;stroke:rgba(0,0,0,.55);stroke-width:5px;paint-order:stroke">HOUSE</text><text class="rd" x="380" y="676" font-size="${6.6*k}">tap to open floors</text></g>`;
+ for(const s of RAW.exterior)lab+=roomLayer(s,view,k,o);
+ lab+=`<text class="rd" x="700" y="1232" font-size="${6.4*k}" style="text-anchor:end">LINDEN CT</text>`;
+ return `<svg class="plan ext" viewBox="-40 -20 780 1250" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Exterior on satellite view, ${VN[view]} view">${sat}${outline}${z}${lab}</svg>`;
+}
+
+/* ================= screen pieces ================= */
+const sb=()=>`<div class="sb"><span>9:41</span><div class="isl"></div><span class="si"><svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.3c2.3 0 4.4.9 6 2.4l1.1-1.2A10.2 10.2 0 0 0 8 .6 10.2 10.2 0 0 0 .9 3.5L2 4.7a8.6 8.6 0 0 1 6-2.4zm0 3.4c1.4 0 2.6.5 3.6 1.4l1.1-1.2A6.8 6.8 0 0 0 8 4a6.8 6.8 0 0 0-4.7 1.9l1.1 1.2c1-.9 2.2-1.4 3.6-1.4zm0 3.3c.6 0 1.1.2 1.5.6L8 11.3 6.5 9.6c.4-.4.9-.6 1.5-.6z"/></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="18" height="9" rx="2" fill="currentColor"/><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" fill="currentColor" opacity=".45"/></svg></span></div>`;
+const hi=()=>`<div class="hi"></div>`;
+function summary(lv,view){
+ const a=lvAgg(lv),L=LVN[lv],ext=lv==='exterior';let A='',B='',bar='';
+ if(view==='plan'){A=ext?'Exterior · 8 zones · lot 8,050 sq ft':L+' · '+lvRooms(lv).length+' rooms · 1,200 sq ft';B=ext?'House outline from OpenStreetMap · drag zones to fit':'Property · 3 levels · 3,600 sq ft · built 1994';}
+ else if(view==='todo'){const ch=lvRooms(lv).flatMap(s=>AG[s.id].ch).sort((x,y)=>x.d-y.d);const nx=ch.find(c=>c.d>=0);A=`${a.today} today · ${a.due-a.today-a.od} this week`+(a.od?` · <span class="red">${a.od} overdue</span>`:'');B=nx?`Next: ${nx.t} · ${nx.who} · ${nx.d===0?'today':fd(nx.due)}`:'Nothing due on this level';}
+ else if(view==='future'){A=`${L} planned ${usd(a.plan)} · ${a.np} projects`;B=`Property ${usd(PROP.plan)} across ${PROP.np} projects`;}
+ else if(view==='past'){A=`${L} lifetime ${usd(a.life)}`+(a.last?` · last ${fd(a.last)}`:'');B=`Property lifetime ${usd(PROP.life)} · receipts on 11 of 14`;}
+ else if(view==='things'){A=`${L} · ${a.th} items`;B='Furnace filter 16×25×1 due Oct 2 · 1 spare';}
+ else if(view==='inv'){A=`${L} · ${a.n} items in ${a.spots} spots`;B=`<span class="acc">${LOWN} pantry items low · Shopping list</span>`;}
+ else if(view==='budget'){A=`${L}: ${usd(a.plan)} plan · ${usd(a.spent)} spent`;B=`Property: ${usd(PROP.plan)} planned · ${usd(PROP.spent)} spent`;bar=`<div class="bar"><i style="width:${Math.round(PROP.spent/(PROP.plan+PROP.spent)*100)}%"></i></div>`;}
+ return `<div class="strip" data-act="list"><div class="t"><div class="a">${A}</div><div class="b">${B}</div>${bar}</div>${ic('cr',16,2.2)}</div>`;
+}
+function viewMenu(view){return `<div class="menu" role="menu"><div class="mh">Show on plan</div>${VIEWS.map(v=>`<button class="mi" role="menuitemradio" aria-checked="${v[0]===view}" data-act="view" data-view="${v[0]}"><span class="ck">${v[0]===view?ic('check',17,2.4):''}</span><span>${v[1]}</span>${ic(v[2],19)}</button>`).join('')}</div>`}
+function canvas(st){
+ const {lv,view,edit}=st;
+ const head=edit?`<div class="nav"><span class="ac" data-act="edit" style="cursor:pointer">Cancel</span><span class="tl">Edit ${LVN[lv]}</span><span class="ac" style="font-weight:600;cursor:pointer" data-act="edit">Done</span></div>`
+ :`<div class="c-head"><div class="c-top"><div><div class="prop">14 Linden Ct</div><div class="prop-sub">Annapolis, MD</div></div><div class="c-act"><button class="cb" aria-label="Search">${ic('search',18,2)}</button><button class="cb" data-act="edit" aria-label="Edit plan">${ic('pencil',17,2)}</button><button class="cb" aria-label="Settings">${ic('gear',18,1.9)}</button></div></div>
+ <button class="vbtn" data-act="menu" aria-haspopup="menu">${ic(VIEWS.find(v=>v[0]===view)[2],18,2)}<span>${VN[view]}</span><span class="cd">${ic('cd',15,2.4)}</span></button></div>`;
+ const pills=`<div class="pills" role="tablist">${LEVELS.map(l=>`<button class="pill${l[0]===lv?' on':''}" role="tab" aria-selected="${l[0]===lv}" data-act="pill" data-lv="${l[0]}">${l[1]}</button>`).join('')}</div>`;
+ const ext=lv==='exterior';
+ const meta=`<div class="meta${ext?' ext':''}"><span>N ↑</span><span class="sc"><i style="width:${ext?44:57}px"></i>${ext?'10 FT':'5 FT'}</span></div>`;
+ const bottom=edit?`<div class="insp"><div class="ib">${ic('blocks',18)}</div><div style="flex:1"><b style="font-weight:600">${SP[st.sel].name}</b><div class="mut" style="font-size:13px">${ftin(SP[st.sel].w)} × ${ftin(SP[st.sel].h)} · snaps to 1 in · drag a wall</div></div><span class="tag a">Rename</span></div>
+ <div class="edbar"><span>${ic('plus',22)}Room</span><span>${ic('split',22)}Split</span><span>${ic('door',22)}Door</span><span>${ic('win',22)}Window</span><span>${ic('ruler',22)}Measure</span><span>${ic('undo',22)}Undo</span></div>`:summary(lv,view);
+ let over='';
+ if(st.menu)over+=viewMenu(view);
+ if(st.sheet==='room')over+=roomSheet(st.sel,view);
+ if(st.sheet==='add')over+=`<div class="scrim" data-act="close"></div>`+addSheet(st.sel,view);
+ return `<div class="scr cv-scr">${sb()}${head}${pills}<div class="cv">${planSVG(lv,view,{sel:st.sheet||edit?st.sel:null,edit})}${meta}</div>${bottom}${hi()}${over}</div>`;
+}
+const ADD=[['todo','To-Do','checks','Chore or one-off task, with repeat and reminders'],['future','Future Project','wrench','Improvement or repair, with estimate'],['past','Past Work','hist','Finished work, with cost, date and receipt'],['things','Appliance, Electronic or Furniture','sofa','Specs, dimensions, filters and bulbs'],['inv','Inventory item','box','Pantry, clothing or stored item'],['meas','Measurement','ruler','Width, depth, height of a spot, door or wall']];
+function addSheet(id,view){const s=SP[id],def=view==='plan'?'meas':view==='budget'?'future':view;
+ return `<div class="sheet" style="height:560px"><div class="grab"></div><div class="sh-h"><div class="tt"><h3>Add to ${s.name}</h3><div class="st">${LVN[s.lv]} · ${VN[view]} view is active, so ${ADD.find(a=>a[0]===def)[1]} is the default</div></div><button class="xb" data-act="close">${ic('x',14,2.4)}</button></div>
+ <div class="sh-b">${ADD.map(a=>`<div class="li" style="${a[0]===def?'background:var(--accent-soft);margin:0 -10px;padding:6px 10px;border-radius:12px;border-color:transparent':''}"><div class="ib${a[0]===def?'':' n'}">${ic(a[2],19)}</div><div class="m"><b>${a[1]}</b><small>${a[3]}</small></div>${a[0]===def?'<span class="tag a">Default</span>':ic('cr',15,2.2)}</div>`).join('')}</div>${hi()}</div>`}
+function roomSheet(id,view){
+ const s=SP[id],a=AG[id];let b='',btn='';
+ const area=Math.round(s.w*s.h/100).toLocaleString('en-US');
+ if(view==='todo'){
+  const grp=[['Overdue',c=>c.d<0,'red'],['Today',c=>c.d===0,''],['This week',c=>c.d>0&&c.d<=7,''],['Later',c=>c.d>7,'']];
+  for(const[g,f,cl]of grp){const L=a.ch.filter(f).sort((x,y)=>x.d-y.d);if(!L.length)continue;b+=`<div class="lh ${cl}"><span>${g}</span><span>${L.length}</span></div>`+L.map(c=>`<div class="li"><span class="cir"></span><div class="m"><b>${c.t}</b><small>${c.rep}${c.link?' · '+c.link:''}</small></div><span class="av" style="background:${PPL[c.who]}">${c.who[0]}</span><span class="r ${c.d<0?'red':''}">${c.d<0?-c.d+'d late':c.d===0?'Today':WK[D(c.due).getDay()]+' '+D(c.due).getDate()}</span></div>`).join('')}
+  if(!a.ch.length)b=empty('No chores here yet','Add a repeating chore like “Wipe counters, daily.”');btn='Add To-Do';}
+ else if(view==='future'||view==='past'){const L=view==='future'?a.fu:a.pa;b+=L.length?`<div class="lh"><span>${L.length} ${L.length>1?'projects':'project'}</span><span>${view==='future'?kd(a.plan)+' planned':kd(a.life)+' spent'}</span></div>`+L.map(p=>`<div class="li"><div class="ib n">${ic(view==='future'?'wrench':'receipt',18)}</div><div class="m"><b>${p.t}</b><small>${view==='future'?`<span class="tag ${p.st==='prog'?'a':''}" style="height:19px;font-size:11.5px">${STN[p.st]}</span>`:fdy(p.date)+' · est '+usd(p.est)}</small></div><span class="r">${usd(view==='future'?p.est:p.act)}</span></div>`).join(''):empty(view==='future'?'No planned projects':'No past work logged',view==='future'?'Add an idea with a rough estimate. You can refine it later.':'Log finished work with its cost, date and receipt.');btn=view==='future'?'Add Future Project':'Add Past Work';}
+ else if(view==='things'){b+=a.th.length?`<div class="lh"><span>${a.th.length} items</span><span>pinned on plan</span></div>`+a.th.map(t=>`<div class="li"><div class="ib n"><svg width="22" height="22" viewBox="-8 -8 16 16" class="gl" style="stroke:var(--ink-2)">${GL[t.ty]}</svg></div><div class="m"><b>${t.n}</b><small>${t.spec||'No specs yet'}</small></div>${ic('cr',15,2.2)}</div>`).join(''):empty('Nothing tracked here','Add appliances, bulbs, filters or furniture.');btn='Add Appliance / Furniture';}
+ else if(view==='inv'){b+=a.iv.length?`<div class="lh"><span>${a.iv.length} storage spots</span><span>${a.n} items</span></div>`+a.iv.map(v=>`<div class="li"><div class="ib n">${ic('box',18)}</div><div class="m"><b>${v[0]}</b><small>${s.name} › ${v[0]}</small></div><span class="r">${v[2]?`<span class="tag w">${v[2]}</span> `:''}${v[1]}</span></div>`).join(''):empty('No storage spots','Add a shelf, bin or drawer, then add items to it.');btn='Add Inventory item';}
+ else if(view==='budget'){b+=`<div class="card" style="margin:6px 0 0;background:var(--surface-2)"><div class="kv"><div><div class="k">Planned</div><div class="v acc">${usd(a.plan)}</div></div><div><div class="k">Spent (actuals)</div><div class="v">${usd(a.spent)}</div></div></div></div><div class="lh"><span>From Future Projects and Past Work</span><span>computed</span></div>`+[...a.fu,...a.pa].map(p=>`<div class="li"><div class="m"><b>${p.t}</b><small>${STN[p.st]}${p.date?' · '+fd(p.date):''}</small></div><span class="r">${p.st==='done'?usd(p.act):`<span class="acc">${usd(p.est)}</span>`}</span></div>`).join('')+(a.fu.length+a.pa.length?'':empty('No money tracked in this room yet','Add a Future Project to start a budget.'));btn='Add Future Project';}
+ else{b+=`<div class="lh"><span>Room</span></div><div class="li"><div class="m"><b>${ftin(s.w)} × ${ftin(s.h)}</b><small>${area} sq ft · from Build with blocks</small></div><span class="tag">Edit shape</span></div>`+(id==='kit'?`<div class="lh"><span>Measurements</span><span>2</span></div><div class="li"><div class="ib n">${ic('ruler',18)}</div><div class="m"><b>Fridge opening</b><small>32 in W × 40 in D · height not set</small></div>${ic('cr',15,2.2)}</div><div class="li"><div class="ib n">${ic('ruler',18)}</div><div class="m"><b>Window over sink</b><small>36 in W × 48 in H</small></div>${ic('cr',15,2.2)}</div>`:`<div class="lh"><span>Measurements</span><span>0</span></div>`+empty('No measurements','Measure openings, walls and doors for fit checks.'));btn='Add Measurement';}
+ return `<div class="sheet" style="height:456px"><div class="grab"></div><div class="sh-h"><div class="tt"><h3>${s.name}</h3><div class="st">${LVN[s.lv]} · ${ftin(s.w)} × ${ftin(s.h)} · ${VN[view]}</div></div><button class="xb" data-act="close" aria-label="Close">${ic('x',14,2.4)}</button></div><div class="sh-b">${b}</div><div class="sh-f"><button class="btn s" data-act="add" data-room="${id}">${ic('plus',18,2.4)}${btn}</button></div>${hi()}</div>`;
+}
+const empty=(t,d)=>`<div style="text-align:center;padding:26px 20px;color:var(--ink-2)"><div style="font-weight:600;color:var(--ink);margin-bottom:4px">${t}</div><div style="font-size:14px">${d}</div></div>`;
+/* ---------- static screens ---------- */
+const row=(l,v='',o={})=>`<div class="row">${o.i?`<div class="ib${o.n?' n':''}" style="width:30px;height:30px;border-radius:8px">${ic(o.i,17)}</div>`:''}<div class="lb">${l}${o.s?`<small>${o.s}</small>`:''}</div>${v?`<span class="vl">${v}</span>`:''}${o.t!==undefined?`<span class="tg${o.t?' on':''}"></span>`:''}${o.c?ic('cr',15,2.2).replace('class="ic"','class="ic cv2"'):''}</div>`;
+const nav=(b,t='',a='')=>`<div class="nav"><span class="bk">${b?ic('cl',22,2.4)+b:''}</span><span class="tl">${t}</span><span class="ac">${a}</span></div>`;
+function scrChore(){return `<div class="scr g">${sb()}${nav('Utility','','Edit')}<div class="body">
+<div class="lt" style="font-size:28px">Change HVAC filter</div><div class="lsub" style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag">Basement · Utility</span><span class="tag a">${ic('link',12,2.2)} Furnace</span></div>
+<div class="card" style="display:flex;align-items:center;gap:12px"><div style="flex:1"><div style="font-weight:600">Due Fri, Oct 2</div><div class="mut" style="font-size:13px">in 3 days · last done Jul 4</div></div><button class="btn sm">${ic('check',16,2.6)}Mark done</button></div>
+<div class="gh">Schedule</div><div class="grp">${row('Repeat','Every 90 days',{i:'repeat',c:1})}<div class="row"><div class="ib" style="width:30px;height:30px;border-radius:8px">${ic('person',17)}</div><div class="lb">Assignee</div><div class="seg" style="width:196px"><span class="on"><i class="dot" style="background:var(--matt)"></i>Matt</span><span><i class="dot" style="background:var(--sam)"></i>Sam</span><span>Any</span></div></div></div>
+<div class="gh">Reminders</div><div class="grp">${row('Push notification','',{i:'bell',t:1,s:'On the due day at 8:00 AM'})}</div>
+<div class="gh">Calendar</div><div class="grp">${row('Add to calendar','',{i:'cal',t:1,s:'Repeats every 90 days'})}
+<div class="row" style="padding:4px 16px 2px"><small class="mut" style="font-size:12px;letter-spacing:.03em">ICLOUD</small></div>
+<div class="row"><i class="dot" style="background:#E0A43A;width:11px;height:11px;border-radius:6px"></i><div class="lb">Home <span class="tag a" style="height:20px;font-size:11.5px;margin-left:4px">Suggested</span></div><span class="acc">${ic('check',18,2.6)}</span></div>
+<div class="row"><i class="dot" style="background:#4C9A5B;width:11px;height:11px;border-radius:6px"></i><div class="lb">Family</div></div>
+<div class="row" style="padding:4px 16px 2px"><small class="mut" style="font-size:12px;letter-spacing:.03em">GOOGLE · MATT.LINDEN@GMAIL.COM</small></div>
+<div class="row"><i class="dot" style="background:#3F7FE0;width:11px;height:11px;border-radius:6px"></i><div class="lb">House</div></div>
+<div class="row"><i class="dot" style="background:#9A6BD8;width:11px;height:11px;border-radius:6px"></i><div class="lb">Matt</div></div></div>
+<div class="gf">Google calendars appear here when the Google account is added in iPhone Settings › Calendar › Accounts.</div>
+</div>${hi()}</div>`}
+function scrProject(){const li=[['LVP planks, 720 sq ft','Floor & Decor · Material',2160,1],['Underlayment, 6 rolls','Floor & Decor · Material',310,1],['Transitions + quarter-round','Floor & Decor · Material',96,1],['Install helper, 2 days','Labor',600,0],['Caulk + touch-up paint','Other',14,0]];
+ return `<div class="scr g">${sb()}${nav('Rec Room','','Edit')}<div class="body">
+<div class="lt">LVP flooring</div><div class="lsub">Basement · Rec Room · 336 sq ft · started Sep 14</div>
+<div class="card"><div class="steps"><div class="n d"><i></i>Idea</div><div class="ln d"></div><div class="n d"><i></i>Planned</div><div class="ln d"></div><div class="n c"><i></i>In Progress</div><div class="ln"></div><div class="n"><i></i>Done</div></div></div>
+<div class="gh">Estimate vs actual</div><div class="card"><div class="kv"><div><div class="k">Estimate</div><div class="v">$4,200 <small>28 h</small></div></div><div><div class="k">Actual so far</div><div class="v acc">$3,180 <small>19 h</small></div></div></div><div class="bar" style="height:8px;margin-top:12px"><i style="width:76%"></i></div><div class="mut" style="font-size:13px;margin-top:6px">76% of estimate used · $1,020 left</div></div>
+<div class="gh">Line items</div><div class="grp">${li.map(l=>row(l[0],usd(l[2])+(l[3]?' '+ic('receipt',14,2):''),{s:l[1]})).join('')}</div>
+<div class="gh">Receipts</div><div class="card" style="display:flex;gap:12px;align-items:center"><div class="thumb"></div><div style="flex:1"><div style="font-weight:600">Floor &amp; Decor</div><div class="mut" style="font-size:13px">Sep 18, 2026 · $2,566.12 · 3 lines matched</div></div><span class="tag o">Scanned</span></div>
+<div style="padding:16px"><button class="btn">${ic('check',18,2.6)}Mark Done…</button><div class="gf" style="margin:8px 0 0;text-align:center">Asks for the final cost, the date and a receipt, then moves the project to Past Work.</div></div>
+</div>${hi()}</div>`}
+function scrAppliance(){return `<div class="scr g">${sb()}${nav('Kitchen','','Edit')}<div class="body">
+<div class="lt" style="font-size:26px">LG French Door Refrigerator</div><div class="lsub">LRFXS2503S · Kitchen · for project “Replace fridge”</div>
+<div style="margin:0 16px 14px"><div class="seg"><span>Owned</span><span class="on">Planning to buy</span></div></div>
+<div class="warnc"><div class="wh">${ic('warn',20,2)}Won’t fit the Fridge opening</div>
+<div style="display:flex;gap:14px;padding:12px 14px;align-items:center">
+<svg width="104" height="112" viewBox="-6 -8 58 62" style="flex:none"><rect x="0" y="0" width="32" height="40" fill="none" stroke="var(--ink-2)" stroke-width=".9" stroke-dasharray="2 1.5"/><path d="M-4 0v40M36 0v40" stroke="var(--wall)" stroke-width="2.4"/><rect x="-1.9" y="0" width="35.8" height="33.8" fill="var(--danger-soft)" stroke="var(--danger)" stroke-width="1"/><text x="16" y="-2.5" font-size="4.6" text-anchor="middle" fill="var(--danger)" font-family="var(--ui)" font-weight="600">35¾</text><text x="16" y="47" font-size="4.3" text-anchor="middle" fill="var(--ink-2)" font-family="var(--ui)">opening 32 × 40</text></svg>
+<div style="flex:1;font-size:14px;display:grid;gap:7px"><div><b class="red">Width 35¾ in</b> vs 32 in<div class="red" style="font-size:12.5px">3¾ in too wide</div></div><div><b>Depth 33¾ in</b> vs 40 in<div class="okc" style="font-size:12.5px">6¼ in to spare</div></div><div><b>Height 69¾ in</b><div class="acc" style="font-size:12.5px">Opening height not measured · Add</div></div></div></div>
+<div style="padding:0 14px 12px;font-size:12.5px" class="mut">The maker asks for 1 in above and ⅛ in on each side. The fit check includes that gap.</div></div>
+<div class="gh">Dimensions</div><div class="grp">${row('Width','35¾ in')}${row('Depth','33¾ in',{s:'31¾ in without handles'})}${row('Height','69¾ in')}</div>
+<div class="gh">Specs</div><div class="grp">${row('Capacity','25 cu ft')}${row('Water filter','LT1000P',{c:1})}${row('Price','$2,399',{s:'Estimate on project'})}</div>
+</div>${hi()}</div>`}
+function scrMeasure(){const k=SP.kit;return `<div class="scr g">${sb()}<div class="nav"><span class="ac">Cancel</span><span class="tl">New Measurement</span><span class="ac" style="font-weight:600">Save</span></div><div class="body">
+<div class="card" style="padding:10px"><svg viewBox="-6 -6 144 127" width="100%" height="150" style="display:block"><rect x="0" y="0" width="132" height="115" style="fill:var(--room);stroke:var(--wall);stroke-width:1.6"/><rect x="2" y="2" width="44" height="18" style="fill:var(--room-alt);stroke:var(--ink-3);stroke-width:.5"/><rect x="62" y="2" width="30" height="18" style="fill:var(--room-alt);stroke:var(--ink-3);stroke-width:.5"/><rect x="11" y="3" width="11" height="14" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:.9;stroke-dasharray:2 1.3"/><text x="66" y="68" class="rl" font-size="7.5">KITCHEN</text><text x="66" y="77" class="rd" font-size="6.2">13′2″ × 11′6″</text><g transform="translate(16.5 10)"><circle r="4.6" style="fill:var(--accent)"/><circle r="1.6" style="fill:var(--on-accent)"/></g></svg><div class="mut" style="font-size:12.5px;text-align:center">Drag the pin to the spot being measured</div></div>
+<div class="gh">Details</div><div class="grp">${row('Name','Fridge opening')}${row('Attached to','Kitchen › spot',{c:1})}</div>
+<div class="gh" style="display:flex;justify-content:space-between"><span>Dimensions</span></div><div class="grp">
+<div class="row"><div class="lb">Width</div><span class="fld on"><b>32</b><span class="mut">in</span></span></div>
+<div class="row"><div class="lb">Depth</div><span class="fld"><b>40</b><span class="mut">in</span></span></div>
+<div class="row"><div class="lb">Height <small>Optional</small></div><span class="fld"><b class="mut" style="font-weight:400">—</b><span class="mut">in</span></span></div>
+<div class="row"><div class="seg" style="flex:1"><span class="on">in</span><span>ft + in</span><span>cm</span></div></div></div>
+<div style="display:flex;gap:8px;margin:12px 16px 0"><button class="btn s sm" style="flex:1">${ic('ruler',16)}Use Measure app</button><button class="btn s sm" style="flex:1">${ic('camera',16)}Add photo</button></div>
+</div><div class="kp">${['1','2','3','4','5','6','7','8','9','⅛ ¼ ½','0','⌫'].map((x,i)=>`<span class="${i===9||i===11?'x':''}">${x}</span>`).join('')}</div>${hi()}</div>`}
+function scrStorage(){const it=[['Wool overcoat','Winter · Matt'],['Snow boots','Winter · Matt'],['Flannel shirts ×4','Winter · Matt'],['Ski gloves + beanies','Winter · Matt']];
+ const tr=(d,l,n,o={})=>`<div class="row" style="padding-left:${16+d*20}px;${o.hl?'background:var(--accent-soft)':''}">${o.x!==undefined?`<span class="mut" style="width:14px">${o.x?ic('cd',14,2.4):ic('cr',14,2.4)}</span>`:'<span style="width:14px"></span>'}<div class="lb" style="${o.hl?'font-weight:600':''}">${l}${o.s?`<small>${o.s}</small>`:''}</div><span class="vl">${n}</span></div>`;
+ return `<div class="scr g">${sb()}<div class="nav"><span></span><span></span><span class="ac">${ic('plus',22,2.2)}</span></div><div class="body">
+<div class="lt">Storage</div><div class="srch">${ic('search',17,2)}<b>winter coat</b></div>
+<div class="card" style="margin-top:10px;box-shadow:inset 0 0 0 1.5px var(--accent)"><div class="mut" style="font-size:12.5px">Best match</div><div style="font-weight:600;font-size:16px;margin:2px 0 6px">Wool overcoat · Matt</div><div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:13.5px" class="acc">Upstairs ${ic('cr',12,2.4)} Attic ${ic('cr',12,2.4)} Shelf 2 ${ic('cr',12,2.4)} <b>Bin “Winter – Matt”</b></div></div>
+<div class="gh">Upstairs › Attic · 86 items</div><div class="grp tree">
+${tr(0,'Shelf 1','22',{x:0,s:'Holiday decor'})}${tr(0,'Shelf 2','39',{x:1})}${tr(1,'Bin “Winter – Matt”','14',{x:1,hl:1})}
+${it.map(i=>tr(2,i[0],'',{s:i[1]})).join('')}${tr(1,'Bin “Winter – Sam”','11',{x:0})}${tr(1,'Bin “Summer – Matt”','0',{x:0,s:'Empty, ready for swap'})}${tr(0,'Shelf 3','25',{x:0,s:'Luggage, camping'})}</div>
+<div class="gh">Other locations</div><div class="grp">${row('Upstairs › Walk-in Closet','146',{i:'tshirt',n:1,c:1})}${row('Basement › Storage','72',{i:'box',n:1,c:1})}</div>
+</div>${hi()}</div>`}
+function scrSwap(){const g=[['Attic › Shelf 2 › Bin “Winter – Matt”','Matt',[['Wool overcoat',1],['Snow boots',1],['Flannel shirts ×4',0]],11],['Attic › Shelf 2 › Bin “Winter – Sam”','Sam',[['Down parka',1],['Wool sweaters ×3',0]],9],['Basement › Storage › Shelf C','Sam',[['Rain boots',0]],3]];
+ return `<div class="scr g">${sb()}${nav('Inventory','','Done')}<div class="body">
+<div class="lt">Seasonal swap</div><div class="lsub">Summer → Winter · 9 of 29 items moved</div>
+<div style="margin:0 16px 4px"><div class="seg"><span>Matt</span><span>Sam</span><span class="on">Everyone</span></div></div>
+<div class="gh">Take out of storage · Winter</div>
+${g.map(x=>`<div class="grp" style="margin-bottom:10px"><div class="row"><div class="ib n" style="width:30px;height:30px;border-radius:8px">${ic('box',16)}</div><div class="lb" style="font-weight:600;font-size:14px">${x[0]}</div><span class="av" style="background:${PPL[x[1]]}">${x[1][0]}</span></div>${x[2].map(i=>`<div class="row" style="min-height:40px"><span class="cir" style="${i[1]?'background:var(--accent);border-color:var(--accent)':''}"></span><div class="lb" style="${i[1]?'color:var(--ink-2);text-decoration:line-through':''}">${i[0]}</div><span class="vl" style="font-size:13px">${i[1]?'In rotation':'Stored'}</span></div>`).join('')}<div class="row" style="min-height:38px"><div class="lb acc" style="font-size:14px">${x[3]} more items</div></div></div>`).join('')}
+<div class="gh">Put into storage · Summer</div><div class="grp">${row('23 summer items in rotation','',{i:'tshirt',s:'Suggested: Attic › Shelf 2 › Bin “Summer – Matt”',c:1})}</div>
+</div>${hi()}</div>`}
+function scrShop(){const p=[['Olive oil','¼ bottle left','Pantry › Middle shelf',''],['Jasmine rice','1 lb left','Pantry › Floor bins',''],['Coffee beans','4 oz left','Pantry › Middle shelf','Sam'],['Oat milk','0 cartons','Kitchen › Fridge','Sam'],['Chickpeas','1 can','Pantry › Middle shelf',''],['Paper towels','2 rolls','Pantry › Floor bins',''],['Peanut butter','expires Oct 9','Pantry › Middle shelf','Matt']];
+ const f=[['Furnace filter 16×25×1 MERV 11','Due Oct 2 · 1 spare · buy 2-pack','filter'],['Fridge water filter LT1000P','Due Oct 15 · 0 spares','fridge'],['A19 E26 LED 2700K','Kitchen pendant out · 0 spares','bulb']];
+ return `<div class="scr g">${sb()}${nav('Inventory','',ic('share',20,2))}<div class="body">
+<div class="lt">Shopping list</div>
+<div class="chips" style="margin:6px 16px 4px"><span class="tag" style="background:var(--ink);color:var(--screen);height:30px;padding:0 13px;font-size:13.5px;border-radius:15px">All · 10</span><span class="tag" style="height:30px;padding:0 13px;font-size:13.5px;border-radius:15px">Pantry · 7</span><span class="tag" style="height:30px;padding:0 13px;font-size:13.5px;border-radius:15px">Filters &amp; bulbs · 3</span></div>
+<div class="gh">Pantry · running low</div><div class="grp">${p.map(i=>`<div class="row"><span class="cir"></span><div class="lb">${i[0]}<small>${i[1]} · ${i[2]}</small></div>${i[3]?`<span class="av" style="background:${PPL[i[3]]}">${i[3][0]}</span>`:''}</div>`).join('')}</div>
+<div class="gh">Filters &amp; bulbs due</div><div class="grp">${f.map(i=>`<div class="row"><span class="cir"></span><div class="lb">${i[0]}<small class="${i[1].includes('0 spares')?'wrn':''}">${i[1]}</small></div><span class="mut">${ic(i[2],18)}</span></div>`).join('')}</div>
+<div class="gf">Low items come from the “running low” flag. Filters and bulbs come from appliance specs and their linked spares.</div>
+</div>${hi()}</div>`}
+function scrOnboard(){const o=[['scan','Scan','Walk each room with your iPhone. About 2 minutes a room. Uses LiDAR: iPhone 15 Pro detected.',''],['blocks','Build with blocks','Drag rooms onto a grid and type dimensions. Starts from a template: Colonial, Ranch, Split-level.','on'],['photo','Trace a photo','Use a listing screenshot or closing papers. Tap two points and enter a known length to set the scale.',''],['rough','Rough it in','Enter approximate square footage and a room list. You have a working plan in about 60 seconds and can refine it later.','']];
+ return `<div class="scr g">${sb()}<div class="nav"><span class="bk">${ic('cl',22,2.4)}</span><span class="tl mut" style="font-weight:500;font-size:15px">Step 2 of 3</span><span class="ac">Skip</span></div><div class="body">
+<div class="lt" style="font-size:28px">How do you want to create your plan?</div><div class="lsub">All four make the same editable plan. You can switch methods or refine it any time.</div>
+${o.map(x=>`<div class="opt ${x[3]}"><div class="ib">${ic(x[0],24)}</div><div style="flex:1"><b>${x[1]}${x[0]==='rough'?' <span class="tag o" style="height:20px;font-size:11.5px;vertical-align:2px">Fastest</span>':''}</b><p>${x[2]}</p></div></div>`).join('')}
+<div class="gf" style="margin:4px 32px 0">The yard is set up next, from the satellite view of 14 Linden Ct.</div>
+<div style="padding:14px 16px 0"><button class="btn">Continue with blocks</button></div>
+</div>${hi()}</div>`}
+function scrSettings(){return `<div class="scr g">${sb()}<div class="nav"><span></span><span></span><span class="ac" style="font-weight:600">Done</span></div><div class="body">
+<div class="lt">Settings</div>
+<div class="grp">${row('14 Linden Ct','',{i:'home',s:'Annapolis, MD · 3 levels + exterior',c:1})}</div>
+<div class="gh">Default floor</div><div class="grp">${LEVELS.map(l=>`<div class="row"><div class="lb">${l[1]}</div>${l[0]==='ground'?`<span class="acc">${ic('check',19,2.6)}</span>`:''}</div>`).join('')}</div>
+<div class="gf">The plan opens here. Change floors with the pill tabs.</div>
+<div class="gh">Housemates</div><div class="grp"><div class="row"><span class="av" style="background:var(--matt)">M</span><div class="lb">Matt</div></div><div class="row"><span class="av" style="background:var(--sam)">S</span><div class="lb">Sam</div></div><div class="row"><div class="lb acc">Add housemate</div></div></div>
+<div class="gf">Housemates are name labels for now. Shared access comes in v1.2.</div>
+<div class="gh">Reminders</div><div class="grp">${row('Default time','8:00 AM',{i:'bell',c:1})}${row('Default calendar','Home · iCloud',{i:'cal',c:1})}</div>
+<div class="gh">Plan</div><div class="grp">${row('Units','Feet + inches',{c:1})}${row('Show plan as a list','',{t:0,s:'Also on automatically with VoiceOver'})}</div>
+<div class="gh">Data</div><div class="grp">${row('iCloud sync','On',{i:'cloud',s:'Last synced 9:38 AM'})}${row('Export CSV','',{i:'share',c:1})}</div>
+</div>${hi()}</div>`}
+
+/* ================= mount ================= */
+const LIVE={lv:'ground',view:'plan',sel:'kit',sheet:null,menu:false,edit:false};
+function frame(html,num,title,cap){return `<div class="frame"><div class="wrap"><div class="phone">${html}</div></div><p class="cap"><b><i>${num}</i>${title}</b>${cap}</p></div>`}
+const cv=o=>canvas(Object.assign({lv:'ground',view:'plan',sel:'kit',sheet:null,menu:false,edit:false},o));
+if(typeof document!=='undefined'){
+ const live=document.getElementById('live');
+ const draw=()=>{live.innerHTML=canvas(LIVE)};
+ live.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]');if(!t)return;const a=t.dataset.act;
+  if(a==='pill'){LIVE.lv=t.dataset.lv;LIVE.sheet=null;LIVE.menu=false;if(LIVE.edit)LIVE.sel=lvRooms(LIVE.lv).find(s=>s.w>=70)?.id||LIVE.sel}
+  else if(a==='menu'){LIVE.menu=!LIVE.menu;LIVE.sheet=null}
+  else if(a==='view'){LIVE.view=t.dataset.view;LIVE.menu=false}
+  else if(a==='room'){if(LIVE.menu){LIVE.menu=false}else{LIVE.sel=t.dataset.room;if(!LIVE.edit)LIVE.sheet='room'}}
+  else if(a==='add'){if(!LIVE.edit){LIVE.sel=t.dataset.room;LIVE.sheet='add';LIVE.menu=false}}
+  else if(a==='close'){LIVE.sheet=null}
+  else if(a==='edit'){LIVE.edit=!LIVE.edit;LIVE.sheet=null;LIVE.menu=false;if(LIVE.edit&&(LIVE.lv==='exterior'||SP[LIVE.sel].lv!==LIVE.lv))LIVE.sel=LIVE.lv==='exterior'?'by':lvRooms(LIVE.lv)[0].id}
+  else if(a==='house'){LIVE.lv='ground'}
+  else return;
+  e.stopPropagation();draw();
+ });
+ draw();
+ document.getElementById('g-views').innerHTML=[
+  [cv({}),'2.1','Plan (default)','Listing-style plan: small-caps names and width × depth. Rooms under 7′ show the name only, and the room sheet has the full dimensions.'],
+  [cv({view:'todo'}),'2.2','To-Dos','Chips count chores due within 7 days. Kitchen, Laundry and Half Bath have red edges because something there is overdue.'],
+  [cv({view:'future'}),'2.3','Future Projects','Tint steps: under $1k, $1k–$5k, $5k or more. The chip shows the planned total and a count when there are 2 or more projects.'],
+  [cv({view:'past'}),'2.4','Past Work','Lifetime spend per room plus the month it was last worked on.'],
+  [cv({view:'things'}),'2.5','Appliances, Electronics & Furniture','Architectural plan symbols sit at each item’s pin, with a count in the room’s corner.'],
+  [cv({view:'inv'}),'2.6','Inventory','Item count per room and number of storage spots. The strip links to the shopping list.'],
+  [cv({view:'budget'}),'2.7','Budget','Computed, never typed in: planned (accent) over spent, per room. Floor and property totals are in the strip.'],
+  [cv({lv:'exterior'}),'2.8','Exterior · Plan','Muted satellite image with the house outline from OpenStreetMap and 8 zones, including Patio and Front bed. Tap the house to go to Ground.'],
+  [cv({lv:'exterior',view:'future'}),'2.9','Exterior · Future Projects','The patio extension ($6.8k) gets the strongest tint. The same view rules apply outdoors.'],
+  [cv({lv:'upstairs',view:'inv'}),'2.10','Upstairs · Inventory','The walk-in closet (146) and the attic (86) hold most belongings.'],
+  [cv({lv:'basement',view:'things'}),'2.11','Basement · Appliances','Furnace, water heater, sump pump and dehumidifier in Utility, which is hatched as unfinished.']
+ ].map(f=>frame(...f)).join('');
+ document.getElementById('g-sheets').innerHTML=[
+  [cv({view:'todo',menu:true}),'3.1','View dropdown','One choice at a time, and Plan is the default. Each view has its own icon, and a checkmark shows the active one.'],
+  [cv({view:'todo',sheet:'add'}),'3.2','“+” add picker','The six add types. The active view’s type is highlighted and marked as the default.'],
+  [cv({view:'todo',sheet:'room'}),'3.3','Room sheet: Kitchen, To-Dos','The half-height sheet groups chores into Overdue, Today, This week and Later. The room stays highlighted above it.']
+ ].map(f=>frame(...f)).join('');
+ document.getElementById('g-detail').innerHTML=[
+  [scrChore(),'4.1','Chore detail','Repeat rule, assignee, push reminder, and Add to calendar with a picker that lists iCloud “Home” and a Google account’s calendars.'],
+  [scrProject(),'4.2','Project detail','Idea → Planned → In Progress → Done, estimate vs. actual, line items and a scanned receipt.'],
+  [scrAppliance(),'4.3','Appliance detail with fit check','A 35¾ in fridge against the 32 × 40 in “Fridge opening” measurement gets a warning.'],
+  [scrMeasure(),'4.4','Measurement entry','Pinned to a spot on the room plan. Width and depth, with height optional. It can be filled from the Measure app or a photo.']
+ ].map(f=>frame(...f)).join('');
+ document.getElementById('g-inv').innerHTML=[
+  [scrStorage(),'5.1','Storage spot tree and search','“winter coat” resolves to Upstairs › Attic › Shelf 2 › Bin “Winter – Matt”.'],
+  [scrSwap(),'5.2','Seasonal swap','Everything stored for the coming season, grouped by where it is, with a filter by housemate.'],
+  [scrShop(),'5.3','Pantry shopping list','Low pantry items plus filters and bulbs that are due, with filters at the top.']
+ ].map(f=>frame(...f)).join('');
+ document.getElementById('g-setup').innerHTML=[
+  [scrOnboard(),'6.1','Onboarding: create your plan','Scan, Build with blocks, Trace a photo, or Rough it in. All four produce the same geometry.'],
+  [cv({edit:true,sel:'kit'}),'6.2','Plan editor mode','Grid, wall handles and editable dimensions. The toolbar replaces the summary strip. Doors and windows are display-only.'],
+  [scrSettings(),'6.3','Settings','Default floor is Ground. Also housemates (as labels), reminder defaults, list view, iCloud and CSV export.']
+ ].map(f=>frame(...f)).join('');
+ /* scale phones */
+ const fit=()=>document.querySelectorAll('.wrap').forEach(w=>{w.firstElementChild.style.transform=`scale(${w.clientWidth/393})`});
+ fit();if(window.ResizeObserver)new ResizeObserver(fit).observe(document.body);else addEventListener('resize',fit);
+ /* theme */
+ const setT=m=>{if(m==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',m);document.querySelectorAll('[data-theme-set]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.themeSet===m)));try{localStorage.setItem('ho-theme',m)}catch(e){}};
+ document.querySelectorAll('[data-theme-set]').forEach(b=>b.addEventListener('click',()=>setT(b.dataset.themeSet)));
+ try{const m=localStorage.getItem('ho-theme');if(m)setT(m)}catch(e){}
+}
+</script>
+</body>
+</html>

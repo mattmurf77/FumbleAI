@@ -1,0 +1,24 @@
+# Render Blueprint for the Home helper service.
+# Setup guide: docs/setup/RENDER.md
+# The service is stateless and stores no user data (docs/homeowner-app/07-merged-plan.md §1 decision 4).
+services:
+  - type: web
+    name: home-server
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: server
+    buildCommand: npm install --omit=dev --no-audit --no-fund
+    startCommand: node src/index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - server/**
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOME_API_KEY
+        sync: false # Render asks for this value when you create the Blueprint.
+      - key: OVERPASS_CONTACT
+        sync: false # Optional: an email for OpenStreetMap's usage policy (sent in the User-Agent).

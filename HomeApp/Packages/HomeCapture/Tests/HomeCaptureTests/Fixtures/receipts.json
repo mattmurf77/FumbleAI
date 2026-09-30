@@ -1,0 +1,49 @@
+[
+ {"name": "hardware", "today": "2026-09-29",
+  "expect": {"total": 256612, "date": "2026-09-18", "vendor": "FLOOR & DECOR"},
+  "lines": [
+   {"text": "FLOOR & DECOR", "y": 0.04},
+   {"text": "Store #212  (555) 010-2000", "y": 0.08},
+   {"text": "09/18/2026 14:22", "y": 0.12},
+   {"text": "LVP PLANK OAK 22.4 SF x 40", "y": 0.30},
+   {"text": "1,999.20", "y": 0.30},
+   {"text": "UNDERLAYMENT", "y": 0.34},
+   {"text": "$356.00", "y": 0.34},
+   {"text": "SUBTOTAL 2,355.20", "y": 0.62},
+   {"text": "TAX 210.92", "y": 0.66},
+   {"text": "TOTAL", "y": 0.70},
+   {"text": "$2,566.12", "y": 0.705},
+   {"text": "VISA ****1234 2,566.12", "y": 0.75},
+   {"text": "TOTAL SAVINGS 3,000.00", "y": 0.80}
+  ]},
+ {"name": "amount-due-month-name", "today": "2026-03-01",
+  "expect": {"total": 48500, "date": "2026-02-14", "vendor": "Ace Plumbing LLC"},
+  "lines": [
+   {"text": "Ace Plumbing LLC", "y": 0.05},
+   {"text": "Invoice 1043", "y": 0.10},
+   {"text": "Date: Feb 14, 2026", "y": 0.15},
+   {"text": "Replace shutoff valve 185.00", "y": 0.40},
+   {"text": "Labor 300.00", "y": 0.45},
+   {"text": "Amount Due: $485.00", "y": 0.85}
+  ]},
+ {"name": "no-total-keyword-future-date", "today": "2026-09-29",
+  "expect": {"total": 1999, "date": "2025-12-01", "vendor": "Corner Market"},
+  "lines": [
+   {"text": "12.34", "y": 0.02},
+   {"text": "Corner Market", "y": 0.06},
+   {"text": "Valid thru 12/01/2027", "y": 0.10},
+   {"text": "2025-12-01", "y": 0.12},
+   {"text": "Milk 4.99", "y": 0.3},
+   {"text": "Eggs 15.00", "y": 0.35},
+   {"text": "19.99", "y": 0.9},
+   {"text": "CASH 20.00", "y": 0.5}
+  ]},
+ {"name": "grand-total-and-old-date", "today": "2026-09-29",
+  "expect": {"total": 123456, "date": null, "vendor": "Big Box Home Center"},
+  "lines": [
+   {"text": "Big Box Home Center", "y": 0.1},
+   {"text": "Printed 01/02/2019", "y": 0.12},
+   {"text": "Total 1,000.00", "y": 0.6},
+   {"text": "Grand Total 1,234.56", "y": 0.65}
+  ]}
+]

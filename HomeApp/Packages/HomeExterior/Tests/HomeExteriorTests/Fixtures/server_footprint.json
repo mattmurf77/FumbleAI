@@ -1,0 +1,51 @@
+{
+ "query": {
+  "lat": 40.0,
+  "lon": -75.0
+ },
+ "building": {
+  "osmId": 1001,
+  "polygon": [
+   [
+    40.00006105,
+    -75.00003434
+   ],
+   [
+    40.00002393,
+    -74.9999021
+   ],
+   [
+    39.99993895,
+    -74.99994221
+   ],
+   [
+    39.99997607,
+    -75.00007444
+   ]
+  ],
+  "areaM2": 120.0,
+  "containsPoint": true,
+  "buildingType": "house"
+ },
+ "roads": [
+  {
+   "osmId": 2001,
+   "name": "Elm St",
+   "highway": "residential",
+   "distanceM": 17.2,
+   "polyline": [
+    [
+     40.00018087,
+     -75.00093813
+    ],
+    [
+     40.00018087,
+     -74.99906187
+    ]
+   ]
+  }
+ ],
+ "candidateCount": 3,
+ "cached": false,
+ "attribution": "\u00a9 OpenStreetMap contributors (ODbL)"
+}
