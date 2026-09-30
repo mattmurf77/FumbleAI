@@ -15,7 +15,8 @@ let package = Package(
     ],
     targets: [
         .target(name: "HomeStore", dependencies: [.product(name: "HomeCore", package: "HomeCore"), .product(name: "GRDB", package: "GRDB.swift")]),
-        .testTarget(name: "HomeStoreTests", dependencies: ["HomeStore", .product(name: "HomeCoreTesting", package: "HomeCore")]),
+        .testTarget(name: "HomeStoreTests", dependencies: ["HomeStore", .product(name: "HomeCoreTesting", package: "HomeCore"),
+                                                  .product(name: "GRDB", package: "GRDB.swift")]),
     ],
     swiftLanguageVersions: [.v5]
 )

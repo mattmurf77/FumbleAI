@@ -257,6 +257,9 @@ final class AppEnvironment {
 
     /// Set by `onOpenURL` / notification taps (`home://chore/<uuid>`); the Plan screen consumes and clears it.
     var pendingDeepLink: ItemRef?
+    /// Floor the Plan tab should switch to (e.g. the Outside level from "Yard & Exterior"); the Plan screen consumes
+    /// and clears it.
+    var pendingLevelID: UUID?
     /// Lens currently shown on the plan (persisted via SettingsRepository.lastLens).
     var selectedLens: LensID = .plan
     var syncStatus: SyncStatus = .upToDate(lastSync: nil)

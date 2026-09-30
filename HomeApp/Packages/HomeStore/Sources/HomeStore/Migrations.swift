@@ -7,6 +7,7 @@ enum Migrations {
     static let v1Core = "v1_core"
     static let v1Local = "v1_local"
     static let v1Search = "v1_search"
+    static let v2OutdoorThings = "v2_outdoor_things"
 
     /// Current FTS index layout version (`app_meta.fts_version`). Bump to force a rebuild on launch.
     static let ftsVersion = 1
@@ -16,6 +17,8 @@ enum Migrations {
         m.registerMigration(v1Core) { db in try db.execute(sql: coreSQL) }
         m.registerMigration(v1Local) { db in try db.execute(sql: localSQL) }
         m.registerMigration(v1Search) { db in try db.execute(sql: searchSQL) }
+        // Rebuilds `thing` (chore / inventory_item reference it); GRDB defers FK checks to the end of the migration.
+        m.registerMigration(v2OutdoorThings) { db in try db.execute(sql: outdoorThingsSQL) }
         return m
     }
 
@@ -407,6 +410,42 @@ CREATE TABLE notification_snooze (       -- active "Snooze 1h" requests (max 2, 
 );
 
 CREATE TABLE app_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);  -- device_id, device_nickname, fts_version...
+"""#
+
+    // MARK: v2_outdoor_things — adds 'outdoor' to thing.category (SQLite table rebuild; no triggers/views on thing)
+    static let outdoorThingsSQL = #"""
+CREATE TABLE thing_new (
+  id                  TEXT PRIMARY KEY NOT NULL,
+  property_id         TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+  scope               TEXT NOT NULL CHECK (scope IN ('space','level','property')),
+  space_id            TEXT REFERENCES space(id) ON DELETE SET NULL,
+  level_id            TEXT REFERENCES level(id) ON DELETE SET NULL,
+  category            TEXT NOT NULL CHECK (category IN ('appliance','electronic','furniture','fixture','system','outdoor')),
+  name                TEXT NOT NULL,
+  ownership           TEXT NOT NULL DEFAULT 'owned' CHECK (ownership IN ('owned','planned')),
+  template_key        TEXT,
+  attributes_json     TEXT NOT NULL DEFAULT '{}',
+  brand TEXT, model TEXT, serial TEXT,
+  purchase_date       TEXT,
+  purchase_price_cents INTEGER,
+  currency_code       TEXT NOT NULL DEFAULT 'USD',
+  warranty_end        TEXT,
+  width_in REAL, depth_in REAL, height_in REAL,
+  fit_measurement_id  TEXT REFERENCES measurement(id) ON DELETE SET NULL,
+  pin_x REAL, pin_y REAL,
+  notes               TEXT,
+  created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, deleted_at DATETIME,
+  CHECK ((scope='space' AND space_id IS NOT NULL AND level_id IS NOT NULL) OR
+         (scope='level' AND space_id IS NULL AND level_id IS NOT NULL) OR
+         (scope='property' AND space_id IS NULL AND level_id IS NULL)),
+  CHECK (json_valid(attributes_json))
+);
+INSERT INTO thing_new SELECT * FROM thing;
+DROP TABLE thing;
+ALTER TABLE thing_new RENAME TO thing;
+CREATE INDEX thing_space    ON thing(space_id)     WHERE deleted_at IS NULL;
+CREATE INDEX thing_level    ON thing(level_id)     WHERE deleted_at IS NULL;
+CREATE INDEX thing_template ON thing(template_key) WHERE deleted_at IS NULL;
 """#
 
     // MARK: v1_search — FTS5, local-only and rebuildable (LLD §3.4)

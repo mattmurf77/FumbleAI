@@ -8,15 +8,17 @@ enum AddDestination: Hashable, Identifiable {
     /// Opens the project form with status Done and the Done fields (FR-CNV-35).
     case pastWork(spaceID: UUID?, levelID: UUID?)
     case thing(spaceID: UUID?)
+    /// Thing form in outdoor mode (Outside level): Outdoor category and outdoor templates first.
+    case outdoorThing(spaceID: UUID?)
     case inventory(spaceID: UUID?)
     case measurement(spaceID: UUID?)
 
-    init(kind: AddKind, spaceID: UUID?, levelID: UUID?) {
+    init(kind: AddKind, spaceID: UUID?, levelID: UUID?, outdoor: Bool = false) {
         switch kind {
         case .todo: self = .todo(spaceID: spaceID, levelID: levelID)
         case .futureProject: self = .futureProject(spaceID: spaceID, levelID: levelID)
         case .pastWork: self = .pastWork(spaceID: spaceID, levelID: levelID)
-        case .thing: self = .thing(spaceID: spaceID)
+        case .thing: self = outdoor ? .outdoorThing(spaceID: spaceID) : .thing(spaceID: spaceID)
         case .inventory: self = .inventory(spaceID: spaceID)
         case .measurement: self = .measurement(spaceID: spaceID)
         }
@@ -27,7 +29,7 @@ enum AddDestination: Hashable, Identifiable {
         case .todo: return .todo
         case .futureProject: return .futureProject
         case .pastWork: return .pastWork
-        case .thing: return .thing
+        case .thing, .outdoorThing: return .thing
         case .inventory: return .inventory
         case .measurement: return .measurement
         }
@@ -39,6 +41,8 @@ enum AddDestination: Hashable, Identifiable {
             return "\(kind.rawValue):\(s?.uuidString ?? "-"):\(l?.uuidString ?? "-")"
         case .thing(let s), .inventory(let s), .measurement(let s):
             return "\(kind.rawValue):\(s?.uuidString ?? "-")"
+        case .outdoorThing(let s):
+            return "\(kind.rawValue)-outdoor:\(s?.uuidString ?? "-")"
         }
     }
 }
@@ -60,6 +64,8 @@ struct AddRouter: View {
             ProjectForm(spaceID: spaceID, levelID: levelID, initialStatus: .done)
         case .thing(let spaceID):
             ThingForm(spaceID: spaceID)
+        case .outdoorThing(let spaceID):
+            ThingForm(spaceID: spaceID, outdoor: true)
         case .inventory(let spaceID):
             InventoryForm(spaceID: spaceID)
         case .measurement(let spaceID):
@@ -74,7 +80,14 @@ struct AddKindInfo {
     let detail: String
     let symbol: String
 
-    static func of(_ kind: AddKind) -> AddKindInfo {
+    static func of(_ kind: AddKind, outdoor: Bool = false) -> AddKindInfo {
+        if outdoor {
+            switch kind {
+            case .thing: return AddKindInfo(title: "Plant or outdoor feature", detail: "Trees, flowers, patio, fire pit, shed, pool…", symbol: "tree")
+            case .inventory: return AddKindInfo(title: "Inventory item", detail: "Tools, garden supplies, seasonal gear", symbol: "shippingbox")
+            default: break
+            }
+        }
         switch kind {
         case .todo: return AddKindInfo(title: "To-Do", detail: "Chore or one-off task, with repeat and reminders", symbol: "checklist")
         case .futureProject: return AddKindInfo(title: "Future Project", detail: "Improvement or repair, with estimate", symbol: "hammer")

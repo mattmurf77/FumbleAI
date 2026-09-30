@@ -59,8 +59,9 @@ struct PlanScreen: View {
         }
         .feedbackPage((isEditing ? "Plan editor" : "Plan") + " · " + (model.level?.name ?? "Home"), context: ["lens": env.selectedLens.rawValue])
         .background(theme.paper.ignoresSafeArea())
-        // Pushed from the home hub: no "‹ Home" while the editor is open (Done / Cancel leave edit mode first).
+        // No back button or tab bar while the editor is open (Done / Cancel leave edit mode first).
         .navigationBarBackButtonHidden(isEditing)
+        .toolbar(isEditing ? .hidden : .visible, for: .tabBar)
         .overlay {
             if model.loaded && model.property == nil {
                 ContentUnavailableView("No home yet", systemImage: "house",
@@ -69,9 +70,11 @@ struct PlanScreen: View {
             }
         }
         .task {
-            model.preferredLevelId = initialLevelID
+            model.preferredLevelId = initialLevelID ?? env.pendingLevelID
             await model.run(env: env)
         }
+        .onChange(of: env.pendingLevelID, initial: true) { _, _ in consumePendingLevel() }
+        .onChange(of: model.levels.map(\.id)) { _, _ in consumePendingLevel() }
         .onChange(of: env.selectedLens) { _, l in model.setLens(l, env: env) }
         .onChange(of: model.levelId) { _, _ in viewport = .zero }
         .onChange(of: env.pendingDeepLink) { _, ref in if let ref { Task { await handleDeepLink(ref) } } }
@@ -84,9 +87,9 @@ struct PlanScreen: View {
         }
         .sheet(item: $addRequest) { r in
             if let direct = r.direct {
-                AddRouter(destination: AddDestination(kind: direct, spaceID: r.spaceID, levelID: r.levelID))
+                AddRouter(destination: AddDestination(kind: direct, spaceID: r.spaceID, levelID: r.levelID, outdoor: r.outdoor))
             } else {
-                AddPicker(spaceID: r.spaceID, levelID: r.levelID, preselected: r.preselected, placeName: r.placeName)
+                AddPicker(spaceID: r.spaceID, levelID: r.levelID, preselected: r.preselected, placeName: r.placeName, outdoor: r.outdoor)
             }
         }
         .sheet(isPresented: $showSearch) {
@@ -116,6 +119,18 @@ struct PlanScreen: View {
             Button("Cancel", role: .cancel) { renameTarget = nil }
         } message: {
             Text("1–60 characters.")
+        }
+    }
+
+    /// "Yard & Exterior" on the Home tab asks for a floor through `env.pendingLevelID`; switch once it exists
+    /// (a yard added a moment ago may not have reached `model.levels` yet).
+    private func consumePendingLevel() {
+        guard let id = env.pendingLevelID else { return }
+        if model.levels.contains(where: { $0.id == id }) {
+            env.pendingLevelID = nil
+            model.select(level: id, env: env)
+        } else if model.levelId == nil {
+            model.preferredLevelId = id
         }
     }
 
@@ -362,7 +377,8 @@ struct PlanScreen: View {
 
     private func add(in spaceId: UUID) {
         let name = model.model.geometry.space(spaceId)?.name
-        addRequest = AddRequest(spaceID: spaceId, levelID: model.levelId, preselected: model.lens.addDefault, placeName: name)
+        addRequest = AddRequest(spaceID: spaceId, levelID: model.levelId, preselected: model.lens.addDefault, placeName: name,
+                                outdoor: model.level?.isExterior == true)
     }
 
     private func pinTapped(_ pin: PinModel) {
@@ -478,6 +494,8 @@ struct AddRequest: Identifiable, Hashable {
     var preselected: AddKind?
     var direct: AddKind? = nil
     var placeName: String? = nil
+    /// Outside level: outdoor-oriented picker and thing form.
+    var outdoor = false
 }
 
 enum FooterLinkTarget: String, Identifiable, Hashable {

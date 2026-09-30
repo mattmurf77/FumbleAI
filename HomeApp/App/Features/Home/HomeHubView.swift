@@ -3,37 +3,29 @@ import HomeCore
 import HomeCoreTesting
 import PlanCanvas
 
-/// The landing screen once a property exists: "What would you like to do?" with the home's name/address, a live
-/// one-line summary and a grid of large cards, one per area of the app.
-///
-/// Navigation: this view owns the app's `NavigationStack` and is its root. Every card pushes (so the system back
-/// button returns here) except screens that bring their own `NavigationStack` (Search, Settings, yard setup), which
-/// open as sheets. Plan "lenses" (To-Dos, Future, Past, Things, Inventory, Budget) push `PlanScreen` after setting
-/// `env.selectedLens`, which `PlanScreenModel.run` reads when the screen starts. Deep links (`env.pendingDeepLink`)
-/// push the plan so `PlanScreen` can consume them.
+/// The Home tab: "What would you like to do?" with the home's name/address, a live one-line summary, the house
+/// (floor plan, yard) and four task cards. Cards switch tabs (`onNavigate`); Search, Settings and yard setup open as
+/// sheets. Counts come from the `HomeHubModel` that `MainTabView` shares across tabs.
 struct HomeHubView: View {
-    @Environment(AppEnvironment.self) private var env
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    @State private var model = HomeHubModel()
-    @State private var path: [HubRoute] = []
+    let model: HomeHubModel
+    /// Handles `.tab` and `.plan` actions (tab switches).
+    let onNavigate: (HubAction) -> Void
+
     @State private var sheet: HubSheet?
 
     private var theme: PlanTheme { PlanTheme.forScheme(scheme) }
     private var columns: Int { typeSize.isAccessibilitySize ? 1 : 2 }
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             content
                 .navigationTitle("Home")
                 .toolbar(.hidden, for: .navigationBar)
-                .navigationDestination(for: HubRoute.self) { route in destination(route) }
         }
-        .tint(theme.accent)
-        .task { await model.run(env: env) }
-        .onAppear { if env.pendingDeepLink != nil { showPlanForDeepLink() } }
-        .onChange(of: env.pendingDeepLink) { _, ref in if ref != nil { showPlanForDeepLink() } }
+        .feedbackPage("Home")
         .sheet(item: $sheet) { s in sheetContent(s) }
     }
 
@@ -69,11 +61,16 @@ struct HomeHubView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let sub = model.subtitle {
-                Text(sub)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.ink2)
-                    .lineLimit(2)
+            HStack(alignment: .top, spacing: 8) {
+                if let sub = model.subtitle {
+                    Text(sub)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.ink2)
+                        .lineLimit(2)
+                        .padding(.top, 12)
+                }
+                Spacer(minLength: 0)
+                HubCircleButton(symbol: "gearshape", label: "Settings", theme: theme) { sheet = .settings }
             }
             Text("What would you like to do?")
                 .font(.system(size: 28, weight: .bold))
@@ -95,7 +92,6 @@ struct HomeHubView: View {
             .padding(.top, 2)
             .accessibilityElement(children: .combine)
         }
-        .padding(.top, 8)
     }
 
     @ViewBuilder
@@ -137,51 +133,11 @@ struct HomeHubView: View {
 
     private func perform(_ action: HubAction) {
         switch action {
-        case .push(let route):
-            if case .plan(let lens, _) = route { env.selectedLens = lens }
-            path.append(route)
         case .sheet(let s):
             sheet = s
+        default:
+            onNavigate(action)
         }
-    }
-
-    @ViewBuilder
-    private func destination(_ route: HubRoute) -> some View {
-        switch route {
-        case .plan(_, let levelID):
-            planScreen(levelID: levelID)
-        case .todosList:
-            ToDosListView()
-        case .budget:
-            BudgetDrillDown()
-        case .storage:
-            StorageTreeView()
-        case .shoppingList:
-            ShoppingListView()
-        case .seasonalSwap:
-            SeasonalSwapView()
-        case .housemates:
-            PeopleEditor()
-        }
-    }
-
-    /// `PlanScreen` pushed onto the hub's stack. It has no `NavigationStack` of its own (its search / settings /
-    /// add flows are sheets), so the system back button ("Home") returns here.
-    ///
-    /// Opens on `levelID` when given (e.g. the Outside level for "Yard & Exterior").
-    @ViewBuilder
-    private func planScreen(levelID: UUID?) -> some View {
-        PlanScreen(initialLevelID: levelID)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(theme.paper, for: .navigationBar)
-    }
-
-    /// A notification tap / `home://` link / search hit for a chore or project: the plan consumes
-    /// `env.pendingDeepLink`, so make sure it is on screen.
-    private func showPlanForDeepLink() {
-        sheet = nil
-        if case .plan? = path.last { return }
-        path.append(.plan(lens: env.selectedLens))
     }
 
     @ViewBuilder
@@ -195,11 +151,119 @@ struct HomeHubView: View {
             if let property = model.property {
                 YardSetupSheet(property: property) { levelID in
                     sheet = nil
-                    env.selectedLens = .plan
-                    path.append(.plan(lens: .plan, levelID: levelID))
+                    onNavigate(.plan(lens: .plan, levelID: levelID))
                 }
             }
         }
+    }
+}
+
+/// The Projects and Stuff tabs: a short header and grouped rows. Rows push inside the tab's stack, open create
+/// forms as sheets, or switch to the Plan tab with a lens (`onNavigate`).
+struct HubRowsScreen: View {
+    @Environment(\.colorScheme) private var scheme
+
+    let title: String
+    let subtitle: String
+    let feedbackName: String
+    let sections: [HubRowSection]
+    let onNavigate: (HubAction) -> Void
+
+    @State private var path: [HubRoute] = []
+    @State private var adding: AddDestination?
+
+    private var theme: PlanTheme { PlanTheme.forScheme(scheme) }
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            List {
+                Section {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(theme.ink2)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 4, trailing: 4))
+                }
+                ForEach(sections) { section in
+                    Section(section.title) {
+                        ForEach(section.rows) { row in rowView(row) }
+                    }
+                }
+            }
+            .navigationTitle(title)
+            .navigationDestination(for: HubRoute.self) { route in destination(route) }
+        }
+        .tint(theme.accent)
+        .feedbackPage(feedbackName)
+        .sheet(item: $adding) { d in AddRouter(destination: d) }
+    }
+
+    private func rowView(_ row: HubRow) -> some View {
+        Button { perform(row.action) } label: {
+            HStack(spacing: 12) {
+                HubSymbolTile(symbol: row.symbol, theme: theme, size: 36)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.title).font(.body.weight(.semibold)).foregroundStyle(theme.ink)
+                    Text(row.detail).font(.subheadline).foregroundStyle(theme.ink2).lineLimit(2)
+                }
+                .multilineTextAlignment(.leading)
+                Spacer(minLength: 6)
+                if let badge = row.badge {
+                    HubBadge(text: badge, tone: row.badgeTone, theme: theme)
+                }
+                Image(systemName: isAdd(row.action) ? "plus" : "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.ink3)
+            }
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func isAdd(_ action: HubAction) -> Bool {
+        if case .add = action { return true }
+        return false
+    }
+
+    private func perform(_ action: HubAction) {
+        switch action {
+        case .push(let route): path.append(route)
+        case .add(let d): adding = d
+        default: onNavigate(action)
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ route: HubRoute) -> some View {
+        switch route {
+        case .budget: BudgetDrillDown()
+        case .storage: StorageTreeView()
+        case .shoppingList: ShoppingListView()
+        case .seasonalSwap: SeasonalSwapView()
+        }
+    }
+}
+
+struct HubCircleButton: View {
+    let symbol: String
+    let label: String
+    let theme: PlanTheme
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(theme.ink)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(theme.surface))
+                .overlay(Circle().strokeBorder(theme.separator, lineWidth: 0.5))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 
@@ -241,41 +305,12 @@ struct HubCardView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(HubPressStyle())
-
-            if let title = card.secondaryTitle, let action = card.secondaryAction {
-                Rectangle().fill(theme.separator).frame(height: 0.5)
-                Button { onTap(action) } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: LensID.plan.symbol)
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(title)
-                            .font(.system(size: 13, weight: .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundStyle(theme.accent)
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(card.title): \(title)")
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .frame(minHeight: 150)
+        .frame(minHeight: 132)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(theme.surface))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(theme.separator, lineWidth: 0.5))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .contextMenu {
-            Button { onTap(card.action) } label: { Text("Open \(card.title)") }
-            if let title = card.secondaryTitle, let action = card.secondaryAction {
-                Button { onTap(action) } label: { Label(title, systemImage: LensID.plan.symbol) }
-            }
-        }
     }
 }
 
@@ -384,33 +419,6 @@ struct HubGridPaper: View {
     }
 }
 
-/// Short-lived hint over the plan (e.g. "Tap “Outside” in the floor pills").
-struct HubPlanHint: View {
-    let text: String
-    let theme: PlanTheme
-    @State private var visible = true
-
-    var body: some View {
-        ZStack {
-            if visible {
-                Label(text, systemImage: "hand.tap")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(theme.onAccent)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(theme.accent))
-                    .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    .onTapGesture { withAnimation { visible = false } }
-            }
-        }
-        .task {
-            try? await Task.sleep(for: .seconds(5))
-            withAnimation { visible = false }
-        }
-    }
-}
-
 // MARK: - Yard setup
 
 /// "Yard & Exterior" when the plan has no outside level: explains, then either maps the yard from the home's
@@ -504,24 +512,24 @@ struct YardSetupSheet: View {
 
 // MARK: - Previews
 
-#Preview("Home hub") {
-    HomeHubView().environment(AppEnvironment.preview())
+#Preview("Home tab") {
+    MainTabView().environment(AppEnvironment.preview())
 }
 
-#Preview("Home hub · large text") {
-    HomeHubView()
+#Preview("Home tab · large text") {
+    MainTabView()
         .environment(AppEnvironment.preview())
         .environment(\.dynamicTypeSize, .accessibility2)
 }
 
-#Preview("Home hub · dark") {
-    HomeHubView()
+#Preview("Home tab · dark") {
+    MainTabView()
         .environment(AppEnvironment.preview())
         .preferredColorScheme(.dark)
 }
 
 #Preview("No home") {
-    HomeHubView().environment(AppEnvironment.preview(sample: false))
+    MainTabView().environment(AppEnvironment.preview(sample: false))
 }
 
 #Preview("Cards") {
@@ -534,11 +542,11 @@ struct YardSetupSheet: View {
         Grid(horizontalSpacing: 10, verticalSpacing: 10) {
             GridRow {
                 HubCardView(card: HomeHubCatalog.todos(counts), theme: .light, onTap: { _ in })
-                HubCardView(card: HomeHubCatalog.inventory(counts), theme: .light, onTap: { _ in })
+                HubCardView(card: HomeHubCatalog.projects(counts), theme: .light, onTap: { _ in })
             }
             GridRow {
-                HubCardView(card: HomeHubCatalog.things(counts), theme: .light, onTap: { _ in })
-                HubCardView(card: HomeHubCatalog.budget(counts), theme: .light, onTap: { _ in })
+                HubCardView(card: HomeHubCatalog.stuff(counts), theme: .light, onTap: { _ in })
+                HubCardView(card: HomeHubCatalog.search, theme: .light, onTap: { _ in })
             }
         }
         HubWideCardView(card: HomeHubCatalog.yard(counts), theme: .light, onTap: { _ in })

@@ -72,6 +72,16 @@ final class MoneyAndFormatTests: XCTestCase {
         XCTAssertNil(HomeLengthFormatter.parse(""))
     }
 
+    func testTemplateCatalogKeysAndOutdoor() {
+        let keys = ThingTemplate.catalog.map(\.key)
+        XCTAssertEqual(Set(keys).count, keys.count)
+        let outdoor = ThingTemplate.catalog.filter { $0.category == .outdoor }
+        XCTAssertGreaterThanOrEqual(outdoor.count, 19)
+        for k in ["tree", "flower_bed", "patio", "fire_pit", "shed", "pool"] { XCTAssertEqual(ThingTemplate.find(k)?.category, .outdoor, k) }
+        XCTAssertEqual(ThingTemplate.defaultSymbol(for: .outdoor), "tree")
+        XCTAssertEqual(try JSONDecoder().decode(Thing.Category.self, from: Data(#""outdoor""#.utf8)), .outdoor)
+    }
+
     func testForwardCompatibleEnumsAndScope() throws {
         let decoded = try JSONDecoder().decode([Level.Kind].self, from: Data(#"["floor","mezzanine"]"#.utf8))
         XCTAssertEqual(decoded, [.floor, .unknown])

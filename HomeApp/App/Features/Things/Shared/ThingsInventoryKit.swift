@@ -210,6 +210,16 @@ extension TIK {
         "refrigerator": TemplateExtra(defaultName: "Fridge"),
         "washer": TemplateExtra(defaultName: "Washing machine"),
         "tv": TemplateExtra(defaultName: "TV", fieldUnits: ["screenSize": "in"], integerFields: ["screenSize"]),
+        "tree": TemplateExtra(fieldUnits: ["heightFt": "ft"]),
+        "flower_bed": TemplateExtra(defaultName: "Flower bed"),
+        "hedge": TemplateExtra(fieldUnits: ["lengthFt": "ft"]),
+        "patio": TemplateExtra(fieldUnits: ["areaSqFt": "sq ft"], integerFields: ["areaSqFt"]),
+        "deck": TemplateExtra(fieldUnits: ["areaSqFt": "sq ft"], integerFields: ["areaSqFt"]),
+        "pool": TemplateExtra(fieldUnits: ["gallons": "gal"], integerFields: ["gallons"]),
+        "hot_tub": TemplateExtra(fieldUnits: ["gallons": "gal"], integerFields: ["gallons"], spareNameFormat: "Hot tub filter {filterModel}"),
+        "fence": TemplateExtra(fieldUnits: ["lengthFt": "ft", "heightFt": "ft"]),
+        "sprinkler_system": TemplateExtra(integerFields: ["zones"]),
+        "outdoor_lighting": TemplateExtra(spareNameFormat: "{bulbBase} bulb"),
     ]
 
     static func extra(for templateKey: String?) -> TemplateExtra {
@@ -220,9 +230,10 @@ extension TIK {
         extra(for: template.key).defaultName ?? template.name
     }
 
-    /// Catalog grouped by category (picker sections), categories in a fixed order.
-    static func templatesByCategory(_ catalog: [ThingTemplate] = ThingTemplate.catalog) -> [(Thing.Category, [ThingTemplate])] {
-        let order: [Thing.Category] = [.appliance, .electronic, .furniture, .fixture, .system]
+    /// Catalog grouped by category (picker sections), categories in a fixed order; Outdoor last, or first outside.
+    static func templatesByCategory(_ catalog: [ThingTemplate] = ThingTemplate.catalog, outdoorFirst: Bool = false) -> [(Thing.Category, [ThingTemplate])] {
+        let indoor: [Thing.Category] = [.appliance, .electronic, .furniture, .fixture, .system]
+        let order: [Thing.Category] = outdoorFirst ? [.outdoor] + indoor : indoor + [.outdoor]
         return order.compactMap { c in
             let t = catalog.filter { $0.category == c }
             return t.isEmpty ? nil : (c, t)
@@ -232,7 +243,7 @@ extension TIK {
     static func categoryTitle(_ c: Thing.Category) -> String {
         switch c {
         case .appliance: return "Appliance"; case .electronic: return "Electronic"; case .furniture: return "Furniture"
-        case .fixture: return "Fixture"; case .system: return "System"; case .unknown: return "Other"
+        case .fixture: return "Fixture"; case .system: return "System"; case .outdoor: return "Outdoor"; case .unknown: return "Other"
         }
     }
 

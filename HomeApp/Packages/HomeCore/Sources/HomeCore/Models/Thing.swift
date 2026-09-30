@@ -1,11 +1,11 @@
 import Foundation
 import PlanKit
 
-/// A durable item: appliance, electronic, furniture, fixture or system. LLD §3.2 `thing`.
+/// A durable item: appliance, electronic, furniture, fixture, system or outdoor feature. LLD §3.2 `thing`.
 public struct Thing: SyncedModel {
     public static let recordType = RecordType.thing
     public enum Category: String, ForwardCompatibleEnum {
-        case appliance, electronic, furniture, fixture, system, unknown
+        case appliance, electronic, furniture, fixture, system, outdoor, unknown
         public static var unknownCase: Category { .unknown }
     }
     /// Planned things are "plan to buy one" (HLD §9-10): drawn dashed and excluded from counts.
@@ -94,7 +94,7 @@ public struct ThingTemplate: Hashable, Codable, Sendable, Identifiable {
     public static func defaultSymbol(for c: Thing.Category) -> String {
         switch c {
         case .appliance: return "refrigerator"; case .electronic: return "tv"; case .furniture: return "sofa"
-        case .fixture: return "lightbulb"; case .system: return "flame"; case .unknown: return "shippingbox"
+        case .fixture: return "lightbulb"; case .system: return "flame"; case .outdoor: return "tree"; case .unknown: return "shippingbox"
         }
     }
 
@@ -153,5 +153,69 @@ public struct ThingTemplate: Hashable, Codable, Sendable, Identifiable {
         ThingTemplate(key: "sink", name: "Sink", category: .fixture, symbol: "sink"),
         ThingTemplate(key: "toilet", name: "Toilet", category: .fixture, symbol: "toilet"),
         ThingTemplate(key: "bathtub", name: "Bathtub", category: .fixture, symbol: "bathtub"),
+    ] + outdoorCatalog
+
+    static let sunChoices = ["full sun", "part sun", "shade"]
+
+    /// Yard, garden and outdoor living (the Outside level).
+    static let outdoorCatalog: [ThingTemplate] = [
+        ThingTemplate(key: "tree", name: "Tree", category: .outdoor, symbol: "tree", fields: [
+            Field("species", "Species", .text), Field("plantedDate", "Planted", .date), Field("heightFt", "Approx. height (ft)", .number)],
+                      suggestedChore: SuggestedChore(title: "Prune tree", rule: RepeatRule(freq: .monthly, interval: 12))),
+        ThingTemplate(key: "shrub", name: "Bush / shrub", category: .outdoor, symbol: "leaf", fields: [
+            Field("species", "Species", .text), Field("plantedDate", "Planted", .date), Field("sun", "Sun", .choice, choices: sunChoices)],
+                      suggestedChore: SuggestedChore(title: "Trim bushes", rule: RepeatRule(freq: .monthly, interval: 6))),
+        ThingTemplate(key: "flower_bed", name: "Flowers / flower bed", category: .outdoor, symbol: "camera.macro", fields: [
+            Field("plants", "Plants", .text), Field("lifecycle", "Type", .choice, choices: ["perennial", "annual", "mixed"]),
+            Field("bloomSeason", "Bloom season", .choice, choices: ["spring", "summer", "fall", "winter"]),
+            Field("sun", "Sun", .choice, choices: sunChoices)]),
+        ThingTemplate(key: "hedge", name: "Hedge", category: .outdoor, symbol: "leaf.fill", fields: [
+            Field("species", "Species", .text), Field("lengthFt", "Length (ft)", .number)],
+                      suggestedChore: SuggestedChore(title: "Trim hedge", rule: RepeatRule(freq: .monthly, interval: 3))),
+        ThingTemplate(key: "vegetable_garden", name: "Vegetable garden", category: .outdoor, symbol: "carrot", fields: [
+            Field("crops", "Crops", .text), Field("raisedBed", "Raised bed", .bool), Field("sun", "Sun", .choice, choices: sunChoices)]),
+        ThingTemplate(key: "patio", name: "Patio", category: .outdoor, symbol: "square.grid.3x3.fill", fields: [
+            Field("surface", "Surface", .choice, choices: ["concrete", "pavers", "stone", "brick", "gravel"]),
+            Field("areaSqFt", "Area (sq ft)", .number)]),
+        ThingTemplate(key: "deck", name: "Deck", category: .outdoor, symbol: "square.split.1x2", fields: [
+            Field("material", "Material", .choice, choices: ["wood", "composite", "PVC"]), Field("areaSqFt", "Area (sq ft)", .number),
+            Field("stainColor", "Stain / color", .text)],
+                      suggestedChore: SuggestedChore(title: "Seal deck", rule: RepeatRule(freq: .monthly, interval: 24))),
+        ThingTemplate(key: "fire_pit", name: "Fire pit", category: .outdoor, symbol: "flame.fill", fields: [
+            Field("fuel", "Fuel", .choice, choices: ["wood", "propane", "natural gas"])]),
+        ThingTemplate(key: "shed", name: "Shed", category: .outdoor, symbol: "house.lodge", fields: [
+            Field("material", "Material", .choice, choices: ["wood", "metal", "resin"]), Field("power", "Has power", .bool)]),
+        ThingTemplate(key: "pool", name: "Pool", category: .outdoor, symbol: "figure.pool.swim", fields: [
+            Field("type", "Type", .choice, choices: ["in-ground", "above-ground"]), Field("gallons", "Volume (gal)", .number),
+            Field("heated", "Heated", .bool), Field("sanitizer", "Sanitizer", .choice, choices: ["chlorine", "salt", "other"])],
+                      suggestedChore: SuggestedChore(title: "Test pool water", rule: RepeatRule(freq: .weekly, interval: 1))),
+        ThingTemplate(key: "hot_tub", name: "Hot tub", category: .outdoor, symbol: "bubbles.and.sparkles", fields: [
+            Field("gallons", "Volume (gal)", .number), Field("filterModel", "Filter model", .text)],
+                      suggestedChore: SuggestedChore(title: "Clean hot tub filter", rule: RepeatRule(freq: .monthly, interval: 1))),
+        ThingTemplate(key: "grill", name: "Grill", category: .outdoor, symbol: "frying.pan", fields: [
+            Field("fuel", "Fuel", .choice, choices: ["propane", "natural gas", "charcoal", "pellet", "electric"])],
+                      suggestedChore: SuggestedChore(title: "Deep clean grill", rule: RepeatRule(freq: .monthly, interval: 6))),
+        ThingTemplate(key: "outdoor_furniture", name: "Outdoor furniture", category: .outdoor, symbol: "chair.lounge", fields: [
+            Field("material", "Material", .choice, choices: ["wood", "metal", "wicker", "plastic"]), Field("hasCushions", "Cushions", .bool)]),
+        ThingTemplate(key: "pergola", name: "Pergola / gazebo", category: .outdoor, symbol: "tent", fields: [
+            Field("material", "Material", .choice, choices: ["wood", "vinyl", "aluminum", "steel"])]),
+        ThingTemplate(key: "fence", name: "Fence", category: .outdoor, symbol: "rectangle.split.3x1", fields: [
+            Field("material", "Material", .choice, choices: ["wood", "vinyl", "chain link", "metal", "composite"]),
+            Field("lengthFt", "Length (ft)", .number), Field("heightFt", "Height (ft)", .number)]),
+        ThingTemplate(key: "playset", name: "Playset", category: .outdoor, symbol: "figure.play", fields: [
+            Field("material", "Material", .choice, choices: ["wood", "metal", "plastic"])],
+                      suggestedChore: SuggestedChore(title: "Inspect playset", rule: RepeatRule(freq: .monthly, interval: 12))),
+        ThingTemplate(key: "sprinkler_system", name: "Sprinkler system", category: .outdoor, symbol: "sprinkler.and.droplets", fields: [
+            Field("zones", "Zones", .number), Field("controller", "Controller", .text)],
+                      suggestedChore: SuggestedChore(title: "Winterize sprinklers", rule: RepeatRule(freq: .monthly, interval: 12))),
+        ThingTemplate(key: "outdoor_lighting", name: "Outdoor lighting", category: .outdoor, symbol: "lamp.floor", fields: [
+            Field("type", "Type", .choice, choices: ["path", "flood", "string", "wall", "landscape"]),
+            Field("power", "Power", .choice, choices: ["hardwired", "low voltage", "solar", "plug-in"]),
+            Field("bulbBase", "Bulb base", .choice, choices: ["E26", "E12", "GU10", "MR16", "integrated LED", "other"]),
+            Field("timer", "Timer / sensor", .bool)]),
+        ThingTemplate(key: "lawn_mower", name: "Lawn mower", category: .outdoor, symbol: "leaf.arrow.triangle.circlepath", fields: [
+            Field("type", "Type", .choice, choices: ["push", "self-propelled", "riding", "robotic"]),
+            Field("fuel", "Fuel", .choice, choices: ["gas", "battery", "corded"])],
+                      suggestedChore: SuggestedChore(title: "Service lawn mower", rule: RepeatRule(freq: .monthly, interval: 12))),
     ]
 }

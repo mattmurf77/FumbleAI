@@ -2,9 +2,10 @@ import SwiftUI
 import HomeCore
 import HomeCoreTesting
 
-/// Create / edit an appliance, electronic, furniture, fixture or system (spec 06, spec 07 fit check).
+/// Create / edit an appliance, electronic, furniture, fixture, system or outdoor feature (spec 06, spec 07 fit check).
 ///
 /// - `ThingForm(spaceID:)` — "+" → Appliance/Electronic/Furniture, defaults to that room (nil = whole house).
+/// - `ThingForm(spaceID:outdoor: true)` — "+" on Outside: Outdoor category, outdoor templates first.
 /// - `ThingForm(thingID:)` — edit; adds spare stock ("Track spares"), maintenance chore and delete.
 /// Self-contained: presents its own `NavigationStack`; show it in a sheet.
 struct ThingForm: View {
@@ -14,6 +15,7 @@ struct ThingForm: View {
     @Environment(\.dismiss) private var dismiss
 
     private let mode: Mode
+    private let outdoor: Bool
     private let onSaved: ((Thing) -> Void)?
 
     @State private var state = TIK.ThingFormState()
@@ -37,13 +39,18 @@ struct ThingForm: View {
     @State private var choreNote: String?
     @State private var errorText: String?
 
-    init(spaceID: UUID?, onSaved: ((Thing) -> Void)? = nil) {
+    init(spaceID: UUID?, outdoor: Bool = false, onSaved: ((Thing) -> Void)? = nil) {
         mode = .create(spaceID)
+        self.outdoor = outdoor
         self.onSaved = onSaved
+        var initial = TIK.ThingFormState()
+        if outdoor { initial.category = .outdoor }
+        _state = State(initialValue: initial)
     }
 
     init(thingID: UUID, onSaved: ((Thing) -> Void)? = nil) {
         mode = .edit(thingID)
+        self.outdoor = false
         self.onSaved = onSaved
     }
 
@@ -83,7 +90,8 @@ struct ThingForm: View {
                     }
                 }
             }
-            .navigationTitle(isEdit ? (original?.name ?? "Item") : "New \(TIK.categoryTitle(state.category))")
+            .navigationTitle(isEdit ? (original?.name ?? "Item")
+                             : state.category == .outdoor ? "New Outdoor item" : "New \(TIK.categoryTitle(state.category))")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -93,7 +101,9 @@ struct ThingForm: View {
                 }
             }
             .sheet(isPresented: $showTemplates) {
-                TemplatePickerSheet(selectedKey: state.templateKey) { state.apply(template: $0) }
+                TemplatePickerSheet(selectedKey: state.templateKey, outdoorFirst: outdoor || state.category == .outdoor) {
+                    state.apply(template: $0)
+                }
             }
             .sheet(isPresented: $showNewMeasurement) {
                 MeasurementForm(spaceID: state.scope.spaceId) { m in
@@ -153,7 +163,9 @@ struct ThingForm: View {
                 }
             }
         } footer: {
-            Text("A template sets the category, icon, fit-check clearances and extra fields like bulb base or filter size.")
+            Text(state.category == .outdoor
+                 ? "A template sets the category, icon and extra fields like species, bloom season or pool size."
+                 : "A template sets the category, icon, fit-check clearances and extra fields like bulb base or filter size.")
         }
     }
 
@@ -291,6 +303,9 @@ struct ThingForm: View {
                 } else if let space = try? await env.plan.space(spaceID) {
                     state.scope = space.scope
                 }
+            } else if outdoor, let yard = idx.levels.first(where: \.isExterior) {
+                // Outdoor item from the Stuff tab: the yard rather than the whole house.
+                state.scope = .level(yard.id)
             }
         case .edit(let id):
             if let t = try? await env.things.thing(id) {
@@ -389,6 +404,10 @@ struct ThingForm: View {
 
 #Preview("New in Kitchen") {
     ThingForm(spaceID: SampleHome.kitchenId).environment(AppEnvironment.preview())
+}
+
+#Preview("New outdoor item") {
+    ThingForm(spaceID: nil, outdoor: true).environment(AppEnvironment.preview())
 }
 
 #Preview("Edit planned fridge (won't fit)") {

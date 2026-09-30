@@ -10,12 +10,15 @@ struct AddPicker: View {
     let levelID: UUID?
     let preselected: AddKind?
     var placeName: String?
+    /// Outside level: the thing row becomes "Plant or outdoor feature" and opens the outdoor form.
+    var outdoor: Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var destination: AddDestination?
 
-    init(spaceID: UUID?, levelID: UUID?, preselected: AddKind?, placeName: String? = nil) {
+    init(spaceID: UUID?, levelID: UUID?, preselected: AddKind?, placeName: String? = nil, outdoor: Bool = false) {
         self.spaceID = spaceID; self.levelID = levelID; self.preselected = preselected; self.placeName = placeName
+        self.outdoor = outdoor
     }
 
     var body: some View {
@@ -47,10 +50,10 @@ struct AddPicker: View {
     }
 
     private func row(_ kind: AddKind) -> some View {
-        let info = AddKindInfo.of(kind)
+        let info = AddKindInfo.of(kind, outdoor: outdoor)
         let isDefault = kind == preselected
         return Button {
-            destination = AddDestination(kind: kind, spaceID: spaceID, levelID: levelID)
+            destination = AddDestination(kind: kind, spaceID: spaceID, levelID: levelID, outdoor: outdoor)
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: info.symbol)
@@ -86,6 +89,11 @@ struct AddPicker: View {
 
 #Preview("Add · To-Dos default") {
     AddPicker(spaceID: SampleHome.kitchenId, levelID: SampleHome.firstFloorId, preselected: .todo, placeName: "Kitchen")
+        .environment(AppEnvironment.preview())
+}
+
+#Preview("Add · Outside") {
+    AddPicker(spaceID: nil, levelID: nil, preselected: nil, placeName: "Backyard", outdoor: true)
         .environment(AppEnvironment.preview())
 }
 

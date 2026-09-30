@@ -16,15 +16,16 @@ extension Notification.Name {
 ///
 /// The button lives in its own small `UIWindow` (one level above the app window) sized to the button, so it stays
 /// visible over SwiftUI sheets without intercepting touches anywhere else. Drag it; it snaps to the nearest side
-/// and remembers where it was. The form is presented with UIKit from the app window's topmost view controller,
+/// and remembers where it was (bottom-right, above the tab bar, until moved). The form is presented with UIKit from the app window's topmost view controller,
 /// so it also works while another sheet is open. Settings › "Show feedback button" hides the button; shaking the
 /// iPhone still opens the form.
 @MainActor
 final class FeedbackPresenter: NSObject, UIAdaptivePresentationControllerDelegate {
     static let shared = FeedbackPresenter()
 
-    private static let sideKey = "feedback.buttonSide"        // "left" | "right"
-    private static let yFractionKey = "feedback.buttonY"      // 0…1 of the usable height
+    // v2: the default moved to the bottom-right corner above the tab bar, so earlier saved positions are ignored.
+    private static let sideKey = "feedback.buttonSide.v2"     // "left" | "right"
+    private static let yFractionKey = "feedback.buttonY.v2"   // 0…1 of the usable height
 
     private weak var env: AppEnvironment?
     private var buttonWindow: UIWindow?
@@ -34,6 +35,8 @@ final class FeedbackPresenter: NSObject, UIAdaptivePresentationControllerDelegat
 
     private let buttonSize: CGFloat = 44
     private let edgeMargin: CGFloat = 6
+    /// Default gap above the bottom safe area, so the button sits just above the tab bar.
+    private let tabBarClearance: CGFloat = 58
 
     // MARK: Setup
 
@@ -95,11 +98,16 @@ final class FeedbackPresenter: NSObject, UIAdaptivePresentationControllerDelegat
 
     private func restingFrame() -> CGRect {
         let defaults = UserDefaults.standard
-        let side = defaults.string(forKey: Self.sideKey) ?? "left"
-        let fraction = defaults.object(forKey: Self.yFractionKey) as? Double ?? 0.55
+        let side = defaults.string(forKey: Self.sideKey) ?? "right"
         let area = usableBounds
         let x = side == "right" ? area.maxX - buttonSize - edgeMargin : area.minX + edgeMargin
-        let y = area.minY + CGFloat(min(max(fraction, 0), 1)) * max(0, area.height - buttonSize)
+        let y: CGFloat
+        if let fraction = defaults.object(forKey: Self.yFractionKey) as? Double {
+            y = area.minY + CGFloat(min(max(fraction, 0), 1)) * max(0, area.height - buttonSize)
+        } else {
+            // Bottom-right by default, just above the tab bar.
+            y = max(area.minY, area.maxY - buttonSize - tabBarClearance)
+        }
         return CGRect(x: x, y: y, width: buttonSize, height: buttonSize)
     }
 
