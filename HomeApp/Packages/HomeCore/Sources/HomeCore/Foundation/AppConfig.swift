@@ -7,6 +7,7 @@ import Foundation
 /// | `HomeServerURL`  | `$(HOME_SERVER_URL)` | Base URL of the stateless Home server (Render). Empty → call Overpass directly. |
 /// | `HomeAPIKey`     | `$(HOME_API_KEY)`    | Sent as `X-Home-Key` when non-empty. |
 /// | `CFBundleIdentifier` | `$(HOME_BUNDLE_ID)` | Also determines the CloudKit container `iCloud.<bundle id>`. |
+/// | `HomeCloudSync`  | `$(HOME_CLOUD_SYNC)` | `NO` turns iCloud sync off (builds signed without the iCloud entitlement). |
 ///
 /// Server endpoints (v1): `GET /health`, `GET /v1/footprint?lat=&lon=` (Overpass proxy), `GET /v1/templates`.
 public struct AppConfig: Hashable, Sendable {
@@ -15,18 +16,21 @@ public struct AppConfig: Hashable, Sendable {
     public var bundleIdentifier: String
     public var appVersion: String
     public var buildNumber: String
+    /// False when the build was signed without the iCloud entitlement; CloudKit must not be touched then.
+    public var cloudSyncEnabled: Bool
 
     public static let defaultBundleIdentifier = "app.fumble.home"
     public static let apiKeyHeader = "X-Home-Key"
     public static let overpassURL = URL(string: "https://overpass-api.de/api/interpreter")!
 
     public init(serverURL: URL? = nil, apiKey: String? = nil, bundleIdentifier: String = AppConfig.defaultBundleIdentifier,
-                appVersion: String = "0.0", buildNumber: String = "0") {
+                appVersion: String = "0.0", buildNumber: String = "0", cloudSyncEnabled: Bool = true) {
         self.serverURL = serverURL
         self.apiKey = (apiKey?.isEmpty ?? true) ? nil : apiKey
         self.bundleIdentifier = bundleIdentifier
         self.appVersion = appVersion
         self.buildNumber = buildNumber
+        self.cloudSyncEnabled = cloudSyncEnabled
     }
 
     /// Builds a config from an Info.plist dictionary. Unexpanded `$(VAR)` placeholders and empty strings count as unset.
@@ -40,7 +44,8 @@ public struct AppConfig: Hashable, Sendable {
                   apiKey: value("HomeAPIKey"),
                   bundleIdentifier: value("CFBundleIdentifier") ?? AppConfig.defaultBundleIdentifier,
                   appVersion: value("CFBundleShortVersionString") ?? "0.0",
-                  buildNumber: value("CFBundleVersion") ?? "0")
+                  buildNumber: value("CFBundleVersion") ?? "0",
+                  cloudSyncEnabled: !["no", "false", "0"].contains(value("HomeCloudSync")?.lowercased() ?? ""))
     }
 
     /// Reads `Bundle.main`. On non-Apple platforms (Linux tests) returns defaults.

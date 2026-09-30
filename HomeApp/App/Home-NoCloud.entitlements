@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Used by the TestFlight lane until the iCloud container is set up on the App ID: no iCloud, no remote push. -->
+<plist version="1.0">
+<dict/>
+</plist>
