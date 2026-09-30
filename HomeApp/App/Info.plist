@@ -45,6 +45,10 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Home Blueprint listens when you tap Talk so you can add several to-dos by voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Home Blueprint turns what you say into to-dos. Recognition runs on your iPhone when it can; otherwise Apple processes the audio.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Home adds your chores to the calendar you choose, including Google calendars added to this iPhone, and updates or removes those events when you edit or delete a chore.</string>
 	<key>NSCalendarsUsageDescription</key>
