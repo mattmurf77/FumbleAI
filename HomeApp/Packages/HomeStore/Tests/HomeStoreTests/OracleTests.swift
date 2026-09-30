@@ -16,7 +16,7 @@ final class OracleTests: XCTestCase {
             XCTAssertTrue(names.contains(t), t)
         }
         let applied = try await store.database.read { d in try String.fetchAll(d, sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid") }
-        XCTAssertEqual(applied, ["v1_core", "v1_local", "v1_search"])
+        XCTAssertEqual(applied, ["v1_core", "v1_local", "v1_search", "v2_outdoor_things"])
     }
 
     func testEveryModelRoundTrips() async throws {

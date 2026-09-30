@@ -137,7 +137,7 @@ final class RoomSheetModel {
     }
 
     var thingsByCategory: [ThingGroup] {
-        let order: [Thing.Category] = [.appliance, .electronic, .furniture, .fixture, .system, .unknown]
+        let order: [Thing.Category] = [.appliance, .electronic, .furniture, .fixture, .system, .outdoor, .unknown]
         let grouped = Dictionary(grouping: things, by: \.category)
         return order.compactMap { c in grouped[c].map { ThingGroup(category: c, things: $0.sorted { $0.name < $1.name }) } }
     }

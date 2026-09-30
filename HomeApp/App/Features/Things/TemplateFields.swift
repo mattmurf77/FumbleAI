@@ -85,10 +85,11 @@ private struct AttributeTextRow: View {
     }
 }
 
-/// Template chooser: catalog grouped by category + "Custom" (no template).
+/// Template chooser: catalog grouped by category + "Custom" (no template). `outdoorFirst` (Outside) leads with Outdoor.
 struct TemplatePickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let selectedKey: String?
+    var outdoorFirst = false
     let onPick: (ThingTemplate?) -> Void
     @State private var filter = ""
 
@@ -102,7 +103,7 @@ struct TemplatePickerSheet: View {
                         row(title: "Custom", subtitle: "No template fields", symbol: "shippingbox", selected: selectedKey == nil)
                     }
                 }
-                ForEach(TIK.templatesByCategory(filtered).map { TemplateGroup(category: $0.0, templates: $0.1) }) { group in
+                ForEach(TIK.templatesByCategory(filtered, outdoorFirst: outdoorFirst).map { TemplateGroup(category: $0.0, templates: $0.1) }) { group in
                     Section(TIK.categoryTitle(group.category)) {
                         ForEach(group.templates) { t in
                             Button {
@@ -159,4 +160,8 @@ private struct TemplateGroup: Identifiable {
 
 #Preview("Template picker") {
     TemplatePickerSheet(selectedKey: "hvac_furnace") { _ in }
+}
+
+#Preview("Template picker · Outside") {
+    TemplatePickerSheet(selectedKey: nil, outdoorFirst: true) { _ in }
 }

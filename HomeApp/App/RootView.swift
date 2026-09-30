@@ -1,7 +1,7 @@
 import SwiftUI
 import HomeCore
 
-/// Root switch: onboarding while the home has no property (or until onboarding finishes), else the Plan screen.
+/// Root switch: onboarding while the home has no property (or until onboarding finishes), else the tab bar.
 /// Observes the current property so both a local commit and an iCloud restore switch screens automatically.
 /// Also presents app-wide prompts: iCloud account changes (FR-SYN-32/33) and a one-time startup problem.
 struct RootView: View {
@@ -14,7 +14,7 @@ struct RootView: View {
 
     /// Feedback "Page" when the visible screen doesn't name itself with `.feedbackPage(_:)`.
     private var rootFeedbackPage: String {
-        !loaded ? "Loading" : showOnboarding ? "Onboarding" : "Plan"
+        !loaded ? "Loading" : showOnboarding ? "Onboarding" : "Home"
     }
 
     var body: some View {
@@ -26,7 +26,7 @@ struct RootView: View {
             } else if showOnboarding {
                 OnboardingFlow(onFinished: { showOnboarding = false })
             } else {
-                HomeHubView()
+                MainTabView()
             }
         }
         .onChange(of: rootFeedbackPage, initial: true) { _, page in FeedbackPageTracker.shared.rootPage = page }

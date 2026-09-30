@@ -1,23 +1,36 @@
 import Foundation
 import HomeCore
 
-// Pure (SwiftUI-free) logic for the home hub: the live counts, the card list and the summary line.
-// Type-checks against HomeCore alone so it can be verified on Linux.
+// Pure (SwiftUI-free) logic for the Home, Projects and Stuff tabs: the live counts, the cards and rows, and the
+// summary line.
 
 // MARK: - Navigation values
 
-/// Screens the hub pushes onto its `NavigationStack` (the hub is the stack's root, so the system back button
-/// returns to it).
+/// The bottom tab bar.
+enum AppTab: String, Hashable, CaseIterable {
+    case home, plan, todos, projects, stuff
+
+    var title: String {
+        switch self {
+        case .home: return "Home"; case .plan: return "Plan"; case .todos: return "To-Dos"
+        case .projects: return "Projects"; case .stuff: return "Stuff"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .home: return "house"; case .plan: return LensID.plan.symbol; case .todos: return LensID.todos.symbol
+        case .projects: return LensID.futureProjects.symbol; case .stuff: return "shippingbox"
+        }
+    }
+}
+
+/// Screens pushed onto a tab's `NavigationStack` (Projects and Stuff).
 enum HubRoute: Hashable {
-    /// The plan screen with a lens preselected (via `env.selectedLens`). `levelID` asks for a specific floor
-    /// (the exterior level for "Yard & Exterior"); see `HomeHubView.planScreen(_:)` for how it is honoured.
-    case plan(lens: LensID, levelID: UUID? = nil)
-    case todosList
     case budget
     case storage
     case shoppingList
     case seasonalSwap
-    case housemates
 }
 
 /// Screens that manage their own `NavigationStack` and are therefore shown as sheets.
@@ -26,10 +39,16 @@ enum HubSheet: String, Identifiable, Hashable {
     var id: String { rawValue }
 }
 
-/// What tapping a card (or its secondary link) does.
+/// What tapping a card or row does.
 enum HubAction: Hashable {
+    /// Switch to another tab.
+    case tab(AppTab)
+    /// Switch to the Plan tab with this lens (and floor, e.g. the Outside level for "Yard & Exterior").
+    case plan(lens: LensID, levelID: UUID? = nil)
     case push(HubRoute)
     case sheet(HubSheet)
+    /// Open a create form ("New project", "Add a plant or outdoor feature", ...).
+    case add(AddDestination)
 }
 
 // MARK: - Live counts
@@ -125,8 +144,7 @@ struct HubCounts: Hashable, Sendable {
 
 struct HubCard: Identifiable, Hashable {
     enum ID: String, Hashable, CaseIterable {
-        case floorPlan, yard, todos, futureProjects, pastWork, budget, things, inventory, shoppingList, seasonalSwap,
-             search, housemates, settings
+        case floorPlan, yard, todos, projects, stuff, search
     }
     enum Tone: Hashable { case neutral, attention }
 
@@ -137,9 +155,6 @@ struct HubCard: Identifiable, Hashable {
     var badge: String?
     var badgeTone: Tone = .neutral
     let action: HubAction
-    /// Optional second way in, e.g. a list card's "See on floor plan".
-    var secondaryTitle: String?
-    var secondaryAction: HubAction?
 }
 
 struct HubSection: Identifiable, Hashable {
@@ -148,16 +163,29 @@ struct HubSection: Identifiable, Hashable {
     let cards: [HubCard]
 }
 
-enum HomeHubCatalog {
-    static let seeOnPlan = "See on floor plan"
+/// A row on the Projects and Stuff tabs.
+struct HubRow: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let detail: String
+    let symbol: String
+    var badge: String?
+    var badgeTone: HubCard.Tone = .neutral
+    let action: HubAction
+}
 
-    /// The hub's cards, grouped. Order within a section is the grid order.
+struct HubRowSection: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let rows: [HubRow]
+}
+
+enum HomeHubCatalog {
+    /// The Home tab: the house itself, then four tasks. Everything else lives in the tabs or the header buttons.
     static func sections(_ c: HubCounts) -> [HubSection] {
         [
             HubSection(id: "home", title: "Your home", cards: [floorPlan(c), yard(c)]),
-            HubSection(id: "work", title: "Get things done", cards: [todos(c), futureProjects(c), pastWork(c), budget(c)]),
-            HubSection(id: "stuff", title: "Your stuff", cards: [things(c), inventory(c), shoppingList(c), seasonalSwap(c)]),
-            HubSection(id: "more", title: "More", cards: [search, housemates(c), settings]),
+            HubSection(id: "tasks", title: "Get things done", cards: [todos(c), projects(c), stuff(c), search]),
         ]
     }
 
@@ -167,13 +195,13 @@ enum HomeHubCatalog {
         HubCard(id: .floorPlan, title: "Floor plan", detail: "Every floor and room at a glance",
                 symbol: LensID.plan.symbol,
                 badge: c.interiorLevelCount > 0 ? plural(c.interiorLevelCount, "floor") : nil,
-                action: .push(.plan(lens: .plan)))
+                action: .plan(lens: .plan))
     }
 
     static func yard(_ c: HubCounts) -> HubCard {
         if let id = c.exteriorLevelID {
-            return HubCard(id: .yard, title: "Yard & Exterior", detail: "Lawn, beds, driveway and outside jobs",
-                           symbol: "tree", action: .push(.plan(lens: .plan, levelID: id)))
+            return HubCard(id: .yard, title: "Yard & Exterior", detail: "Trees, flowers, patio and outside jobs",
+                           symbol: "tree", action: .plan(lens: .plan, levelID: id))
         }
         return HubCard(id: .yard, title: "Yard & Exterior", detail: "Add your yard to plan outside work",
                        symbol: "tree", badge: "Add", action: .sheet(.addYard))
@@ -181,8 +209,7 @@ enum HomeHubCatalog {
 
     static func todos(_ c: HubCounts) -> HubCard {
         var card = HubCard(id: .todos, title: LensID.todos.title, detail: "Chores and reminders by due date",
-                           symbol: LensID.todos.symbol, action: .push(.todosList),
-                           secondaryTitle: seeOnPlan, secondaryAction: .push(.plan(lens: .todos)))
+                           symbol: LensID.todos.symbol, action: .tab(.todos))
         if c.overdue > 0 {
             card.badge = "\(c.overdue) overdue"; card.badgeTone = .attention
         } else if c.dueToday > 0 {
@@ -193,72 +220,94 @@ enum HomeHubCatalog {
         return card
     }
 
-    static func futureProjects(_ c: HubCounts) -> HubCard {
-        let detail = c.inProgressCount > 0 ? "\(c.inProgressCount) in progress · ideas and plans" : "Ideas, plans and work in progress"
-        return HubCard(id: .futureProjects, title: LensID.futureProjects.title, detail: detail,
-                       symbol: LensID.futureProjects.symbol, badge: count(c.futureCount),
-                       action: .push(.plan(lens: .futureProjects)))
+    static func projects(_ c: HubCounts) -> HubCard {
+        let detail = c.inProgressCount > 0 ? "\(c.inProgressCount) in progress · past work and budget"
+                                           : "Ideas, past work and budget"
+        return HubCard(id: .projects, title: "Projects & budget", detail: detail,
+                       symbol: LensID.futureProjects.symbol, badge: count(c.futureCount), action: .tab(.projects))
     }
 
-    static func pastWork(_ c: HubCounts) -> HubCard {
-        let detail = c.lifetimeCents > 0 ? "\(c.lifetime.compact) spent on finished jobs" : "Finished jobs, receipts and costs"
-        return HubCard(id: .pastWork, title: LensID.pastWork.title, detail: detail,
-                       symbol: LensID.pastWork.symbol, badge: count(c.pastCount),
-                       action: .push(.plan(lens: .pastWork)))
-    }
-
-    static func budget(_ c: HubCounts) -> HubCard {
-        HubCard(id: .budget, title: LensID.budget.title, detail: "Planned, spent and remaining by floor",
-                symbol: LensID.budget.symbol, badge: c.plannedCents > 0 ? c.planned.compact : nil,
-                action: .push(.budget),
-                secondaryTitle: seeOnPlan, secondaryAction: .push(.plan(lens: .budget)))
-    }
-
-    static func things(_ c: HubCounts) -> HubCard {
-        let detail = c.plannedThings > 0 ? "\(c.plannedThings) planned · manuals, warranties, fit" : "Manuals, warranties and what fits"
-        return HubCard(id: .things, title: LensID.things.title, detail: detail,
-                       symbol: LensID.things.symbol, badge: count(c.ownedThings),
-                       action: .push(.plan(lens: .things)))
-    }
-
-    static func inventory(_ c: HubCounts) -> HubCard {
-        var card = HubCard(id: .inventory, title: LensID.inventory.title, detail: "Pantry, clothing and storage",
-                           symbol: LensID.inventory.symbol, action: .push(.storage),
-                           secondaryTitle: seeOnPlan, secondaryAction: .push(.plan(lens: .inventory)))
+    static func stuff(_ c: HubCounts) -> HubCard {
+        var card = HubCard(id: .stuff, title: "Record your stuff", detail: "Appliances, furniture, plants and storage",
+                           symbol: "shippingbox", action: .tab(.stuff))
         if c.lowCount > 0 {
             card.badge = "\(c.lowCount) low"; card.badgeTone = .attention
         } else {
-            card.badge = count(c.inventoryCount)
+            card.badge = count(c.ownedThings + c.inventoryCount)
         }
         return card
     }
 
-    static func shoppingList(_ c: HubCounts) -> HubCard {
-        HubCard(id: .shoppingList, title: "Shopping list", detail: "Low supplies and replacements due",
-                symbol: "cart", badge: count(c.shoppingCount), action: .push(.shoppingList))
-    }
-
-    static func seasonalSwap(_ c: HubCounts) -> HubCard {
-        let detail: String
-        switch c.upcomingSeason {
-        case .summer?: detail = "Get summer things out, put winter away"
-        case .winter?: detail = "Get winter things out, put summer away"
-        default: detail = "Rotate seasonal clothes and gear"
-        }
-        return HubCard(id: .seasonalSwap, title: "Seasonal swap", detail: detail,
-                       symbol: "arrow.triangle.2.circlepath", badge: count(c.swapCount), action: .push(.seasonalSwap))
-    }
-
-    static let search = HubCard(id: .search, title: "Search", detail: "Find anything: “where’s the winter coat?”",
+    static let search = HubCard(id: .search, title: "Find something", detail: "“Where’s the winter coat?”",
                                 symbol: "magnifyingglass", action: .sheet(.search))
 
-    static func housemates(_ c: HubCounts) -> HubCard {
-        HubCard(id: .housemates, title: "Housemates", detail: "Who chores and things belong to",
-                symbol: "person.2", badge: count(c.peopleCount), action: .push(.housemates))
+    // MARK: Projects tab
+
+    static func projectSections(_ c: HubCounts) -> [HubRowSection] {
+        [
+            HubRowSection(id: "add", title: "Add", rows: [
+                HubRow(id: "newProject", title: "New project or idea", detail: "An improvement or repair, with an estimate",
+                       symbol: "plus.circle", action: .add(.futureProject(spaceID: nil, levelID: nil))),
+                HubRow(id: "logWork", title: "Log finished work", detail: "What was done, the cost and the receipt",
+                       symbol: "checkmark.circle", action: .add(.pastWork(spaceID: nil, levelID: nil))),
+            ]),
+            HubRowSection(id: "see", title: "See", rows: [
+                HubRow(id: "future", title: LensID.futureProjects.title,
+                       detail: c.inProgressCount > 0 ? "\(c.inProgressCount) in progress · shown on the floor plan" : "Ideas and plans, shown on the floor plan",
+                       symbol: LensID.futureProjects.symbol, badge: count(c.futureCount), action: .plan(lens: .futureProjects)),
+                HubRow(id: "past", title: LensID.pastWork.title,
+                       detail: c.lifetimeCents > 0 ? "\(c.lifetime.compact) spent on finished jobs" : "Finished jobs, receipts and costs",
+                       symbol: LensID.pastWork.symbol, badge: count(c.pastCount), action: .plan(lens: .pastWork)),
+                HubRow(id: "budget", title: LensID.budget.title, detail: "Planned, spent and remaining by floor",
+                       symbol: LensID.budget.symbol, badge: c.plannedCents > 0 ? c.planned.compact : nil, action: .push(.budget)),
+            ]),
+        ]
     }
 
-    static let settings = HubCard(id: .settings, title: "Settings", detail: "Home details, reminders, iCloud, export",
-                                  symbol: "gearshape", action: .sheet(.settings))
+    // MARK: Stuff tab ("Record your stuff")
+
+    static func stuffSections(_ c: HubCounts) -> [HubRowSection] {
+        [
+            HubRowSection(id: "add", title: "Record something", rows: [
+                HubRow(id: "thing", title: "Appliance, electronic or furniture", detail: "Specs, warranty, filters and bulbs",
+                       symbol: "sofa", action: .add(.thing(spaceID: nil))),
+                HubRow(id: "outdoor", title: "Plant or outdoor feature", detail: "Trees, flowers, patio, fire pit, shed, pool",
+                       symbol: "tree", action: .add(.outdoorThing(spaceID: nil))),
+                HubRow(id: "inventory", title: "Pantry, clothing or stored item", detail: "What you have and where it’s kept",
+                       symbol: "shippingbox", action: .add(.inventory(spaceID: nil))),
+                HubRow(id: "measurement", title: "Measurement", detail: "Width, depth and height of a spot, door or wall",
+                       symbol: "ruler", action: .add(.measurement(spaceID: nil))),
+            ]),
+            HubRowSection(id: "browse", title: "Browse", rows: [
+                HubRow(id: "things", title: "On the floor plan", detail: c.plannedThings > 0 ? "\(c.plannedThings) planned · see what’s in each room" : "See what’s in each room",
+                       symbol: LensID.things.symbol, badge: count(c.ownedThings), action: .plan(lens: .things)),
+                inventoryRow(c),
+                HubRow(id: "shopping", title: "Shopping list", detail: "Low supplies and replacements due",
+                       symbol: "cart", badge: count(c.shoppingCount), action: .push(.shoppingList)),
+                HubRow(id: "swap", title: "Seasonal swap", detail: swapDetail(c),
+                       symbol: "arrow.triangle.2.circlepath", badge: count(c.swapCount), action: .push(.seasonalSwap)),
+            ]),
+        ]
+    }
+
+    static func inventoryRow(_ c: HubCounts) -> HubRow {
+        var row = HubRow(id: "storage", title: "Storage & inventory", detail: "Pantry, closets and storage spots",
+                         symbol: LensID.inventory.symbol, action: .push(.storage))
+        if c.lowCount > 0 {
+            row.badge = "\(c.lowCount) low"; row.badgeTone = .attention
+        } else {
+            row.badge = count(c.inventoryCount)
+        }
+        return row
+    }
+
+    static func swapDetail(_ c: HubCounts) -> String {
+        switch c.upcomingSeason {
+        case .summer?: return "Get summer things out, put winter away"
+        case .winter?: return "Get winter things out, put summer away"
+        default: return "Rotate seasonal clothes and gear"
+        }
+    }
 
     // MARK: Text
 
@@ -287,9 +336,4 @@ enum HomeHubCatalog {
 
     /// Badge text for a plain count; nothing for zero so empty cards stay quiet.
     static func count(_ n: Int) -> String? { n > 0 ? "\(n)" : nil }
-
-    /// Hint shown on the plan when the hub couldn't preselect a floor (see integration notes).
-    static func levelHint(levelName: String?) -> String {
-        "Tap “\(levelName ?? "Outside")” in the floor pills"
-    }
 }

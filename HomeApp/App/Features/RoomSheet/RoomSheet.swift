@@ -98,7 +98,7 @@ struct RoomSheet: View {
         .task(id: spaceId ?? fixedScope?.levelId) { await model.run(env: env, spaceId: spaceId, scope: fixedScope) }
         .sheet(item: $openItem) { item in ItemDetailRouter(ref: item.ref) }
         .sheet(item: $addRequest) { r in
-            AddPicker(spaceID: r.spaceID, levelID: r.levelID, preselected: r.preselected, placeName: r.placeName)
+            AddPicker(spaceID: r.spaceID, levelID: r.levelID, preselected: r.preselected, placeName: r.placeName, outdoor: r.outdoor)
         }
         .alert("Rename room", isPresented: $renaming) {
             TextField("Name", text: $renameText)
@@ -142,7 +142,7 @@ struct RoomSheet: View {
         case .todo: return "Add To-Do"
         case .futureProject: return "Add Future Project"
         case .pastWork: return "Log Past Work"
-        case .thing: return "Add Appliance, Electronic or Furniture"
+        case .thing: return isOutdoor ? "Add Plant or outdoor feature" : "Add Appliance, Electronic or Furniture"
         case .inventory: return "Add Inventory item"
         case .measurement: return "Add Measurement"
         case nil: return "Add…"
@@ -151,8 +151,10 @@ struct RoomSheet: View {
 
     private func requestAdd(preselect: AddKind?) {
         addRequest = AddRequest(spaceID: model.space?.id, levelID: model.space?.levelId ?? fixedScope?.levelId,
-                                preselected: preselect, placeName: model.space?.name)
+                                preselected: preselect, placeName: model.space?.name, outdoor: isOutdoor)
     }
+
+    private var isOutdoor: Bool { model.level?.isExterior == true || model.space?.isExterior == true }
 
     private func commitRename() {
         guard let id = model.space?.id else { return }
@@ -406,7 +408,8 @@ struct RoomSheet: View {
     @ViewBuilder
     private var thingSections: some View {
         if model.things.isEmpty {
-            Section { empty("Nothing tracked here. Add appliances, bulbs, filters or furniture.") }
+            Section { empty(isOutdoor ? "Nothing tracked here. Add trees, flowers, a patio, grill or shed."
+                                      : "Nothing tracked here. Add appliances, bulbs, filters or furniture.") }
         }
         ForEach(model.thingsByCategory) { group in
             Section(categoryTitle(group.category)) {
@@ -436,7 +439,7 @@ struct RoomSheet: View {
     private func categoryTitle(_ c: Thing.Category) -> String {
         switch c {
         case .appliance: return "Appliances"; case .electronic: return "Electronics"; case .furniture: return "Furniture"
-        case .fixture: return "Fixtures"; case .system: return "Systems"; case .unknown: return "Other"
+        case .fixture: return "Fixtures"; case .system: return "Systems"; case .outdoor: return "Outdoor"; case .unknown: return "Other"
         }
     }
 
