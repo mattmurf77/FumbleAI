@@ -51,6 +51,24 @@ platform :ios do
       in_house: false
     )
 
+    # Xcode's automatic signing archives with a development profile before re-signing for the App Store,
+    # and Apple refuses to create a development profile for a team with no registered devices. On a
+    # brand-new account, register one placeholder device so the archive step can proceed. Testers
+    # install through TestFlight, so this device is never used; it can be removed at the yearly reset.
+    begin
+      if Spaceship::ConnectAPI::Device.all.empty?
+        UI.important("No devices registered on this team; registering a placeholder so automatic signing can archive.")
+        register_device(
+          name: "CI placeholder (TestFlight builds)",
+          udid: ENV.fetch("HOME_PLACEHOLDER_UDID", "00008101-001A2B3C4D5E6F70"),
+          platform: "ios",
+          api_key: api_key
+        )
+      end
+    rescue => e
+      UI.important("Could not check or register devices: #{e.message}")
+    end
+
     # xcodebuild needs the key as a file for -authenticationKeyPath.
     key_dir = Dir.mktmpdir("asc-key")
     key_path = File.join(key_dir, "AuthKey_#{key_id}.p8")
@@ -82,10 +100,6 @@ platform :ios do
         "HOME_TEAM_ID" => team_id,
         "DEVELOPMENT_TEAM" => team_id,
         "CODE_SIGN_STYLE" => "Automatic",
-        # Sign the archive for distribution directly. The default "Apple Development" identity needs a
-        # development profile, which Apple refuses to create for a team with no registered devices.
-        "CODE_SIGN_IDENTITY" => "Apple Distribution",
-        "HOME_APS_ENVIRONMENT" => "production",
         "CURRENT_PROJECT_VERSION" => build_number.to_s
       }
       %w[HOME_SERVER_URL HOME_API_KEY].each do |name|
