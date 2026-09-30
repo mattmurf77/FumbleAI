@@ -178,4 +178,24 @@ platform :ios do
       FileUtils.rm_rf(key_dir)
     end
   end
+  desc "Print the processing state of recent TestFlight builds (diagnostics; no build or upload)"
+  lane :status do
+    key_b64 = env!("APP_STORE_CONNECT_KEY_P8")
+    key_text = key_b64.include?("BEGIN PRIVATE KEY") ? key_b64 : Base64.decode64(key_b64)
+    app_store_connect_api_key(
+      key_id: env!("APP_STORE_CONNECT_KEY_ID"),
+      issuer_id: env!("APP_STORE_CONNECT_ISSUER_ID"),
+      key_content: key_text,
+      in_house: false
+    )
+    bundle_id = env!("HOME_BUNDLE_ID")
+    app = Spaceship::ConnectAPI::App.find(bundle_id)
+    UI.user_error!("No App Store Connect app found for #{bundle_id}") unless app
+    UI.message("App: #{app.name} (id #{app.id}, bundle #{app.bundle_id})")
+    builds = Spaceship::ConnectAPI::Build.all(app_id: app.id, sort: "-uploadedDate", limit: 10)
+    UI.important("No builds found for this app.") if builds.empty?
+    builds.each do |b|
+      UI.message("build #{b.version} | state=#{b.processing_state} | uploaded=#{b.uploaded_date} | expired=#{b.expired} | min_os=#{b.min_os_version}")
+    end
+  end
 end
