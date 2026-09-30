@@ -8,12 +8,17 @@ import PlanCanvas
 ///
 /// Plan lenses and floors are chosen through `env.selectedLens` / `env.pendingLevelID` before switching to the
 /// Plan tab, which applies them. Deep links (`env.pendingDeepLink`) switch to the Plan tab, which consumes them.
+/// Lists shared into the share extension (Notes, Messages…) open in Quick add when the app comes to the foreground.
 struct MainTabView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var tab: AppTab = .home
     @State private var model = HomeHubModel()
+    @State private var sharedText: SharedText?
+
+    private struct SharedText: Identifiable { let id = UUID(); let text: String }
 
     private var theme: PlanTheme { PlanTheme.forScheme(scheme) }
     private var todoBadge: Int { model.counts.overdue + model.counts.dueToday }
@@ -57,9 +62,22 @@ struct MainTabView: View {
         .tint(theme.accent)
         .task { await model.run(env: env) }
         .onChange(of: env.pendingDeepLink, initial: true) { _, ref in if ref != nil { tab = .plan } }
+        .onChange(of: scenePhase, initial: true) { _, phase in if phase == .active { collectShared() } }
+        .sheet(item: $sharedText) { shared in
+            QuickCaptureSheet(initialText: shared.text)
+        }
     }
 
-    private func tabLabel(_ t: AppTab) -> some View {
+    /// Text waiting from the share extension → Quick add (review step) on the To-Dos tab.
+    private func collectShared() {
+        guard sharedText == nil else { return }
+        let entries = SharedCaptureInbox.takeAll()
+        guard !entries.isEmpty else { return }
+        tab = .todos
+        sharedText = SharedText(text: entries.map(\.text).joined(separator: "\n"))
+    }
+
+        private func tabLabel(_ t: AppTab) -> some View {
         Label(t.title, systemImage: t.symbol)
     }
 

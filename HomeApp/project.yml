@@ -34,6 +34,8 @@ settings:
     HOME_SIGN_STYLE: Automatic
     HOME_SIGN_IDENTITY: Apple Development
     HOME_PROFILE_NAME: ""
+    # Provisioning profile for the share extension (TestFlight lane; empty = automatic signing).
+    HOME_SHARE_PROFILE_NAME: ""
     HOME_ENTITLEMENTS: App/Home.entitlements
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
@@ -79,7 +81,9 @@ targets:
           - "PrivacyInfo.xcprivacy"
       - path: App/PrivacyInfo.xcprivacy
         buildPhase: resources
+      - path: Shared
     dependencies:
+      - target: HomeShare
       - package: PlanKit
       - package: HomeCore
         product: HomeCore
@@ -127,9 +131,12 @@ targets:
         HomeServerURL: $(HOME_SERVER_URL)
         HomeAPIKey: $(HOME_API_KEY)
         HomeCloudSync: $(HOME_CLOUD_SYNC)
+        HomeKeychainGroup: $(AppIdentifierPrefix)$(HOME_BUNDLE_ID).shared
     entitlements:
       path: App/Home.entitlements
       properties:
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)$(HOME_BUNDLE_ID).shared
         com.apple.developer.icloud-container-identifiers:
           - iCloud.$(HOME_BUNDLE_ID)
         com.apple.developer.icloud-services:
@@ -153,6 +160,59 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
+        CURRENT_PROJECT_VERSION: $(inherited)
+        MARKETING_VERSION: $(inherited)
+
+  HomeShare:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: ShareExtension
+        excludes:
+          - "Info.plist"
+          - "HomeShare.entitlements"
+      - path: Shared
+    dependencies:
+      - package: HomeCore
+        product: HomeCore
+      - package: PlanKit
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: $(DEVELOPMENT_LANGUAGE)
+        CFBundleDisplayName: Home Blueprint
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: HomeShare
+        CFBundlePackageType: $(PRODUCT_BUNDLE_PACKAGE_TYPE)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        HomeKeychainGroup: $(AppIdentifierPrefix)$(HOME_BUNDLE_ID).shared
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+    entitlements:
+      path: ShareExtension/HomeShare.entitlements
+      properties:
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)$(HOME_BUNDLE_ID).shared
+    settings:
+      base:
+        PRODUCT_NAME: HomeShare
+        PRODUCT_BUNDLE_IDENTIFIER: $(HOME_BUNDLE_ID).share
+        DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
+        CODE_SIGN_STYLE: $(HOME_SIGN_STYLE)
+        CODE_SIGN_IDENTITY: $(HOME_SIGN_IDENTITY)
+        PROVISIONING_PROFILE_SPECIFIER: $(HOME_SHARE_PROFILE_NAME)
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
         CURRENT_PROJECT_VERSION: $(inherited)
         MARKETING_VERSION: $(inherited)
 
