@@ -1,8 +1,10 @@
 import SwiftUI
 import HomeCore
 
-/// "Build with blocks" (FR-PLN-20/21): pick a style (Ranch, Colonial 2-story, Cape, Split-level, Townhouse, Condo,
-/// Blank) plus bedrooms/bathrooms → `BlockTemplating.draft` → Review. After commit the Plan editor refines it.
+/// "Build with blocks" (FR-PLN-20/21): pick a style (Ranch, Colonial 2-story, Cape, Split-level, Bi-level,
+/// Townhouse, Condo, Blank) plus bedrooms/bathrooms → `BlockTemplating.draft` → Review. After commit the Plan editor
+/// refines it. Multi-level styles include stairs on every level; "Same outline on every level" (default on) makes the
+/// upper/lower levels take the main floor's outline with the stairs lined up, so the user only subdivides.
 struct BlocksFlow: View {
     @Environment(AppEnvironment.self) private var env
     @Bindable var model: OnboardingModel
@@ -11,37 +13,22 @@ struct BlocksFlow: View {
     @State private var style: HouseStyle? = .twoStory
     @State private var bedrooms = 3
     @State private var bathrooms = 2.5
+    @State private var matchOutlines = true
 
     /// Grid order; nil = Blank.
-    static let options: [HouseStyle?] = [.ranch, .twoStory, .capeCod, .splitLevel, .townhouse, .apartment, nil]
+    static let options: [HouseStyle?] = HouseStyle.pickerOrder.map { Optional($0) } + [nil]
 
-    static func name(_ s: HouseStyle?) -> String {
-        switch s {
-        case .ranch: return "Ranch"; case .twoStory: return "Colonial 2-story"; case .capeCod: return "Cape"
-        case .splitLevel: return "Split-level"; case .townhouse: return "Townhouse"; case .apartment: return "Condo"
-        case nil: return "Blank"
-        }
-    }
+    static func name(_ s: HouseStyle?) -> String { s?.displayName ?? "Blank" }
 
     static func detail(_ s: HouseStyle?) -> String {
         switch s {
-        case .ranch: return "One floor, attached garage"
-        case .twoStory: return "Living downstairs, bedrooms up"
-        case .capeCod: return "Primary down, bedrooms under the roof"
-        case .splitLevel: return "Three short levels"
-        case .townhouse: return "Narrow and tall"
-        case .apartment: return "One floor, no yard"
+        case .townhouse?: return "Narrow and tall"
+        case let s?: return s.subtitle
         case nil: return "Start from an empty floor"
         }
     }
 
-    static func symbol(_ s: HouseStyle?) -> String {
-        switch s {
-        case .ranch: return "house"; case .twoStory: return "building"; case .capeCod: return "house.lodge"
-        case .splitLevel: return "stairs"; case .townhouse: return "building.2"; case .apartment: return "building.columns"
-        case nil: return "square.dashed"
-        }
-    }
+    static func symbol(_ s: HouseStyle?) -> String { s?.symbol ?? "square.dashed" }
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -75,6 +62,17 @@ struct BlocksFlow: View {
                             LabeledContent("Bathrooms", value: bathrooms.formatted(.number.precision(.fractionLength(0...1))))
                         }
                         .padding(.vertical, 8)
+                        if style?.isMultiLevel == true {
+                            Divider()
+                            Toggle(isOn: $matchOutlines) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Same outline on every level")
+                                    Text("Stairs line up floor to floor; you split the rooms.")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                        }
                     }
                     .padding(.horizontal, 12)
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemGroupedBackground)))
@@ -98,12 +96,12 @@ struct BlocksFlow: View {
     private func build() {
         let draft: PlanDraft
         if let style {
-            draft = env.blocks.draft(style: style, beds: bedrooms, baths: bathrooms)
+            draft = env.blocks.draft(style: style, beds: bedrooms, baths: bathrooms, matchOutlines: matchOutlines)
         } else {
             draft = PlanDraft(levels: [LevelDraft(name: "1st Floor", kind: .floor, sortOrder: 0)], source: .blocks)
         }
         // Condo skips exterior seeding by default (spec 03 edge cases); the review screen can turn it on.
-        model.seedExterior = model.resolved != nil && style != .apartment
+        model.seedExterior = style != .apartment
         model.approxSqFt = nil
         model.useDraft(draft, path: .blocks, env: env)
     }

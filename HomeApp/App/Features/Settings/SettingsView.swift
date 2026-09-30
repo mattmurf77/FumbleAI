@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var calendarStatus: PermissionStatus = .unknown
     @State private var calendars: [CalendarInfo] = []
     @State private var errorText: String?
+    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = true
 
     private static let offsets: [(Int, String)] = [
         (0, "At time"), (15, "15 minutes before"), (30, "30 minutes before"), (60, "1 hour before"),
@@ -42,6 +43,16 @@ struct SettingsView: View {
                 Section("Data") {
                     NavigationLink { ExportView() } label: { Label("Export data (CSV)", systemImage: "square.and.arrow.up") }
                     NavigationLink { RecentlyDeletedView() } label: { Label("Recently Deleted", systemImage: "trash") }
+                }
+                Section {
+                    Toggle("Show feedback button", isOn: $showFeedbackButton)
+                    #if canImport(UIKit)
+                    Button { FeedbackPresenter.shared.present() } label: { Label("Send feedback", systemImage: "exclamationmark.bubble") }
+                    #endif
+                } header: {
+                    Text("Feedback")
+                } footer: {
+                    Text("Report a bug, suggest polish or share an idea from any screen. Shake your iPhone to send feedback even when the button is hidden.")
                 }
                 aboutSection
             }
@@ -72,6 +83,7 @@ struct SettingsView: View {
                 for await list in env.people.observePeople(property: pid) { people = list.sorted { $0.sortOrder < $1.sortOrder } }
             }
         }
+        .feedbackPage("Settings")
     }
 
     // MARK: Home

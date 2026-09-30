@@ -60,6 +60,7 @@ struct SeasonalSwapView: View {
                 groupSections(putAway, title: "Put away · \(TIK.seasonTitle(shownSeason.opposite))", inRotation: false, verb: "Put away")
             }
         }
+        .feedbackPage("Seasonal swap")
         .navigationTitle("Seasonal swap")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

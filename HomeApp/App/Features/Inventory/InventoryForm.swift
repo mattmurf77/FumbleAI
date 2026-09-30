@@ -119,6 +119,7 @@ struct InventoryForm: View {
             .task { await load() }
             .task(id: state.scope) { await loadSpots() }
         }
+        .feedbackPage("Inventory form")
     }
 
     private var isSpare: Bool { if case .spare = mode { return true }; return false }

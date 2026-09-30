@@ -1,14 +1,15 @@
-# Render Blueprint for the Home helper service.
+# Render Blueprint for the Home Blueprint helper service and its feedback database.
 # Setup guide: docs/setup/RENDER.md
-# The service is stateless and stores no user data (docs/homeowner-app/07-merged-plan.md §1 decision 4).
+# The map lookup and templates are stateless. The only stored data is in-app feedback users choose to send
+# (category, their text, page name, app/iOS version, device model, a random install id) in Render Postgres.
 services:
   - type: web
     name: home-server
     runtime: node
     plan: free
-    region: oregon
+    region: oregon # Must match the database region so the private (internal) connection string works.
     rootDir: server
-    buildCommand: npm install --omit=dev --no-audit --no-fund
+    buildCommand: npm ci --omit=dev --no-audit --no-fund
     startCommand: node src/index.js
     healthCheckPath: /health
     autoDeploy: true
@@ -22,3 +23,20 @@ services:
         sync: false # Render asks for this value when you create the Blueprint.
       - key: OVERPASS_CONTACT
         sync: false # Optional: an email for OpenStreetMap's usage policy (sent in the User-Agent).
+      - key: HOME_ADMIN_KEY
+        sync: false # Password for the feedback admin page (/admin/feedback?key=...). Different from HOME_API_KEY.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: home-blueprint-db
+          property: connectionString # Internal (private network) URL; no TLS needed.
+
+databases:
+  - name: home-blueprint-db
+    # Smallest paid Render Postgres compute plan (0.1 CPU, 256 MB RAM) in the current plan names.
+    # Older accounts/docs call the same size "basic-256mb". Paid plans are not deleted after 30 days like "free".
+    plan: 0.1c-256mb
+    region: oregon
+    postgresMajorVersion: "17"
+    databaseName: home_blueprint
+    user: home_blueprint
+    ipAllowList: [] # Private network only: reachable from home-server, not from the internet.

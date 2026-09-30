@@ -40,7 +40,7 @@ public struct RoughInGenerator: RoughInGenerating {
     static func clamp(_ i: RoughInInput) -> RoughInInput {
         RoughInInput(floors: min(max(i.floors, 1), 3), hasBasement: i.hasBasement, approxSqFt: min(max(i.approxSqFt, 400), 10_000),
                      bedrooms: min(max(i.bedrooms, 0), 8), bathrooms: min(max((i.bathrooms * 2).rounded() / 2, 0), 6),
-                     includeGarage: i.includeGarage)
+                     includeGarage: i.includeGarage, style: i.style)
     }
 
     /// Per-floor share of the above-grade area (§6.10 step 1).
@@ -90,6 +90,7 @@ public struct RoughInGenerator: RoughInGenerating {
 
     public func draft(_ input: RoughInInput) -> PlanDraft {
         let i = Self.clamp(input)
+        if i.style == .biLevel { return Self.biLevelDraft(i) }
         var ids = DeterministicIDs(seed: DeterministicIDs.seed("rough|\(i.floors)|\(i.hasBasement)|\(i.approxSqFt)|\(i.bedrooms)|\(i.bathrooms)|\(i.includeGarage)"))
         let lists = Self.roomLists(i)
         let shares = Self.floorShares(i.floors)
@@ -105,6 +106,8 @@ public struct RoughInGenerator: RoughInGenerating {
             let unit = groundArea / lists[0].reduce(0) { $0 + $1.weight }
             garageWidth = max(Self.snap(Weight.garage * unit / h), 120)
         }
+        // The ground floor's hall strip anchors the upper floors' halls so the stairs line up floor to floor.
+        var anchor: HallAnchor?
         for f in 0..<i.floors {
             let (w, h) = Self.rectSize(area: totalSqIn * shares[f])
             var spaces: [SpaceDraft] = []
@@ -112,7 +115,9 @@ public struct RoughInGenerator: RoughInGenerating {
                 spaces += Self.make([RoomSpec("Garage", .garage, Weight.garage)], [Rect(x: 0, y: 0, width: garageWidth, height: h)], &ids)
             }
             let floorRect = Rect(x: garageWidth, y: 0, width: w, height: h)
-            spaces += Self.layoutFloor(lists[f], in: floorRect, multiFloor: i.floors > 1, ids: &ids)
+            let laid = Self.layoutFloor(lists[f], in: floorRect, multiFloor: i.floors > 1, anchor: anchor, ids: &ids)
+            spaces += laid.spaces
+            if f == 0 { anchor = laid.anchor }
             levels.append(LevelDraft(tempId: ids.next(), name: CaptureNaming.floorName(index: f), kind: .floor, sortOrder: f, spaces: spaces))
         }
 
@@ -126,6 +131,45 @@ public struct RoughInGenerator: RoughInGenerating {
         return PlanDraft(levels: levels, source: .rough)
     }
 
+    // MARK: Bi-level (split foyer)
+
+    /// Main Level (sort 0: living, kitchen, dining, bedrooms, baths) over a Lower Level (sort −1, basement kind:
+    /// family room, laundry, a bath, the garage when asked, and a 4th+ bedroom). The approximate square feet are split
+    /// evenly and both levels share one outline; the entry foyer and stairs sit in the hall strip at the same spot.
+    public static func biLevelRoomLists(_ input: RoughInInput) -> (main: [RoomSpec], lower: [RoomSpec]) {
+        let i = clamp(input)
+        let fullBaths = Int(i.bathrooms.rounded(.down))
+        let half = i.bathrooms - Double(fullBaths) >= 0.5
+        var main = [RoomSpec("Living Room", .living, Weight.living), RoomSpec("Kitchen", .kitchen, Weight.kitchen),
+                    RoomSpec("Dining Room", .dining, Weight.dining)]
+        var lower = [RoomSpec("Family Room", .family, Weight.family), RoomSpec("Laundry", .laundry, Weight.laundry)]
+        if i.includeGarage { lower.append(RoomSpec("Garage", .garage, Weight.garage)) }
+        let mainBeds = i.bedrooms >= 4 ? i.bedrooms - 1 : i.bedrooms
+        if mainBeds > 0 { main.append(RoomSpec("Primary Bedroom", .bedroom, Weight.primary)) }
+        if mainBeds > 1 { for b in 2...mainBeds { main.append(RoomSpec("Bedroom \(b)", .bedroom, Weight.bedroom)) } }
+        if i.bedrooms >= 4 { lower.append(RoomSpec("Bedroom \(i.bedrooms)", .bedroom, Weight.bedroom)) }
+        for b in 0..<fullBaths {
+            let name = fullBaths > 1 ? "Bathroom \(b + 1)" : "Bathroom"
+            if fullBaths >= 2 && b == fullBaths - 1 { lower.append(RoomSpec(name, .bathroom, Weight.fullBath)) }
+            else { main.append(RoomSpec(name, .bathroom, Weight.fullBath)) }
+        }
+        if half { lower.append(RoomSpec("Half Bath", .halfBath, Weight.halfBath)) }
+        return (main, lower)
+    }
+
+    static func biLevelDraft(_ i: RoughInInput) -> PlanDraft {
+        var ids = DeterministicIDs(seed: DeterministicIDs.seed("rough|biLevel|\(i.approxSqFt)|\(i.bedrooms)|\(i.bathrooms)|\(i.includeGarage)"))
+        let lists = biLevelRoomLists(i)
+        let (w, h) = rectSize(area: Double(i.approxSqFt) * 144 / 2)
+        let rect = Rect(x: 0, y: 0, width: w, height: h)
+        let main = layoutFloor(lists.main, in: rect, multiFloor: true, anchor: nil, foyer: true, ids: &ids)
+        let lower = layoutFloor(lists.lower, in: rect, multiFloor: true, anchor: main.anchor, ids: &ids)
+        return PlanDraft(levels: [
+            LevelDraft(tempId: ids.next(), name: "Lower Level", kind: .basement, sortOrder: -1, spaces: lower.spaces),
+            LevelDraft(tempId: ids.next(), name: "Main Level", kind: .floor, sortOrder: 0, spaces: main.spaces),
+        ], source: .rough)
+    }
+
     // MARK: Layout
 
     static func snap(_ v: Double) -> Double { max(grid, Geometry.snap(v, to: grid)) }
@@ -136,12 +180,23 @@ public struct RoughInGenerator: RoughInGenerating {
         return (w, snap(area / w))
     }
 
+    /// Where the ground floor put its hall strip and stairs (absolute level coordinates).
+    struct HallAnchor: Hashable {
+        /// Height of the rooms above the hall.
+        var topHeight: Double
+        /// Left edge of the stairs block (nil: no separate stairs block).
+        var stairsMinX: Double?
+    }
+
     /// Hall strip through the middle; rooms split into two groups by weight above/below it; treemap each group.
-    static func layoutFloor(_ rooms: [RoomSpec], in rect: Rect, multiFloor: Bool, ids: inout DeterministicIDs) -> [SpaceDraft] {
-        guard !rooms.isEmpty else { return [] }
+    /// With an `anchor` (an upper floor) the hall and stairs go where the ground floor has them, when they fit.
+    /// `foyer`: an "Entry Foyer" (72 in) in the hall strip left of the stairs (bi-level).
+    static func layoutFloor(_ rooms: [RoomSpec], in rect: Rect, multiFloor: Bool, anchor: HallAnchor? = nil, foyer: Bool = false,
+                            ids: inout DeterministicIDs) -> (spaces: [SpaceDraft], anchor: HallAnchor?) {
+        guard !rooms.isEmpty else { return ([], nil) }
         // Too shallow for a hall strip (tiny floors): rooms only.
         guard rect.height >= hallWidth + 2 * 60, rooms.count > 1 else {
-            return make(rooms, Treemap.squarify(rooms.map(\.weight), in: rect, snap: grid), &ids)
+            return (make(rooms, Treemap.squarify(rooms.map(\.weight), in: rect, snap: grid), &ids), nil)
         }
         // Balanced partition: heaviest first, each to the lighter side (ties → top). Order inside a side is kept.
         var topIdx: [Int] = [], bottomIdx: [Int] = []
@@ -152,22 +207,35 @@ public struct RoughInGenerator: RoughInGenerating {
         let top = topIdx.sorted().map { rooms[$0] }, bottom = bottomIdx.sorted().map { rooms[$0] }
 
         let avail = rect.height - hallWidth
-        var topH = Geometry.snap(avail * tw / (tw + bw), to: grid)
+        var topH = anchor?.topHeight ?? Geometry.snap(avail * tw / (tw + bw), to: grid)
         topH = min(max(topH, 60), avail - 60)
         let topRect = Rect(minX: rect.minX, minY: rect.minY, maxX: rect.maxX, maxY: rect.minY + topH)
         let hallRect = Rect(minX: rect.minX, minY: topRect.maxY, maxX: rect.maxX, maxY: topRect.maxY + hallWidth)
         let bottomRect = Rect(minX: rect.minX, minY: hallRect.maxY, maxX: rect.maxX, maxY: rect.maxY)
 
         var out = make(top, Treemap.squarify(top.map(\.weight), in: topRect, snap: grid), &ids)
+        var stairsMinX: Double?
         if multiFloor && hallRect.width > stairsLength + 60 {
-            let split = hallRect.maxX - stairsLength
-            out += make([RoomSpec("Hall", .hall, 0)], [Rect(minX: hallRect.minX, minY: hallRect.minY, maxX: split, maxY: hallRect.maxY)], &ids)
-            out += make([RoomSpec("Stairs", .stairs, 0)], [Rect(minX: split, minY: hallRect.minY, maxX: hallRect.maxX, maxY: hallRect.maxY)], &ids)
+            var split = hallRect.maxX - stairsLength
+            if let a = anchor?.stairsMinX, a >= hallRect.minX + 60, a + stairsLength <= hallRect.maxX { split = a }
+            stairsMinX = split
+            var hallRight = split
+            var extra: [(RoomSpec, Rect)] = []
+            if foyer && split - hallRect.minX >= 72 + 60 {
+                extra.append((RoomSpec("Entry Foyer", .hall, 0), Rect(minX: split - 72, minY: hallRect.minY, maxX: split, maxY: hallRect.maxY)))
+                hallRight = split - 72
+            }
+            out += make([RoomSpec("Hall", .hall, 0)], [Rect(minX: hallRect.minX, minY: hallRect.minY, maxX: hallRight, maxY: hallRect.maxY)], &ids)
+            out += make(extra.map(\.0), extra.map(\.1), &ids)
+            out += make([RoomSpec("Stairs", .stairs, 0)], [Rect(minX: split, minY: hallRect.minY, maxX: split + stairsLength, maxY: hallRect.maxY)], &ids)
+            if split + stairsLength < hallRect.maxX - 1 {
+                out += make([RoomSpec("Landing", .hall, 0)], [Rect(minX: split + stairsLength, minY: hallRect.minY, maxX: hallRect.maxX, maxY: hallRect.maxY)], &ids)
+            }
         } else {
             out += make([RoomSpec(multiFloor ? "Hall & Stairs" : "Hall", multiFloor ? .stairs : .hall, 0)], [hallRect], &ids)
         }
         out += make(bottom, Treemap.squarify(bottom.map(\.weight), in: bottomRect, snap: grid), &ids)
-        return out
+        return (out, HallAnchor(topHeight: topH, stairsMinX: stairsMinX))
     }
 
     static func make(_ specs: [RoomSpec], _ rects: [Rect], _ ids: inout DeterministicIDs) -> [SpaceDraft] {

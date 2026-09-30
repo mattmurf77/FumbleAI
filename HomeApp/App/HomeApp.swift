@@ -29,7 +29,12 @@ struct HomeApp: App {
                 .onOpenURL { url in env.handle(url: url) }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await env.sceneBecameActive() } }
+            if phase == .active {
+                Task { await env.sceneBecameActive() }   // also retries queued feedback
+                #if canImport(UIKit)
+                FeedbackPresenter.shared.sceneBecameActive()
+                #endif
+            }
         }
         .backgroundTask(.appRefresh(AppConfig.refreshTaskIdentifier)) { [env] in
             await env.runBackgroundRefresh()
@@ -38,7 +43,8 @@ struct HomeApp: App {
 }
 
 #if canImport(UIKit)
-final class AppDelegate: NSObject, UIApplicationDelegate {
+/// A `UIResponder` so it ends every window's responder chain: unhandled motion events (shake) arrive here.
+final class AppDelegate: UIResponder, UIApplicationDelegate {
     /// UNUserNotificationCenter delegate; installed before launch completes so a "Done" tap that launched the app
     /// is delivered, configured with the live services from `HomeApp.body`.
     let notificationHandler = NotificationActionHandler()
@@ -49,6 +55,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         application.registerForRemoteNotifications()
         notificationHandler.install()
         return true
+    }
+
+    /// Shake → feedback form (see `FeedbackPresenter`).
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        if motion == .motionShake {
+            NotificationCenter.default.post(name: .homeDeviceDidShake, object: nil)
+        }
+        super.motionEnded(motion, with: event)
     }
 }
 #endif

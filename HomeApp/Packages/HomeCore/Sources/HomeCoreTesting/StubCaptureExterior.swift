@@ -34,7 +34,7 @@ public struct StubRoughInGenerator: RoughInGenerating {
 public struct StubBlockTemplates: BlockTemplating {
     public init() {}
     public func draft(style: HouseStyle, beds: Int, baths: Double) -> PlanDraft {
-        var d = StubRoughInGenerator().draft(RoughInInput(floors: style == .twoStory ? 2 : 1, hasBasement: false, approxSqFt: 1600,
+        var d = StubRoughInGenerator().draft(RoughInInput(floors: style.isMultiLevel ? 2 : 1, hasBasement: false, approxSqFt: 1600,
                                                           bedrooms: beds, bathrooms: baths))
         d.source = .blocks
         for l in d.levels.indices { for s in d.levels[l].spaces.indices { d.levels[l].spaces[s].source = .blocks; d.levels[l].spaces[s].isApproximate = false } }

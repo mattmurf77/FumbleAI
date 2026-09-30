@@ -100,12 +100,13 @@ struct ReviewDraft: View {
                 }
             }
 
-            if model.resolved != nil {
-                Section {
-                    Toggle("Set up the yard from the satellite view", isOn: $model.seedExterior)
-                } footer: {
-                    Text("Runs in the background after your plan opens.")
-                }
+            Section {
+                Toggle(model.resolved != nil ? "Set up the yard from the satellite view" : "Set up the yard",
+                       isOn: $model.seedExterior)
+            } footer: {
+                Text(model.resolved != nil
+                     ? "Runs in the background after your plan opens. If your house outline can't be found, we start from this floor's shape."
+                     : "Adds an Outside floor with your house outline and a front yard, backyard, side yards, driveway and sidewalk to drag into place.")
             }
         }
         .navigationTitle("Review your plan")

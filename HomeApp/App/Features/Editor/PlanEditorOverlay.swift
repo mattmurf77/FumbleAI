@@ -87,6 +87,20 @@ struct PlanEditorOverlay<Accessory: View>: View {
         .sheet(isPresented: $showAddFloor) {
             AddFloorSheet(property: property) { id in onLevelAdded(id) }
         }
+        .confirmationDialog(stairsRequestTitle, isPresented: stairsRequestBinding, titleVisibility: .visible,
+                            presenting: editor.stairsRequest) { req in
+            Button("Add stairs on \(req.floor.level.name)") { Task { await editor.addMatchingStairs(req.polygon, on: req.floor, env: env) } }
+            Button("Cancel", role: .cancel) { editor.stairsRequest = nil }
+        } message: { req in
+            Text("The stairwell will be cut out of \(req.blockers.joined(separator: ", ")) on \(req.floor.level.name).")
+        }
+        .task { await editor.loadOtherFloors(env: env) }
+    }
+
+    private var stairsRequestTitle: String { "Add matching stairs on \(editor.stairsRequest?.floor.level.name ?? "that floor")?" }
+
+    private var stairsRequestBinding: Binding<Bool> {
+        Binding(get: { editor.stairsRequest != nil }, set: { if !$0 { editor.stairsRequest = nil } })
     }
 
     // MARK: Header
@@ -145,7 +159,7 @@ struct PlanEditorOverlay<Accessory: View>: View {
 
     @ViewBuilder
     private var banner: some View {
-        if let text = editor.message ?? editor.toolHint {
+        if let text = editor.message ?? editor.notice ?? editor.toolHint {
             Text(text)
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(editor.message != nil ? theme.danger : theme.ink)
@@ -154,7 +168,7 @@ struct PlanEditorOverlay<Accessory: View>: View {
                 .overlay(Capsule().strokeBorder(theme.separator, lineWidth: 0.5))
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .top)
-                .onTapGesture { editor.message = nil }
+                .onTapGesture { editor.message = nil; editor.notice = nil }
         }
     }
 
@@ -255,7 +269,7 @@ struct PlanEditorOverlay<Accessory: View>: View {
 
     private func inspector(_ space: Space) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "square.dashed")
+            Image(systemName: space.spaceType == .stairs ? "stairs" : "square.dashed")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(theme.accent)
                 .frame(width: 36, height: 36)
@@ -273,6 +287,11 @@ struct PlanEditorOverlay<Accessory: View>: View {
                         Button(t.displayName) { editor.apply(env: env, { s in s.setType(space.id, to: t); return true }) }
                     }
                 } label: { Label("Room type", systemImage: "tag") }
+                ForEach(editor.floorsMissing(space)) { floor in
+                    Button { editor.requestMatchingStairs(space, on: floor, env: env) } label: {
+                        Label("Add matching stairs on \(floor.level.name)", systemImage: "stairs")
+                    }
+                }
                 Button(role: .destructive) { confirmDelete = true } label: { Label("Delete room", systemImage: "trash") }
             } label: {
                 Text("Edit").font(.subheadline.weight(.semibold))
@@ -306,6 +325,16 @@ struct PlanEditorOverlay<Accessory: View>: View {
     private var toolbar: some View {
         HStack(spacing: 0) {
             Menu {
+                let matches = editor.stairsToMatchHere
+                if !matches.isEmpty {
+                    Section("Line up with another floor") {
+                        ForEach(matches) { m in
+                            Button { editor.addStairsHere(m.polygons, from: m.floor, env: env) } label: {
+                                Label("Stairs matching \(m.floor.level.name)", systemImage: "stairs")
+                            }
+                        }
+                    }
+                }
                 ForEach(roomTypes, id: \.self) { t in
                     Button(t.displayName) { addRoom(t) }
                 }
@@ -357,7 +386,9 @@ struct PlanEditorOverlay<Accessory: View>: View {
 
     private func addRoom(_ type: SpaceType) {
         let center = viewport.toModel(CGPoint(x: viewport.size.width / 2, y: viewport.size.height / 2))
-        let size = geometry.level.isExterior ? Vec2(120, 96) : (type == .closet ? Vec2(48, 72) : Vec2(144, 144))
+        // Stairs: a straight run, 3 ft 6 in wide × 10 ft long (drawn with treads).
+        let size = geometry.level.isExterior ? Vec2(120, 96)
+            : (type == .closet ? Vec2(48, 72) : type == .stairs ? Vec2(42, 120) : Vec2(144, 144))
         editor.tool = .select
         editor.apply(env: env, { s in s.addRoom(type: type, center: center, size: size) != nil },
                      failure: "Couldn’t place a room there.")
@@ -368,9 +399,11 @@ struct PlanEditorOverlay<Accessory: View>: View {
     private func switchLevel() {
         let old = editor
         Task { _ = await old.flush(env: env) }
-        editor = PlanEditorModel(geometry: geometry, unitSystem: unit)
+        let next = PlanEditorModel(geometry: geometry, unitSystem: unit)
+        editor = next
         interaction = nil
         gestures.cancel()
+        Task { await next.loadOtherFloors(env: env) }
     }
 }
 

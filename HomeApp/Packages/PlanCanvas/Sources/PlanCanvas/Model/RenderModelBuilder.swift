@@ -48,7 +48,8 @@ public enum RenderModelBuilder {
                 pole: pole.point, poleRadius: pole.radius, dimsText: dims,
                 spokenDims: spokenDims(poly, isApproximate: s.isApproximate, system: unitSystem),
                 areaSqIn: poly.area, fillStyle: RoomFill.of(s.spaceType, isExterior: s.isExterior),
-                allowsAdd: s.spaceType != .stairs))
+                allowsAdd: s.spaceType != .stairs,
+                treads: s.spaceType == .stairs && !s.isExterior ? StairTreads.lines(for: poly) : []))
         }
         // Exterior zones draw on top of bigger zones: sort by area descending (garden bed over backyard).
         if g.level.isExterior { spaces.sort { $0.areaSqIn > $1.areaSqIn } }

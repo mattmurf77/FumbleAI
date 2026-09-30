@@ -26,7 +26,7 @@ struct PathChooser: View {
                     }
                 }
                 PathCard(symbol: "square.grid.3x3.square", title: "Build with blocks",
-                         detail: "Drag rooms onto a grid and type dimensions. Starts from a template: Colonial, Ranch, Split-level.") {
+                         detail: "Drag rooms onto a grid and type dimensions. Starts from a template: Colonial, Ranch, Split-level, Bi-level.") {
                     model.routes.append(.blocks)
                 }
                 PathCard(symbol: "photo.on.rectangle", title: "Trace a photo",
@@ -42,7 +42,7 @@ struct PathChooser: View {
                     if let r = model.resolved {
                         Text("The yard is set up next, from the satellite view of \(r.address.line ?? r.displayName).")
                     } else {
-                        Text("Add your address later in Settings to set up the yard.")
+                        Text("The yard is set up around your house's outline. Add your address later for the satellite view.")
                     }
                 }
                 .font(.footnote)

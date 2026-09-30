@@ -10,6 +10,12 @@ struct RootView: View {
     @State private var loaded = false
     @State private var showOnboarding = false
     @State private var accountError: String?
+    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = true
+
+    /// Feedback "Page" when the visible screen doesn't name itself with `.feedbackPage(_:)`.
+    private var rootFeedbackPage: String {
+        !loaded ? "Loading" : showOnboarding ? "Onboarding" : "Plan"
+    }
 
     var body: some View {
         @Bindable var env = env
@@ -20,9 +26,15 @@ struct RootView: View {
             } else if showOnboarding {
                 OnboardingFlow(onFinished: { showOnboarding = false })
             } else {
-                PlanScreen()
+                HomeHubView()
             }
         }
+        .onChange(of: rootFeedbackPage, initial: true) { _, page in FeedbackPageTracker.shared.rootPage = page }
+        #if canImport(UIKit)
+        // Floating feedback button on every screen (own window, above sheets) + shake to send feedback.
+        .onAppear { FeedbackPresenter.shared.install(env: env) }
+        .onChange(of: showFeedbackButton) { _, show in FeedbackPresenter.shared.setButtonVisible(show) }
+        #endif
         .task {
             for await p in env.plan.observeCurrentProperty() {
                 property = p

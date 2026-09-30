@@ -80,6 +80,7 @@ struct DiagnosticsView: View {
                 Section { Text(message).foregroundStyle(.secondary) }
             }
         }
+        .feedbackPage("Settings · Diagnostics")
         .navigationTitle("Diagnostics")
         .refreshable { await load() }
         .task { await load() }

@@ -1,6 +1,7 @@
 import SwiftUI
 import PlanKit
 import HomeCore
+import PlanCanvas
 
 /// Lightweight read-only drawing of a `LevelDraft` for the review screen (the real canvas is PlanCanvas, which renders
 /// committed levels). Fills by space type, dashed outlines for approximate rooms, doors/windows as short strokes,
@@ -23,6 +24,11 @@ struct DraftPlanPreview: View {
                 path.addLines(s.polygon.vertices.map(pt))
                 path.closeSubpath()
                 ctx.fill(path, with: .color(Self.fill(for: s)))
+                if s.spaceType == .stairs {
+                    var treads = Path()
+                    for t in StairTreads.lines(for: s.polygon) { treads.move(to: pt(t.a)); treads.addLine(to: pt(t.b)) }
+                    ctx.stroke(treads, with: .color(.primary.opacity(0.35)), lineWidth: 0.75)
+                }
                 let warn = highlighted.contains(s.tempId)
                 ctx.stroke(path, with: .color(warn ? .orange : .primary.opacity(0.75)),
                            style: StrokeStyle(lineWidth: warn ? 2.5 : 1.5, dash: s.isApproximate ? [6, 4] : []))

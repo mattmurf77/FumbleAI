@@ -86,6 +86,9 @@ struct AppDependencies {
     var yardSeeder: any YardSeeding
     var exteriorSeeder: any ExteriorSeeding
 
+    // In-app feedback (live: Home server + on-device queue; in-memory for previews/tests)
+    var feedback: any FeedbackSubmitting = InMemoryFeedbackSubmitter()
+
     // Extras outside the HomeCore protocols (nil for in-memory wiring)
     var account: AccountHooks? = nil
     var setDeviceNickname: (@Sendable (String) -> Void)? = nil
@@ -190,6 +193,9 @@ struct AppDependencies {
         d.snapshots = SatelliteSnapshotter()
         d.yardSeeder = YardSeeder()
         d.exteriorSeeder = ExteriorSeeder(footprints: d.footprints, seeder: d.yardSeeder)
+
+        // INTEGRATION: Feedback — POST {HomeServerURL}/v1/feedback; queued in Application Support/Feedback when offline
+        d.feedback = FeedbackClient(config: config)
         return d
     }
 }
@@ -239,6 +245,8 @@ final class AppEnvironment {
     let yardSeeder: any YardSeeding
     let exteriorSeeder: any ExteriorSeeding
 
+    let feedback: any FeedbackSubmitting
+
     let fitChecker = FitChecker()
     let recurrence: RecurrenceEngine
 
@@ -272,6 +280,7 @@ final class AppEnvironment {
         reminders = d.reminders; notificationAuth = d.notificationAuth; calendar = d.calendar; sync = d.sync
         roomPlanImporter = d.roomPlanImporter; roughIn = d.roughIn; blocks = d.blocks; photoTrace = d.photoTrace; receipts = d.receipts
         addresses = d.addresses; footprints = d.footprints; snapshots = d.snapshots; yardSeeder = d.yardSeeder; exteriorSeeder = d.exteriorSeeder
+        feedback = d.feedback
         recurrence = RecurrenceEngine(calendar: d.clock.calendar)
         account = d.account
         nicknameWriter = d.setDeviceNickname
@@ -329,6 +338,7 @@ final class AppEnvironment {
             }
         }
         observeTimeChanges()
+        retryPendingFeedback()
         await reminders.replan(reason: .launch)
         scheduleAppRefresh()
     }
@@ -347,7 +357,14 @@ final class AppEnvironment {
     }
 
     func sceneBecameActive() async {
+        retryPendingFeedback()
         await reminders.replan(reason: .foreground)
+    }
+
+    /// Sends feedback saved while offline (in the background; a sleeping server can take a while to answer).
+    private func retryPendingFeedback() {
+        let feedback = self.feedback
+        Task.detached(priority: .utility) { await feedback.retryPending() }
     }
 
     /// `home://chore/<uuid>` etc.

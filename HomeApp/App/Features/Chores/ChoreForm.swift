@@ -129,6 +129,7 @@ struct ChoreForm: View {
                 Text("The to-do was saved. You can try adding it to your calendar again.")
             }
         }
+        .feedbackPage("Chore form")
         .task { await load() }
     }
 

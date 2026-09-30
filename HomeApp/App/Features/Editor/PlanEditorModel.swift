@@ -23,6 +23,8 @@ final class PlanEditorModel {
     var tool: Tool = .select
     /// Banner text (overlap, invalid split, save errors).
     var message: String?
+    /// Neutral banner text (e.g. "Added matching stairs on 2nd Floor.").
+    var notice: String?
     /// Bumped whenever the snap target changes (selection haptic).
     private(set) var hapticTick = 0
 
@@ -178,6 +180,104 @@ final class PlanEditorModel {
                                                                         spaceId: edit.spaceId, segment: edit.segment,
                                                                         dims: Dims3(width: edit.lengthIn), source: .planEdit))
             }
+        }
+    }
+
+    // MARK: Stairs across floors (spec 01 edge case "a Stairs room on each floor")
+
+    /// Another interior floor of the property and its rooms, for lining stairs up.
+    struct OtherFloor: Identifiable, Hashable {
+        var level: Level
+        var spaces: [Space]
+        var id: UUID { level.id }
+        var stairs: [Space] { spaces.filter { $0.spaceType == .stairs && $0.deletedAt == nil } }
+    }
+
+    /// A pending "Add matching stairs on <floor>" that would reshape rooms there (asks first).
+    struct StairsRequest: Identifiable {
+        var id = UUID()
+        var polygon: PlanKit.Polygon
+        var floor: OtherFloor
+        var blockers: [String]
+    }
+
+    private(set) var otherFloors: [OtherFloor] = []
+    var stairsRequest: StairsRequest?
+
+    /// Loads the property's other interior floors (called when the editor opens and after it switches floors).
+    func loadOtherFloors(env: AppEnvironment) async {
+        guard !session.level.isExterior else { otherFloors = []; return }
+        let levels = ((try? await env.plan.levels(property: session.level.propertyId)) ?? [])
+            .filter { $0.deletedAt == nil && !$0.isExterior && $0.id != levelId }
+            .sorted { $0.sortOrder < $1.sortOrder }
+        var out: [OtherFloor] = []
+        for l in levels {
+            let spaces = ((try? await env.plan.geometry(level: l.id))?.spaces ?? []).filter { $0.deletedAt == nil }
+            out.append(OtherFloor(level: l, spaces: spaces))
+        }
+        otherFloors = out
+    }
+
+    /// Stairs on another floor that this floor lacks.
+    struct StairsMatch: Identifiable {
+        var floor: OtherFloor
+        var polygons: [PlanKit.Polygon]
+        var id: UUID { floor.id }
+    }
+
+    /// Floors whose stairs are missing here ("Stairs matching <floor>" in the Room menu), with the missing shapes.
+    var stairsToMatchHere: [StairsMatch] {
+        guard !session.level.isExterior else { return [] }
+        let here = session.spaces.map(FloorShape.init)
+        return otherFloors.compactMap { f in
+            let missing = FloorMatching.missingStairs(reference: f.spaces.map(FloorShape.init), target: here)
+            return missing.isEmpty ? nil : StairsMatch(floor: f, polygons: missing)
+        }
+    }
+
+    /// Other floors that don't have the selected stairs yet ("Add matching stairs on <floor>").
+    func floorsMissing(_ stairs: Space) -> [OtherFloor] {
+        guard stairs.spaceType == .stairs else { return [] }
+        let ref = [FloorShape(stairs)]
+        return otherFloors.filter { !FloorMatching.missingStairs(reference: ref, target: $0.spaces.map(FloorShape.init)).isEmpty }
+    }
+
+    /// Adds the other floor's stairs to this floor at the same position (undoable; carves overlapped rooms).
+    func addStairsHere(_ polygons: [PlanKit.Polygon], from floor: OtherFloor, env: AppEnvironment) {
+        tool = .select
+        apply(env: env, { s in
+            var ok = true
+            for p in polygons where s.insertStairs(p) == nil { ok = false }
+            return ok
+        }, failure: "Couldn’t fit the stairs from \(floor.level.name) here. Clear that spot and try again.")
+    }
+
+    /// Step 1 of "Add matching stairs on <floor>": asks first when rooms there must be reshaped.
+    func requestMatchingStairs(_ stairs: Space, on floor: OtherFloor, env: AppEnvironment) {
+        let blockers = FloorMatching.blockers(for: stairs.polygon, on: floor.spaces)
+        if blockers.isEmpty {
+            Task { await addMatchingStairs(stairs.polygon, on: floor, env: env) }
+        } else {
+            stairsRequest = StairsRequest(polygon: stairs.polygon, floor: floor, blockers: blockers.map(\.name))
+        }
+    }
+
+    /// Writes the stairs onto the other floor (its own transaction; not part of this floor's undo).
+    func addMatchingStairs(_ polygon: PlanKit.Polygon, on floor: OtherFloor, env: AppEnvironment) async {
+        stairsRequest = nil
+        guard let g = try? await env.plan.geometry(level: floor.level.id) else {
+            message = "Couldn’t open \(floor.level.name)."; return
+        }
+        var other = PlanEditSession(geometry: g)
+        guard other.insertStairs(polygon, name: FloorMatching.stairsName) != nil else {
+            message = "Couldn’t fit the stairs on \(floor.level.name). Clear that spot there first."; return
+        }
+        do {
+            try await env.plan.updateSpaces(other.changes(against: g.spaces.filter { $0.deletedAt == nil }))
+            notice = "Added matching stairs on \(floor.level.name)."
+            await loadOtherFloors(env: env)
+        } catch {
+            message = "Couldn’t save: \(error.localizedDescription)"
         }
     }
 

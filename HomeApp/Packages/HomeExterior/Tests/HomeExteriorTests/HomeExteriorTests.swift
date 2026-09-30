@@ -241,6 +241,41 @@ final class ExteriorSeederTests: XCTestCase {
         XCTAssertEqual(offline.spaces.count, 7)
         XCTAssertEqual(ExteriorSeeder.fallbackLevel(origin: nil).spaces.count, 7)
     }
+
+    /// Founder bug "Exterior/yard is missing": a failed lookup (offline, server cold-start timeout, 401/5xx) or no
+    /// address must still give an Outside level, with the house block sized from the ground floor.
+    func testAlwaysAYardSizedFromTheGroundFloor() async throws {
+        // Ground floor: 40 × 28 ft main block plus a 20 × 20 ft garage wing (an L).
+        let ground = [Polygon(rect: Rect(x: 0, y: 0, width: 480, height: 336)), Polygon(rect: Rect(x: 480, y: 96, width: 240, height: 240))]
+        let outline = try XCTUnwrap(FloorMatching.outline(of: ground.map { FloorShape(polygon: $0, spaceType: .room) }))
+        let seeder = ExteriorSeeder(footprints: FailingProvider())
+        for level in [await seeder.exteriorLevelOrFallback(for: address, groundOutline: outline, yard: YardSeeder()),
+                      await seeder.exteriorLevelOrFallback(for: nil, groundOutline: outline, yard: YardSeeder()),
+                      await ExteriorSeeder(footprints: ServerFootprintProvider(config: AppConfig(serverURL: URL(string: "https://example.test")!),
+                                                                                transport: MockTransport(status: 401)))
+                          .exteriorLevelOrFallback(for: address, groundOutline: outline, yard: YardSeeder())] {
+            XCTAssertEqual(level.name, "Outside")
+            XCTAssertEqual(level.kind, .exterior)
+            XCTAssertEqual(level.warnings, [.footprintFallback], "committable: no network-unavailable tag")
+            let house = try XCTUnwrap(level.spaces.first { $0.spaceType == .footprint })
+            XCTAssertEqual(house.polygon.area, 480 * 336 + 240 * 240, accuracy: 1)
+            XCTAssertEqual(house.polygon.count, 6, "true outline, not a box")
+            XCTAssertEqual(house.polygon.bounds.center.x, 0, accuracy: 0.01)
+            XCTAssertEqual(Set(level.spaces.map(\.name)), ["House", "Front Yard", "Driveway", "Sidewalk", "Backyard", "Side Yard L", "Side Yard R"])
+            for a in level.spaces where a.spaceType != .footprint {
+                XCTAssertLessThanOrEqual(Clip.intersectionArea(a.polygon, house.polygon), 1, "\(a.name) covers the house")
+            }
+        }
+        // A found footprint still wins over the floor outline.
+        let found = await ExteriorSeeder(footprints: OverpassFootprintProvider(transport: MockTransport(body: try fixture("overpass_house"))))
+            .exteriorLevelOrFallback(for: address, groundOutline: outline, yard: YardSeeder())
+        XCTAssertTrue(found.warnings.isEmpty)
+        // 404 no_building (no footprint) + a floor outline → the floor outline, not the 40 × 30 block.
+        let noBuilding = await ExteriorSeeder(footprints: OverpassFootprintProvider(transport: MockTransport(body: try fixture("overpass_empty"))))
+            .exteriorLevelOrFallback(for: address, groundOutline: outline, yard: YardSeeder())
+        XCTAssertEqual(noBuilding.spaces.first { $0.spaceType == .footprint }?.polygon.area ?? 0, 480 * 336 + 240 * 240, accuracy: 1)
+        XCTAssertEqual(noBuilding.georef?.originLat, 40)
+    }
 }
 
 // MARK: - Snapshot cache

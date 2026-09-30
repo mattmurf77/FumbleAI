@@ -38,6 +38,7 @@ struct ExportView: View {
                 Section { Text(errorText).foregroundStyle(.red) }
             }
         }
+        .feedbackPage("Settings · Export")
         .navigationTitle("Export data")
         .onChange(of: includeAttachments) { _, _ in exportURL = nil }
     }

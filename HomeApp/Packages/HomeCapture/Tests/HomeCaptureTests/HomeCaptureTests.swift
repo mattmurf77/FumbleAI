@@ -83,6 +83,39 @@ final class RoughInGeneratorTests: XCTestCase {
         for l in d.levels { assertTiles(l.spaces) }
     }
 
+    /// Multi-floor rough-in: a stairs block on every floor at the same position.
+    func testStairsOnEveryFloorLineUp() throws {
+        for floors in [2, 3] {
+            for garage in [false, true] {
+                let d = gen.draft(RoughInInput(floors: floors, hasBasement: false, approxSqFt: 2400, bedrooms: 4, bathrooms: 2.5, includeGarage: garage))
+                let stairs = d.levels.map { $0.spaces.filter { $0.spaceType == .stairs } }
+                XCTAssertTrue(stairs.allSatisfy { $0.count == 1 }, "\(floors) floors")
+                let r0 = try XCTUnwrap(stairs[0].first).polygon.bounds, r1 = try XCTUnwrap(stairs[1].first).polygon.bounds
+                XCTAssertEqual(r0, r1, "\(floors) floors, garage \(garage)")
+                for l in d.levels { assertTiles(l.spaces) }
+            }
+        }
+    }
+
+    func testBiLevelRoughIn() throws {
+        let input = RoughInInput(floors: 2, hasBasement: true, approxSqFt: 2000, bedrooms: 4, bathrooms: 2.5, includeGarage: true, style: .biLevel)
+        let d = gen.draft(input)
+        XCTAssertEqual(d.levels.map(\.name), ["Lower Level", "Main Level"])
+        XCTAssertEqual(d.levels.map(\.kind), [.basement, .floor])
+        let lower = d.levels[0].spaces, main = d.levels[1].spaces
+        XCTAssertEqual(main.filter { $0.spaceType == .bedroom }.count, 3)
+        XCTAssertEqual(lower.filter { $0.spaceType == .bedroom }.count, 1)
+        for t: SpaceType in [.family, .laundry, .garage, .bathroom, .halfBath, .stairs] { XCTAssertTrue(lower.contains { $0.spaceType == t }, "lower \(t)") }
+        XCTAssertTrue(main.contains { $0.name == "Entry Foyer" })
+        XCTAssertEqual(try XCTUnwrap(lower.first { $0.spaceType == .stairs }).polygon.bounds,
+                       try XCTUnwrap(main.first { $0.spaceType == .stairs }).polygon.bounds)
+        XCTAssertEqual(d.levels[0].bounds, d.levels[1].bounds)
+        let total = d.levels.flatMap(\.spaces).reduce(0) { $0 + $1.polygon.area } / 144
+        XCTAssertEqual(total, 2000, accuracy: 2000 * 0.04)
+        for l in d.levels { assertTiles(l.spaces) }
+        XCTAssertEqual(d, gen.draft(input))
+    }
+
     func testClampsInputs() {
         let d = gen.draft(RoughInInput(floors: 9, hasBasement: false, approxSqFt: 50, bedrooms: -2, bathrooms: 0))
         XCTAssertEqual(d.levels.count, 3)
@@ -94,7 +127,7 @@ final class RoughInGeneratorTests: XCTestCase {
 
 final class BlockTemplatesTests: XCTestCase {
     func testEveryStyleProducesValidTiledLevels() {
-        for style in HouseStyle.allCases {
+        for style in HouseStyle.knownCases + [.unknown] {
             for beds in [0, 1, 3, 5] {
                 let d = BlockTemplates().draft(style: style, beds: beds, baths: 2.5)
                 XCTAssertEqual(d.source, .blocks)
@@ -119,6 +152,52 @@ final class BlockTemplatesTests: XCTestCase {
         XCTAssertEqual(d.levels[0].spaces.filter { $0.spaceType == .halfBath }.count, 1)
         XCTAssertEqual(BlockTemplates.displayName(.twoStory), "Colonial 2-story")
         XCTAssertFalse(BlockTemplates.seedsExteriorByDefault(.apartment))
+    }
+
+    /// Bi-level (split foyer): Main Level over a partly below-grade Lower Level, stairs + entry foyer between.
+    func testBiLevelTemplate() throws {
+        XCTAssertEqual(BlockTemplates.displayName(.biLevel), "Bi-level")
+        let d = BlockTemplates().draft(style: .biLevel, beds: 3, baths: 2)
+        XCTAssertEqual(d.levels.map(\.name), ["Lower Level", "Main Level"])
+        XCTAssertEqual(d.levels.map(\.sortOrder), [-1, 0])
+        XCTAssertEqual(d.levels.map(\.kind), [.basement, .floor])
+        let lower = d.levels[0].spaces, main = d.levels[1].spaces
+        for t: SpaceType in [.living, .kitchen, .dining] { XCTAssertTrue(main.contains { $0.spaceType == t }, "main \(t)") }
+        XCTAssertEqual(main.filter { $0.spaceType == .bedroom }.count, 3)
+        XCTAssertTrue(main.contains { $0.name == "Entry Foyer" })
+        for t: SpaceType in [.family, .bathroom, .laundry, .garage] { XCTAssertTrue(lower.contains { $0.spaceType == t }, "lower \(t)") }
+        XCTAssertEqual(d.levels.flatMap(\.spaces).filter { $0.spaceType == .bathroom }.count, 2)
+        // Stairs on both levels at the same position; both levels share one outline.
+        let s0 = try XCTUnwrap(lower.first { $0.spaceType == .stairs }), s1 = try XCTUnwrap(main.first { $0.spaceType == .stairs })
+        XCTAssertEqual(s0.polygon.bounds, s1.polygon.bounds)
+        let o0 = try XCTUnwrap(FloorMatching.outline(of: d.levels[0])), o1 = try XCTUnwrap(FloorMatching.outline(of: d.levels[1]))
+        XCTAssertEqual(o0.area, o1.area, accuracy: 1)
+        XCTAssertEqual(o0.bounds, o1.bounds)
+        // 4 beds: the 4th goes down.
+        let four = BlockTemplates().draft(style: .biLevel, beds: 4, baths: 2.5)
+        XCTAssertEqual(four.levels[0].spaces.filter { $0.spaceType == .bedroom }.count, 1)
+        XCTAssertEqual(four.levels[0].spaces.filter { $0.spaceType == .halfBath }.count, 1)
+    }
+
+    /// Every multi-level style has stairs on every level, at the same position, and (by default) one shared outline.
+    func testMultiLevelTemplatesHaveAlignedStairsAndMatchingOutlines() throws {
+        for style in HouseStyle.knownCases where style.isMultiLevel {
+            for beds in [1, 3, 5] {
+                let d = BlockTemplates().draft(style: style, beds: beds, baths: 2.5)
+                guard d.levels.count > 1 else { continue }
+                let stairs = d.levels.map { $0.spaces.filter { $0.spaceType == .stairs }.map(\.polygon.bounds) }
+                XCTAssertTrue(stairs.allSatisfy { $0.count == 1 }, "\(style) \(beds): stairs on every level")
+                XCTAssertEqual(Set(stairs.flatMap { $0 }).count, 1, "\(style) \(beds): stairs line up")
+                let outlines = try d.levels.map { try XCTUnwrap(FloorMatching.outline(of: $0)) }
+                for o in outlines.dropFirst() {
+                    XCTAssertEqual(o.area, outlines[0].area, accuracy: 1, "\(style) \(beds)")
+                    XCTAssertEqual(o.bounds, outlines[0].bounds, "\(style) \(beds)")
+                }
+            }
+        }
+        // Opt-out keeps each level's own natural size.
+        let free = BlockTemplates().draft(style: .twoStory, beds: 2, baths: 1, matchOutlines: false)
+        XCTAssertNotEqual(free.levels[0].bounds, free.levels[1].bounds)
     }
 
     func testSplitLevelHasThreeLevels() {

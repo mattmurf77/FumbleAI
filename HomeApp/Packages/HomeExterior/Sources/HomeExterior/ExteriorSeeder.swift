@@ -13,8 +13,8 @@ import HomeCore
 /// The satellite snapshot is not part of the draft (it is local-only and keyed by the committed level id): call
 /// `SatelliteSnapshotting.snapshot(center:spanMeters:levelId:)` after commit.
 public struct ExteriorSeeder: ExteriorSeeding {
-    public static let networkUnavailableTag = "footprint-unavailable"
-    public static let levelName = "Outside"
+    public static let networkUnavailableTag = ExteriorPlanning.footprintUnavailableTag
+    public static let levelName = ExteriorPlanning.levelName
 
     public var footprints: any FootprintProviding
     public var seeder: any YardSeeding
@@ -41,11 +41,11 @@ public struct ExteriorSeeder: ExteriorSeeding {
                           warnings: warnings)
     }
 
-    /// Manual set-up with no lookup ("Geocode fails" state): blank Outside level with the fallback block and zones.
-    public static func fallbackLevel(origin: GeoCoordinate?, seeder: any YardSeeding = YardSeeder()) -> LevelDraft {
-        LevelDraft(name: levelName, kind: .exterior, sortOrder: Level.exteriorSortOrder,
-                   spaces: seeder.seed(footprint: nil, frontDir: Vec2(0, 1), roadDistanceIn: nil),
-                   georef: origin.map { GeoReference(originLat: $0.latitude, originLon: $0.longitude) },
-                   warnings: [.footprintFallback])
+    /// Manual set-up with no lookup ("Geocode fails" state, no address, lookup failed): Outside level with the
+    /// default zones around `houseOutline` (the ground floor's outline, re-centered on the pin) or, without one, the
+    /// 40 × 30 ft block. See `ExteriorSeeding.exteriorLevelOrFallback` (HomeCore) for the full "always a yard" path.
+    public static func fallbackLevel(origin: GeoCoordinate?, houseOutline: Polygon? = nil,
+                                     seeder: any YardSeeding = YardSeeder()) -> LevelDraft {
+        ExteriorPlanning.fallbackLevel(houseOutline: houseOutline, origin: origin, seeder: seeder)
     }
 }

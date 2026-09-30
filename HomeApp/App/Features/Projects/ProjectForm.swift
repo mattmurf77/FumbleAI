@@ -121,6 +121,7 @@ struct ProjectForm: View {
                 Button("OK", role: .cancel) {}
             } message: { Text(errorText ?? "") }
         }
+        .feedbackPage("Project form")
         .task { await load() }
     }
 

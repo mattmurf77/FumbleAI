@@ -44,6 +44,7 @@ struct ChoreDetailView: View {
                 ProgressView()
             }
         }
+        .feedbackPage("Chore details")
         .navigationTitle(chore.map { names.name($0.scope) } ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

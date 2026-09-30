@@ -31,6 +31,7 @@ struct RecentlyDeletedView: View {
                 }
             }
         }
+        .feedbackPage("Settings · Recently Deleted")
         .navigationTitle("Recently Deleted")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

@@ -94,6 +94,7 @@ struct RoomSheet: View {
                 }
             }
         }
+        .feedbackPage("Room · " + title, context: ["lens": lens.rawValue])
         .task(id: spaceId ?? fixedScope?.levelId) { await model.run(env: env, spaceId: spaceId, scope: fixedScope) }
         .sheet(item: $openItem) { item in ItemDetailRouter(ref: item.ref) }
         .sheet(item: $addRequest) { r in
