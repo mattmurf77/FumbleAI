@@ -44,7 +44,8 @@ final class OnboardingModel {
     var storyKinds: [Int: Level.Kind] = [:]
     /// Suggested Things the user checked (none by default, FR-PLN-38).
     var acceptedSuggestions: Set<UUID> = []
-    /// Exterior seeding after commit (off by default for Condo).
+    /// Set up the "Outside" level after commit (off by default for Condo). Runs with or without an address: without
+    /// one, or when the footprint lookup fails, the yard is built around the ground floor's outline.
     var seedExterior = true
     /// Rough it in: saved on the property as a sanity reference (FR-PLN-15).
     var approxSqFt: Int?
@@ -53,9 +54,10 @@ final class OnboardingModel {
     var isSaving = false
     var commitError: String?
 
-    /// Marker added by the exterior seeder when the footprint lookup failed for network reasons (FR-EXT-15:
-    /// don't commit, retry on next launch). Mirrors `HomeExterior.ExteriorSeeder.networkUnavailableTag`.
-    static let footprintUnavailableTag = "footprint-unavailable"
+    /// Marker added by the exterior seeder when the footprint lookup failed for network reasons. Mirrors
+    /// `HomeExterior.ExteriorSeeder.networkUnavailableTag`. Onboarding no longer skips the yard on it (it falls back
+    /// to the ground floor's outline, see `ExteriorSetup`); kept for other callers.
+    static let footprintUnavailableTag = ExteriorPlanning.footprintUnavailableTag
 
     // MARK: Restore check (FR-PLN-01)
 
@@ -166,8 +168,11 @@ final class OnboardingModel {
             if let i = draft.levels.firstIndex(where: { $0.sortOrder == 0 && $0.kind != .exterior }), i < levelIds.count {
                 try? await env.plan.setDefaultLevel(levelIds[i], property: propertyId)
             }
-            if seedExterior, let address = resolved {
-                Self.startExteriorSeeding(env: env, propertyId: propertyId, address: address)
+            if seedExterior {
+                // Always a yard (founder bug "Exterior/yard is missing"): address → footprint when it works, else the
+                // ground floor's outline with the default zones. Never blocks the canvas (FR-PLN-05).
+                let ground = ExteriorPlanning.groundLevelIndex(draft.levels).flatMap { FloorMatching.outline(of: draft.levels[$0]) }
+                ExteriorSetup.start(ExteriorSetup.Services(env), propertyId: propertyId, address: resolved, groundOutline: ground)
             }
             scanData = nil
             onFinished()
@@ -176,20 +181,10 @@ final class OnboardingModel {
         }
     }
 
-    /// Exterior seeding runs after the commit and never blocks the canvas (FR-PLN-05, FR-EXT-01). With no network it
-    /// is skipped (FR-EXT-15; retried from Settings / next launch by the owner of that flow).
-    static func startExteriorSeeding(env: AppEnvironment, propertyId: UUID, address: ResolvedAddress) {
-        let seeder = env.exteriorSeeder, committer = env.planCommitter, snapshots = env.snapshots
-        let unavailable = DraftWarning.other(footprintUnavailableTag)
-        Task.detached(priority: .utility) {
-            let level = await seeder.exteriorLevel(for: address)
-            if level.warnings.contains(unavailable) { return }
-            guard let ids = try? await committer.commit(PlanDraft(levels: [level], source: .autoseed), into: propertyId,
-                                                        acceptedSuggestions: []),
-                  let levelId = ids.first else { return }
-            // Local-only satellite image under the zones (best effort).
-            _ = try? await snapshots.snapshot(center: address.coordinate, spanMeters: 90, levelId: levelId)
-        }
+    /// Exterior seeding runs after the commit and never blocks the canvas (FR-PLN-05, FR-EXT-01). A failed lookup
+    /// (offline, server timeout, rate limit) no longer skips the yard: it falls back to the house block.
+    static func startExteriorSeeding(env: AppEnvironment, propertyId: UUID, address: ResolvedAddress?, groundOutline: Polygon? = nil) {
+        ExteriorSetup.start(ExteriorSetup.Services(env), propertyId: propertyId, address: address, groundOutline: groundOutline)
     }
 
     // MARK: Device capabilities
