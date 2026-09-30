@@ -106,6 +106,15 @@ public protocol RoughInGenerating: PlanDraftProducing {
 /// "Build with blocks" starting templates.
 public protocol BlockTemplating: PlanDraftProducing {
     func draft(style: HouseStyle, beds: Int, baths: Double) -> PlanDraft
+    /// `matchOutlines`: every level of a multi-level style gets the reference floor's outline, with the stairs at
+    /// the same position on each level (the user then only subdivides). Default: ignores the flag.
+    func draft(style: HouseStyle, beds: Int, baths: Double, matchOutlines: Bool) -> PlanDraft
+}
+
+extension BlockTemplating {
+    public func draft(style: HouseStyle, beds: Int, baths: Double, matchOutlines: Bool) -> PlanDraft {
+        draft(style: style, beds: beds, baths: baths)
+    }
 }
 
 /// Photo-trace scale calibration (§6.9). Points are image **pixel** coordinates.

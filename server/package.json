@@ -1,7 +1,7 @@
 {
   "name": "home-server",
   "version": "1.0.0",
-  "description": "Tiny stateless helper service for the Home iPhone app: OpenStreetMap footprint lookup and appliance templates. Stores no user data.",
+  "description": "Small helper service for the Home Blueprint iPhone app: OpenStreetMap footprint lookup, appliance templates, and in-app feedback stored in Render Postgres.",
   "private": true,
   "type": "module",
   "main": "src/index.js",

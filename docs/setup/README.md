@@ -5,7 +5,7 @@ Step-by-step guides for getting the Home iPhone app to your testers. They're wri
 | Guide | What it covers | Needed? |
 |---|---|---|
 | [TESTFLIGHT.md](TESTFLIGHT.md) | Apple Developer account, the App ID with iCloud and Push, the iCloud container, the App Store Connect app, the API key, GitHub secrets, running the TestFlight build, inviting testers, and building from Xcode as a backup | **Yes** |
-| [RENDER.md](RENDER.md) | The optional helper service on Render (house-outline lookup and appliance templates); stores no user data | Optional |
+| [RENDER.md](RENDER.md) | The helper service on Render (house-outline lookup, appliance templates) and the Postgres database that stores in-app feedback; how to read feedback | Needed for feedback |
 
 **Suggested order:** Part 1 of TESTFLIGHT.md first, because Apple's approval can take up to 2 days. Set up Render while you wait, then finish TESTFLIGHT.md.
 

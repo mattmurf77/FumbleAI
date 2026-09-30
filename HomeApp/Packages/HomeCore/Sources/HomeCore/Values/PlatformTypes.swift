@@ -149,15 +149,69 @@ public struct RoughInInput: Hashable, Sendable, Codable {
     /// Half baths as .5.
     public var bathrooms: Double
     public var includeGarage: Bool
-    public init(floors: Int, hasBasement: Bool, approxSqFt: Int, bedrooms: Int, bathrooms: Double, includeGarage: Bool = false) {
+    /// Optional house style. `.biLevel` makes a Main Level over a Lower Level (split foyer) and ignores
+    /// `floors` / `hasBasement`; nil (and every other style) uses the floors / basement inputs.
+    public var style: HouseStyle?
+    public init(floors: Int, hasBasement: Bool, approxSqFt: Int, bedrooms: Int, bathrooms: Double, includeGarage: Bool = false,
+                style: HouseStyle? = nil) {
         self.floors = floors; self.hasBasement = hasBasement; self.approxSqFt = approxSqFt
-        self.bedrooms = bedrooms; self.bathrooms = bathrooms; self.includeGarage = includeGarage
+        self.bedrooms = bedrooms; self.bathrooms = bathrooms; self.includeGarage = includeGarage; self.style = style
     }
 }
 
-/// "Build with blocks" house styles.
-public enum HouseStyle: String, Hashable, Sendable, Codable, CaseIterable {
+/// "Build with blocks" / "Rough it in" house styles. Product names: Ranch, Colonial 2-story (`twoStory`),
+/// Split-level, Bi-level (split foyer), Cape (`capeCod`), Townhouse, Condo (`apartment`).
+/// Forward compatible: a style written by a newer app decodes to `.unknown`; use `knownCases` for pickers.
+public enum HouseStyle: String, ForwardCompatibleEnum {
     case ranch, twoStory, splitLevel, capeCod, townhouse, apartment
+    /// Split foyer: the front door opens onto a mid-level landing with a short flight up to the main living level
+    /// and a short flight down to a partly below-grade lower level.
+    case biLevel
+    case unknown
+    public static var unknownCase: HouseStyle { .unknown }
+
+    /// Picker order (Blank is not a style).
+    public static let pickerOrder: [HouseStyle] = [.ranch, .twoStory, .capeCod, .splitLevel, .biLevel, .townhouse, .apartment]
+
+    /// Product display name.
+    public var displayName: String {
+        switch self {
+        case .ranch: return "Ranch"; case .twoStory: return "Colonial 2-story"; case .splitLevel: return "Split-level"
+        case .biLevel: return "Bi-level"; case .capeCod: return "Cape"; case .townhouse: return "Townhouse"
+        case .apartment: return "Condo"; case .unknown: return "Other"
+        }
+    }
+
+    /// One-line description for the style picker.
+    public var subtitle: String {
+        switch self {
+        case .ranch: return "One floor, attached garage"
+        case .twoStory: return "Living downstairs, bedrooms up"
+        case .splitLevel: return "Three short levels"
+        case .biLevel: return "Split foyer: main floor up, family room and garage down"
+        case .capeCod: return "Primary down, bedrooms under the roof"
+        case .townhouse: return "Narrow and tall, shared walls"
+        case .apartment: return "One floor, no yard"
+        case .unknown: return "A style from a newer version of the app"
+        }
+    }
+
+    /// SF Symbol for the style picker.
+    public var symbol: String {
+        switch self {
+        case .ranch: return "house"; case .twoStory: return "building"; case .capeCod: return "house.lodge"
+        case .splitLevel: return "stairs"; case .biLevel: return "arrow.up.and.down.square"; case .townhouse: return "building.2"
+        case .apartment: return "building.columns"; case .unknown: return "questionmark.square.dashed"
+        }
+    }
+
+    /// More than one interior level (stairs are part of the template).
+    public var isMultiLevel: Bool {
+        switch self {
+        case .ranch, .apartment, .unknown: return false
+        case .twoStory, .splitLevel, .biLevel, .capeCod, .townhouse: return true
+        }
+    }
 }
 
 public enum TraceWarning: Error, Hashable, Sendable {
