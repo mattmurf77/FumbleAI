@@ -8,15 +8,9 @@ extension Notification.Name {
     static let homeDeviceDidShake = Notification.Name("app.fumble.home.deviceDidShake")
 }
 
-extension UIWindow {
-    /// Shake gesture → `homeDeviceDidShake`. (UIKit delivers motion events to the key window's responder chain.)
-    open override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
-        super.motionEnded(motion, with: event)
-        if motion == .motionShake {
-            NotificationCenter.default.post(name: .homeDeviceDidShake, object: nil)
-        }
-    }
-}
+// The shake itself is detected in `AppDelegate.motionEnded` (HomeApp.swift): the app delegate is a `UIResponder`
+// at the end of every window's responder chain, so it sees motion events nothing else handled. (Overriding
+// `motionEnded` in an extension of `UIWindow` is not allowed in Swift.)
 
 /// Shows the floating feedback button on every screen and presents the feedback form above whatever is showing.
 ///

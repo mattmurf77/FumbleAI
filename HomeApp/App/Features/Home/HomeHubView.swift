@@ -484,31 +484,20 @@ struct YardSetupSheet: View {
         .presentationDetents([.medium, .large])
     }
 
+    /// Always ends with a yard (founder bug "Exterior/yard is missing"): the address footprint when the lookup works,
+    /// else the ground floor's outline (or the 40 × 30 ft block) with the default zones — see `ExteriorSetup`.
     @MainActor
     private func mapFromAddress() async {
-        guard let coordinate = property.coordinate else { return }
         working = true
         message = nil
         defer { working = false }
-        let address = ResolvedAddress(address: property.address ?? PostalAddressLite(), coordinate: coordinate,
-                                      displayName: property.address?.singleLine ?? property.name)
-        let level = await env.exteriorSeeder.exteriorLevel(for: address)
-        if level.warnings.contains(.other(OnboardingModel.footprintUnavailableTag)) || level.spaces.isEmpty {
-            message = "Couldn’t find your house outline right now. Draw the yard yourself, or try again later."
-            return
-        }
-        do {
-            let ids = try await env.planCommitter.commit(PlanDraft(levels: [level], source: .autoseed),
-                                                         into: property.id, acceptedSuggestions: [])
-            guard let levelID = ids.first else { return }
-            // Local-only satellite image under the zones (best effort, never blocks).
-            let snapshots = env.snapshots
-            Task.detached(priority: .utility) {
-                _ = try? await snapshots.snapshot(center: coordinate, spanMeters: 90, levelId: levelID)
-            }
-            onAdded(levelID)
-        } catch {
-            message = "Couldn’t add the yard: \(error.localizedDescription)"
+        let services = ExteriorSetup.Services(env)
+        let id = await ExteriorSetup.ensureOutside(services, propertyId: property.id,
+                                                   address: ExteriorSetup.address(of: property), groundOutline: nil)
+        if let id {
+            onAdded(id)
+        } else {
+            message = "Couldn’t add the yard. Try again, or draw it yourself."
         }
     }
 }
