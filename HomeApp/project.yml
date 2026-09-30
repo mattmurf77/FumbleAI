@@ -29,6 +29,12 @@ settings:
     HOME_API_KEY: ""
     # Push environment in the entitlements: development for local runs, production for Release/TestFlight.
     HOME_APS_ENVIRONMENT: development
+    # Signing overrides used by the TestFlight lane (manual App Store signing). Defaults keep Xcode's automatic signing.
+    HOME_CLOUD_SYNC: "YES"
+    HOME_SIGN_STYLE: Automatic
+    HOME_SIGN_IDENTITY: Apple Development
+    HOME_PROFILE_NAME: ""
+    HOME_ENTITLEMENTS: App/Home.entitlements
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
@@ -118,6 +124,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         HomeServerURL: $(HOME_SERVER_URL)
         HomeAPIKey: $(HOME_API_KEY)
+        HomeCloudSync: $(HOME_CLOUD_SYNC)
     entitlements:
       path: App/Home.entitlements
       properties:
@@ -131,7 +138,10 @@ targets:
         PRODUCT_NAME: Home
         PRODUCT_BUNDLE_IDENTIFIER: $(HOME_BUNDLE_ID)
         DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
-        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_STYLE: $(HOME_SIGN_STYLE)
+        CODE_SIGN_IDENTITY: $(HOME_SIGN_IDENTITY)
+        PROVISIONING_PROFILE_SPECIFIER: $(HOME_PROFILE_NAME)
+        CODE_SIGN_ENTITLEMENTS: $(HOME_ENTITLEMENTS)
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO

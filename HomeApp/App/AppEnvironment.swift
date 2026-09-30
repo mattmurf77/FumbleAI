@@ -142,7 +142,7 @@ struct AppDependencies {
         d.diagnostics = store.diagnostics
 
         // INTEGRATION: HomeSync — CKSyncEngine over iCloud.<bundle id>, private DB, zone property-<uuid>
-        if let sync = try? SyncCoordinator.live(store: store, containerIdentifier: config.cloudKitContainerIdentifier) {
+        if config.cloudSyncEnabled, let sync = try? SyncCoordinator.live(store: store, containerIdentifier: config.cloudKitContainerIdentifier) {
             d.sync = sync
             d.account = AccountHooks(
                 events: {
