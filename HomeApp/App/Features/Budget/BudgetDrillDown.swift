@@ -37,6 +37,7 @@ struct BudgetDrillDown: View {
                 }
             }
         }
+        .feedbackPage("Budget")
         .overlay {
             if !loaded { ProgressView() }
             else if rollup == nil {
@@ -112,6 +113,7 @@ struct BudgetFloorView: View {
                 }
             }
         }
+        .feedbackPage("Budget · " + levelName)
         .navigationTitle(levelName)
         .task { await observeFloor() }
         .task { await observeRooms() }

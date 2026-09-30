@@ -6,28 +6,19 @@ import HomeCore
 /// number of levels, `source = .blocks`, then the editor opens on the ground floor. Deterministic.
 ///
 /// Styles (product names → `HouseStyle`): Ranch → `.ranch`, Colonial 2-story → `.twoStory`, Split-level →
-/// `.splitLevel`, Cape → `.capeCod`, Townhouse → `.townhouse`, Condo → `.apartment`. "Blank" is `blank()`.
+/// `.splitLevel`, Bi-level → `.biLevel`, Cape → `.capeCod`, Townhouse → `.townhouse`, Condo → `.apartment`.
+/// "Blank" is `blank()`. `.unknown` (a style from a newer app) falls back to the Ranch layout.
+///
+/// Multi-level styles put a Stairs block on every level. With `matchOutlines` (the default) every level takes the
+/// reference floor's outline (the largest level, normally the ground / main level) and its hall strip, so the stairs sit at the same
+/// position on each level and the user only has to subdivide.
 public struct BlockTemplates: BlockTemplating {
     public init() {}
 
     /// Product display name for a style.
-    public static func displayName(_ style: HouseStyle) -> String {
-        switch style {
-        case .ranch: return "Ranch"; case .twoStory: return "Colonial 2-story"; case .splitLevel: return "Split-level"
-        case .capeCod: return "Cape"; case .townhouse: return "Townhouse"; case .apartment: return "Condo"
-        }
-    }
+    public static func displayName(_ style: HouseStyle) -> String { style.displayName }
 
-    public static func subtitle(_ style: HouseStyle) -> String {
-        switch style {
-        case .ranch: return "One floor, attached garage"
-        case .twoStory: return "Living downstairs, bedrooms up"
-        case .splitLevel: return "Three short levels"
-        case .capeCod: return "Primary down, bedrooms under the roof"
-        case .townhouse: return "Narrow and tall, shared walls"
-        case .apartment: return "One floor, no yard"
-        }
-    }
+    public static func subtitle(_ style: HouseStyle) -> String { style.subtitle }
 
     /// Whether exterior seeding is offered by default after this style (Condo skips it, spec 03 edge cases).
     public static func seedsExteriorByDefault(_ style: HouseStyle) -> Bool { style != .apartment }
@@ -57,6 +48,10 @@ public struct BlockTemplates: BlockTemplating {
     static func halfBath() -> Block { Block(name: "Half Bath", type: .halfBath, widthFt: 5, depthFt: 7) }
     static func laundry() -> Block { Block(name: "Laundry", type: .laundry, widthFt: 6, depthFt: 8) }
     static func garage() -> Block { Block(name: "Garage", type: .garage, widthFt: 22, depthFt: 22) }
+    /// Split-foyer entry landing (bi-level), placed in the hall strip next to the stairs.
+    static func foyer() -> Block { Block(name: "Entry Foyer", type: .hall, widthFt: 6, depthFt: 3.5) }
+    /// Filler for a band of a matched outline that the style has no rooms for.
+    static func unassigned() -> Block { Block(name: FloorMatching.unassignedName, type: .room, widthFt: 12, depthFt: 10) }
 
     struct Floor {
         var name: String
@@ -66,17 +61,49 @@ public struct BlockTemplates: BlockTemplating {
         var rows: [[Block]]
         var hallAfterRow: Int?
         var stairs: Bool
+        /// Blocks placed in the hall strip just left of the stairs (bi-level entry foyer).
+        var hallExtras: [Block] = []
+    }
+
+    /// The reference floor's outline, hall strip and stairs, imposed on the other levels (`matchOutlines`).
+    struct Frame: Hashable {
+        var width: Double
+        var depth: Double
+        /// Top of the hall strip, when the reference floor has one.
+        var hallY: Double?
+        /// Stairs block (in the hall strip, or appended to the right of a single-row floor).
+        var stairs: Rect?
     }
 
     // MARK: Draft
 
     public func draft(style: HouseStyle, beds: Int, baths: Double) -> PlanDraft {
+        draft(style: style, beds: beds, baths: baths, matchOutlines: true)
+    }
+
+    public func draft(style: HouseStyle, beds: Int, baths: Double, matchOutlines: Bool) -> PlanDraft {
         let beds = min(max(beds, 0), 8)
         let baths = min(max((baths * 2).rounded() / 2, 0), 6)
-        var ids = DeterministicIDs(seed: DeterministicIDs.seed("blocks|\(style.rawValue)|\(beds)|\(baths)"))
+        var ids = DeterministicIDs(seed: DeterministicIDs.seed("blocks|\(style.rawValue)|\(beds)|\(baths)\(matchOutlines ? "" : "|free")"))
         let floors = Self.floors(style: style, beds: beds, baths: baths)
-        let levels = floors.map { f -> LevelDraft in
-            LevelDraft(tempId: ids.next(), name: f.name, kind: f.kind, sortOrder: f.sortOrder, spaces: Self.layout(f, ids: &ids))
+        // Reference floor: the largest natural layout (the ground floor for most styles), laid out with scratch ids;
+        // the other levels take its frame.
+        var refIndex: Int?
+        var frame: Frame?
+        if matchOutlines && floors.count > 1 {
+            var scratch = DeterministicIDs(seed: 0)
+            let natural = floors.map { Self.layout($0, frame: nil, ids: &scratch).frame }
+            let best = natural.indices.max { a, b in
+                let fa = natural[a].width * natural[a].depth, fb = natural[b].width * natural[b].depth
+                return fa != fb ? fa < fb : abs(floors[a].sortOrder) > abs(floors[b].sortOrder)
+            }
+            refIndex = best
+            frame = best.map { natural[$0] }
+        }
+        let levels = floors.enumerated().map { i, f -> LevelDraft in
+            let tempId = ids.next()
+            let own = i == refIndex ? nil : frame
+            return LevelDraft(tempId: tempId, name: f.name, kind: f.kind, sortOrder: f.sortOrder, spaces: Self.layout(f, frame: own, ids: &ids).spaces)
         }
         return PlanDraft(levels: levels, source: .blocks)
     }
@@ -119,7 +146,7 @@ public struct BlockTemplates: BlockTemplating {
             return Floor(name: CaptureNaming.floorName(index: index), kind: .floor, sortOrder: index, rows: r, hallAfterRow: hall, stairs: stairs)
         }
         switch style {
-        case .ranch:
+        case .ranch, .unknown:
             return [floor(0, [living(), kitchen(), dining(), garage()] + bedrooms(beds) + full + half + [laundry()], stairs: false)]
         case .twoStory:
             return [floor(0, [living(), family(), kitchen(), dining(), garage(), laundry()] + half, stairs: true),
@@ -136,6 +163,19 @@ public struct BlockTemplates: BlockTemplating {
             var main = floor(0, [living(), kitchen(), dining()], stairs: true); main.name = "Main Level"
             var upper = floor(1, bedrooms(beds) + full, stairs: true); upper.name = "Upper Level"
             return upper.rows.isEmpty ? [lower, main] : [lower, main, upper]
+        case .biLevel:
+            // Split foyer: the entry landing sits in the main level's hall strip beside the stairs; a short flight
+            // goes up to the main level (living, kitchen, dining, bedrooms) and one goes down to the partly
+            // below-grade lower level (family room, bath, laundry, garage; a 4th+ bedroom goes down too).
+            let mainBeds = beds >= 4 ? beds - 1 : beds
+            let mainBaths = full.count >= 2 ? Array(full.dropLast()) : full
+            let lowerBaths = full.count >= 2 ? [full[full.count - 1]] : []
+            var main = floor(0, [living(), kitchen(), dining()] + bedrooms(mainBeds) + mainBaths, stairs: true)
+            main.name = "Main Level"; main.hallExtras = [foyer()]
+            let lowerBed = beds >= 4 ? [bedroom(beds)] : []
+            var lower = floor(-1, [family(), garage(), laundry()] + lowerBed + lowerBaths + half, stairs: true)
+            lower.name = "Lower Level"; lower.kind = .basement
+            return [lower, main]
         case .townhouse:
             // Narrow: two rooms per row, stairs along the hall.
             let ground = [living(), kitchen(), dining()] + half
@@ -158,22 +198,50 @@ public struct BlockTemplates: BlockTemplating {
     /// Rows are stacked top (back) to bottom (front); each row's depth is its deepest block; widths keep each block's
     /// typical area; every row is stretched to the widest row (the last block takes the slack) so the floor tiles a
     /// rectangle. A 42 in hall (with stairs at the right end on multi-floor styles) goes after `hallAfterRow`.
-    static func layout(_ f: Floor, ids: inout DeterministicIDs) -> [SpaceDraft] {
+    ///
+    /// With a `frame` (another level's outline) the rows are scaled to the frame's width, the rows before the hall
+    /// fill the frame down to its hall strip and the rows after it fill the rest, and the stairs are placed exactly
+    /// where the frame has them. A band with no rooms gets an "Unassigned space" block.
+    static func layout(_ f: Floor, frame: Frame?, ids: inout DeterministicIDs) -> (spaces: [SpaceDraft], frame: Frame) {
         let ft = 12.0
+        let stairsLen = 120.0
         func snap(_ v: Double) -> Double { max(grid, Geometry.snap(v, to: grid)) }
         struct Placed { var block: Block; var rect: Rect }
-        var rowsOut: [[(Block, Double)]] = []   // (block, width in)
+        var rows: [[(Block, Double)]] = []   // (block, natural width in)
         var depths: [Double] = []
         for row in f.rows where !row.isEmpty {
             let depth = snap(row.map(\.depthFt).max()! * ft)
             depths.append(depth)
-            rowsOut.append(row.map { ($0, snap($0.area * 144 / depth)) })
+            rows.append(row.map { ($0, snap($0.area * 144 / depth)) })
         }
-        guard !rowsOut.isEmpty else { return [] }
-        let width = rowsOut.map { $0.reduce(0) { $0 + $1.1 } }.max()!
+        guard !rows.isEmpty || frame != nil else { return ([], Frame(width: 0, depth: 0, hallY: nil, stairs: nil)) }
+
+        // Hall position (index of the row it follows) and target sizes.
+        var hallAfter: Int? = f.hallAfterRow.flatMap { $0 < rows.count - 1 ? $0 : nil }
+        let width: Double
+        if let fr = frame {
+            width = fr.width
+            if let hy = fr.hallY {
+                if rows.isEmpty { rows = [[(unassigned(), width)]]; depths = [hy] }
+                if rows.count == 1 { rows.append([(unassigned(), width)]); depths.append(fr.depth - hy - hallDepth) }
+                let h = min(hallAfter ?? 0, rows.count - 2)
+                hallAfter = h
+                depths = fit(Array(depths[...h]), to: hy) + fit(Array(depths[(h + 1)...]), to: fr.depth - hy - hallDepth)
+            } else {
+                if rows.isEmpty { rows = [[(unassigned(), width)]]; depths = [fr.depth] }
+                hallAfter = nil
+                depths = fit(depths, to: fr.depth)
+            }
+            rows = rows.map { row in zip(row.map(\.0), fit(row.map(\.1), to: width)).map { ($0, $1) } }
+        } else {
+            width = rows.map { $0.reduce(0) { $0 + $1.1 } }.max()!
+        }
+
         var placed: [Placed] = []
         var y = 0.0
-        for (r, row) in rowsOut.enumerated() {
+        var hallY: Double?
+        var stairsRect: Rect?
+        for (r, row) in rows.enumerated() {
             var x = 0.0
             for (k, item) in row.enumerated() {
                 let w = k == row.count - 1 ? width - x : item.1
@@ -181,28 +249,56 @@ public struct BlockTemplates: BlockTemplating {
                 x += w
             }
             y += depths[r]
-            if f.hallAfterRow == r && r < rowsOut.count - 1 {
-                let stairsLen = 120.0
-                if f.stairs && width > stairsLen + 60 {
+            if hallAfter == r {
+                hallY = y
+                // Right to left: stairs, hall extras (foyer), then the hall takes the rest.
+                var right = width
+                if f.stairs {
+                    let s = frame?.stairs ?? (width > stairsLen + 60 ? Rect(x: width - stairsLen, y: y, width: stairsLen, height: hallDepth) : nil)
+                    if let s {
+                        placed.append(Placed(block: Block(name: "Stairs", type: .stairs, widthFt: 0, depthFt: 0), rect: s))
+                        stairsRect = s
+                        right = s.minX
+                    }
+                }
+                for extra in f.hallExtras.reversed() {
+                    let w = snap(extra.widthFt * ft)
+                    guard right - w >= 60 else { break }
+                    placed.append(Placed(block: extra, rect: Rect(x: right - w, y: y, width: w, height: hallDepth)))
+                    right -= w
+                }
+                if right > 0 {
                     placed.append(Placed(block: Block(name: "Hall", type: .hall, widthFt: 0, depthFt: 0),
-                                         rect: Rect(x: 0, y: y, width: width - stairsLen, height: hallDepth)))
-                    placed.append(Placed(block: Block(name: "Stairs", type: .stairs, widthFt: 0, depthFt: 0),
-                                         rect: Rect(x: width - stairsLen, y: y, width: stairsLen, height: hallDepth)))
-                } else {
-                    placed.append(Placed(block: Block(name: "Hall", type: .hall, widthFt: 0, depthFt: 0),
-                                         rect: Rect(x: 0, y: y, width: width, height: hallDepth)))
+                                         rect: Rect(x: 0, y: y, width: right, height: hallDepth)))
                 }
                 y += hallDepth
             }
         }
         // Single-row floors with stairs: add a stair block to the right so the floors connect.
-        if f.stairs && f.hallAfterRow == nil {
-            placed.append(Placed(block: Block(name: "Stairs", type: .stairs, widthFt: 0, depthFt: 0),
-                                 rect: Rect(x: width, y: 0, width: hallDepth, height: 120)))
+        if f.stairs && hallAfter == nil {
+            let s = frame?.stairs ?? Rect(x: width, y: 0, width: hallDepth, height: 120)
+            placed.append(Placed(block: Block(name: "Stairs", type: .stairs, widthFt: 0, depthFt: 0), rect: s))
+            stairsRect = s
         }
-        return placed.compactMap { p in
+        let spaces = placed.compactMap { p -> SpaceDraft? in
             guard let poly = try? Polygon(p.rect.corners, minArea: Tolerance.minZoneArea) else { return nil }
             return SpaceDraft(tempId: ids.next(), name: p.block.name, spaceType: p.block.type, polygon: poly, source: .blocks, isApproximate: false)
         }
+        return (spaces, frame ?? Frame(width: width, depth: y, hallY: hallY, stairs: stairsRect))
+    }
+
+    /// Scales lengths proportionally so they sum to `total`, each on the grid (≥ 1 grid step); the last takes the slack.
+    static func fit(_ lengths: [Double], to total: Double) -> [Double] {
+        guard !lengths.isEmpty else { return [] }
+        let sum = lengths.reduce(0, +)
+        guard sum > 0 else { return lengths }
+        var out: [Double] = []
+        var used = 0.0
+        for (i, l) in lengths.enumerated() {
+            if i == lengths.count - 1 { out.append(max(total - used, grid)); break }
+            let v = max(grid, Geometry.snap(l * total / sum, to: grid))
+            out.append(v); used += v
+        }
+        return out
     }
 }

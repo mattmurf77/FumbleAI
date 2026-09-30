@@ -43,13 +43,16 @@ public struct SpaceRender: Hashable, Sendable, Identifiable {
     public var fillStyle: RoomFill
     /// No "+" on stairs (mockup).
     public var allowsAdd: Bool
+    /// Stairs only: tread lines and walk line (model inches), drawn over the fill. Empty for other rooms.
+    public var treads: [Segment]
 
     public init(id: UUID, name: String, shortName: String, spaceType: SpaceType, isExterior: Bool, isApproximate: Bool,
                 polygon: Polygon, bbox: Rect, pole: Vec2, poleRadius: Double, dimsText: String, spokenDims: String,
-                areaSqIn: Double, fillStyle: RoomFill, allowsAdd: Bool) {
+                areaSqIn: Double, fillStyle: RoomFill, allowsAdd: Bool, treads: [Segment] = []) {
         self.id = id; self.name = name; self.shortName = shortName; self.spaceType = spaceType; self.isExterior = isExterior
         self.isApproximate = isApproximate; self.polygon = polygon; self.bbox = bbox; self.pole = pole; self.poleRadius = poleRadius
         self.dimsText = dimsText; self.spokenDims = spokenDims; self.areaSqIn = areaSqIn; self.fillStyle = fillStyle; self.allowsAdd = allowsAdd
+        self.treads = treads
     }
 }
 

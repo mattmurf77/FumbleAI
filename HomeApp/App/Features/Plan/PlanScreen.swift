@@ -51,6 +51,7 @@ struct PlanScreen: View {
                     .padding(.bottom, 6)
             }
         }
+        .feedbackPage((isEditing ? "Plan editor" : "Plan") + " · " + (model.level?.name ?? "Home"), context: ["lens": env.selectedLens.rawValue])
         .background(theme.paper.ignoresSafeArea())
         .overlay {
             if model.loaded && model.property == nil {

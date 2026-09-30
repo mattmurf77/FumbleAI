@@ -36,6 +36,7 @@ struct PeopleEditor: View {
                 Text("Housemates are name labels for now. Sharing with other people’s iPhones is coming later.")
             }
         }
+        .feedbackPage("Housemates")
         .navigationTitle("Housemates")
         .toolbar { ToolbarItem(placement: .primaryAction) { EditButton() } }
         .confirmationDialog("Delete \(pendingDelete?.name ?? "housemate")?",

@@ -91,6 +91,7 @@ struct MeasurementForm: View {
             .task { await load() }
             .task(id: state.spaceId) { await loadRoomParts() }
         }
+        .feedbackPage("Measurement form")
     }
 
     private var attachedSection: some View {

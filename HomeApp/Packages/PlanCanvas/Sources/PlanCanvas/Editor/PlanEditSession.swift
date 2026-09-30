@@ -356,6 +356,43 @@ public struct PlanEditSession: Sendable {
         return sp.id
     }
 
+    /// Adds a Stairs room with exactly `polygon` (the stairs of the floor above/below, so they line up), cutting the
+    /// stairwell out of any room it overlaps (a room left with several pieces keeps its id and items on the largest;
+    /// the others become new rooms with the same type). One undo step. Returns nil, changing nothing, when stairs
+    /// already cover that spot or a room can't be cut cleanly.
+    @discardableResult
+    public mutating func insertStairs(_ polygon: Polygon, name: String? = nil) -> UUID? {
+        guard !level.isExterior, let poly = try? Polygon(polygon.vertices, minArea: Tolerance.minZoneArea) else { return nil }
+        var working: [Space] = []
+        var extras: [Space] = []
+        var removed: [UUID] = []
+        var nextSort = (spaces.map(\.sortOrder).max() ?? -1) + 1
+        for s in spaces {
+            guard !s.isExterior, Clip.overlaps(s.polygon, poly) else { working.append(s); continue }
+            if s.spaceType == .stairs { return nil }
+            guard let pieces = FloorMatching.carve(s.polygon, removing: poly) else { return nil }
+            guard let first = pieces.first else { removed.append(s.id); continue }
+            var kept = s
+            kept.polygon = first
+            kept.isApproximate = false
+            working.append(kept)
+            for p in pieces.dropFirst() {
+                extras.append(Space(propertyId: s.propertyId, levelId: s.levelId, name: s.name, spaceType: s.spaceType,
+                                    polygon: p, source: .manual, sortOrder: nextSort))
+                nextSort += 1
+            }
+        }
+        pushUndo()
+        spaces = working
+        for var e in extras { e.name = uniqueName(e.name); spaces.append(e) }
+        for id in removed { deletionTargets[id] = .level(level.id) }
+        let sp = Space(propertyId: level.propertyId, levelId: level.id, name: name ?? uniqueName(FloorMatching.stairsName),
+                       spaceType: .stairs, polygon: poly, source: .manual, sortOrder: nextSort)
+        spaces.append(sp)
+        selection = sp.id
+        return sp.id
+    }
+
     func uniqueName(_ base: String) -> String {
         let names = Set(spaces.map { $0.name.lowercased() })
         if !names.contains(base.lowercased()) { return base }

@@ -133,6 +133,7 @@ struct ThingForm: View {
             .task { await load() }
             .onChange(of: state.scope) { _, _ in Task { await reloadTargets() } }
         }
+        .feedbackPage("Thing form")
     }
 
     // MARK: Sections

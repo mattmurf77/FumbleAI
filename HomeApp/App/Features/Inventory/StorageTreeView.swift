@@ -16,8 +16,10 @@ struct StorageTreeView: View {
     var body: some View {
         if let spaceID {
             RoomStorageTree(spaceID: spaceID)
+                .feedbackPage("Storage · Room")
         } else {
             StorageRoomsList()
+                .feedbackPage("Storage")
         }
     }
 }

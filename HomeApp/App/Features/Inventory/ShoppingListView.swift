@@ -50,6 +50,7 @@ struct ShoppingListView: View {
                 }
             }
         }
+        .feedbackPage("Shopping list")
         .navigationTitle("Shopping list")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

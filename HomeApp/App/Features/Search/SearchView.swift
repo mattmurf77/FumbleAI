@@ -89,6 +89,7 @@ struct SearchView: View {
                 await runSearch(query)
             }
         }
+        .feedbackPage("Search")
     }
 
     // MARK: Rows

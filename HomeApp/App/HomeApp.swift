@@ -29,7 +29,12 @@ struct HomeApp: App {
                 .onOpenURL { url in env.handle(url: url) }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await env.sceneBecameActive() } }
+            if phase == .active {
+                Task { await env.sceneBecameActive() }   // also retries queued feedback
+                #if canImport(UIKit)
+                FeedbackPresenter.shared.sceneBecameActive()
+                #endif
+            }
         }
         .backgroundTask(.appRefresh(AppConfig.refreshTaskIdentifier)) { [env] in
             await env.runBackgroundRefresh()

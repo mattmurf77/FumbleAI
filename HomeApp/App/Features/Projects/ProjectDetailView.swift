@@ -35,6 +35,7 @@ struct ProjectDetailView: View {
             else if missing { ContentUnavailableView("Project not found", systemImage: "hammer", description: Text("It may have been deleted.")) }
             else { ProgressView() }
         }
+        .feedbackPage("Project details")
         .navigationTitle(project.map { names.name($0.scope) } ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

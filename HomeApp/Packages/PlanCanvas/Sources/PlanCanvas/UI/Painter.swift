@@ -33,6 +33,16 @@ public struct Painter {
             if s.id == selection { ctx.fill(p, with: .color(theme.accentSoft)) }
         }
 
+        // Stair treads (thin lines over the fill, under lens edges and walls).
+        for s in spaces where !s.treads.isEmpty {
+            var treads = Path()
+            for t in s.treads {
+                treads.move(to: v.toScreen(t.a))
+                treads.addLine(to: v.toScreen(t.b))
+            }
+            ctx.stroke(treads, with: .color(theme.wall.opacity(0.45)), lineWidth: 0.8)
+        }
+
         // Editor grid (1 ft) sits on the fills, under the walls.
         if let e = editor { drawGrid(&ctx, v, size: size, stepIn: e.gridIn) }
 

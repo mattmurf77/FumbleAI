@@ -97,6 +97,7 @@ struct DoneSheet: View {
                 Button("OK", role: .cancel) {}
             } message: { Text(errorText ?? "") }
         }
+        .feedbackPage("Project · Mark done")
         .onAppear(perform: prefill)
     }
 

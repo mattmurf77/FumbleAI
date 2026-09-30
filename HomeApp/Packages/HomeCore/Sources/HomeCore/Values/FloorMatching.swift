@@ -111,6 +111,33 @@ public enum FloorMatching {
         return stairs(in: reference).filter { s in !there.contains { Clip.intersectionArea($0, s) > s.area * 0.5 } }
     }
 
+    /// Cuts the bounding rectangle of `hole` (a stairwell) out of `polygon` and returns the remainder as simple
+    /// polygons (merged back together where possible, largest first; slivers under 4 sq ft dropped). Returns
+    /// `[polygon]` when they don't overlap and nil when the cut can't be made cleanly (e.g. a concave room the cut
+    /// lines cross more than twice).
+    public static func carve(_ polygon: Polygon, removing hole: Polygon) -> [Polygon]? {
+        let r = hole.bounds
+        let holeRect = Polygon(rect: r)
+        let overlap = Clip.intersectionArea(polygon, holeRect)
+        guard overlap > Tolerance.maxInteriorOverlap else { return [polygon] }
+        var pieces = [polygon]
+        let cuts: [(Vec2, Vec2)] = [(Vec2(x: r.minX, y: r.minY), Vec2(x: 0, y: 1)), (Vec2(x: r.maxX, y: r.minY), Vec2(x: 0, y: 1)),
+                                    (Vec2(x: r.minX, y: r.minY), Vec2(x: 1, y: 0)), (Vec2(x: r.minX, y: r.maxY), Vec2(x: 1, y: 0))]
+        for (point, dir) in cuts {
+            pieces = pieces.flatMap { p -> [Polygon] in
+                guard let (a, b) = Clip.split(p, linePoint: point, direction: dir, minArea: 1) else { return [p] }
+                return [a, b]
+            }
+        }
+        let inside = r.insetBy(0.01)
+        pieces.removeAll { inside.contains($0.centroid) }
+        // Clean cut: nothing left over the hole and the area adds up.
+        guard pieces.allSatisfy({ Clip.intersectionArea($0, holeRect) <= Tolerance.maxInteriorOverlap }) else { return nil }
+        let remaining = pieces.reduce(0) { $0 + $1.area }
+        guard abs(remaining - (polygon.area - overlap)) <= 2 else { return nil }
+        return mergeAdjacent(pieces).filter { $0.area >= Tolerance.minRoomArea }.sorted { $0.area > $1.area }
+    }
+
     /// Target-floor rooms that a new stairs polygon would overlap (the editor refuses or asks first).
     public static func blockers(for stairs: Polygon, on target: [Space]) -> [Space] {
         target.filter { $0.deletedAt == nil && !$0.isExterior && Clip.overlaps($0.polygon, stairs) }

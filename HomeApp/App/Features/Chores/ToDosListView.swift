@@ -91,6 +91,7 @@ struct ToDosListView: View {
                 }
             }
         }
+        .feedbackPage(title)
         .overlay {
             if !loaded {
                 ProgressView()
