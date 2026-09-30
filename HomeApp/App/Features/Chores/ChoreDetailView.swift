@@ -28,6 +28,7 @@ struct ChoreDetailView: View {
     @State private var undo: UndoState?
     @State private var doneFeedback = 0
     @State private var errorText: String?
+    @State private var texting = false
 
     private struct UndoState: Equatable { var message: String; var previousDue: LocalDate?; var token = UUID() }
     struct ProjectRoute: Identifiable, Hashable { let id: UUID }
@@ -54,6 +55,9 @@ struct ChoreDetailView: View {
         }
         .sheet(isPresented: $editing) { ChoreForm(choreID: choreID) }
         .sheet(isPresented: $rescheduling) { rescheduleSheet }
+        .sheet(isPresented: $texting) {
+            if let c = chore { MessageComposer(text: reminderMessage(c)) { texting = false } }
+        }
         .navigationDestination(item: $spawnedProject) { ProjectDetailView(projectID: $0.id) }
         .confirmationDialog("Delete this to-do?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await delete() } }
@@ -67,6 +71,30 @@ struct ChoreDetailView: View {
         .overlay(alignment: .bottom) { undoBar }
         .task { await observe() }
         .task(id: chore?.updatedAt) { await loadExtras() }
+    }
+
+    // MARK: Sharing
+
+    private func assigneeName(_ c: Chore) -> String? { c.assigneeId.flatMap { people[$0] } }
+
+    private func textReminderTitle(_ c: Chore) -> String {
+        assigneeName(c).map { "Text \($0) a reminder" } ?? "Text a reminder"
+    }
+
+    /// "Hi Sam — reminder: Clean gutters (Due Sat, Oct 3 · Outside). Sent from Home Blueprint."
+    private func reminderMessage(_ c: Chore) -> String {
+        let greeting = assigneeName(c).map { "Hi \($0) — reminder: " } ?? "Reminder: "
+        var details = [ScheduleFormat.due(c, today: env.clock.today), names.name(c.scope)]
+        if c.nextDueOn == nil { details.removeFirst() }
+        return greeting + c.title + " (" + details.joined(separator: " · ") + "). Sent from Home Blueprint."
+    }
+
+    private func shareText(_ c: Chore) -> String {
+        var lines = [c.title, names.path(c.scope)]
+        if c.nextDueOn != nil { lines.append(ScheduleFormat.due(c, today: env.clock.today)) }
+        if let rule = c.repeatRule { lines.append("Repeats: " + rule.humanText) }
+        if let notes = c.notes, !notes.isEmpty { lines.append(notes) }
+        return lines.joined(separator: "\n")
     }
 
     // MARK: Content
@@ -108,6 +136,21 @@ struct ChoreDetailView: View {
                 } else {
                     Label("No reminder", systemImage: "bell.slash").foregroundStyle(.secondary)
                 }
+            }
+
+            Section {
+                if MessageComposer.canSend {
+                    Button { texting = true } label: {
+                        Label(textReminderTitle(c), systemImage: "message")
+                    }
+                }
+                ShareLink(item: shareText(c), subject: Text(c.title)) {
+                    Label("Share to-do", systemImage: "square.and.arrow.up")
+                }
+            } header: {
+                Text("Share")
+            } footer: {
+                Text("Opens Messages with the to-do filled in; you choose who to send it to.")
             }
 
             Section("Calendar") {

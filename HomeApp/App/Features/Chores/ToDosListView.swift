@@ -3,7 +3,8 @@ import HomeCore
 import HomeCoreTesting
 
 /// To-Dos as a list (spec 04 "To-Dos view", also the list form of the lens): Overdue / Today / This week / Later
-/// (+ No date, Paused). Swipe to mark done or skip, tap for detail, "+" to add, filter by housemate (FR-CHR-61).
+/// (+ No date, Paused). Swipe to mark done or skip, tap for detail, "+" to add, the mic or "Paste a list" to add many at
+/// once (`QuickCaptureSheet`), share the list (Messages, Mail…), filter by housemate (FR-CHR-61).
 /// Push it inside a NavigationStack. Optional filters restrict it to one room / floor / whole house.
 struct ToDosListView: View {
     @Environment(AppEnvironment.self) private var env
@@ -19,12 +20,15 @@ struct ToDosListView: View {
     @State private var people: [Person] = []
     @State private var personFilter: UUID?
     @State private var adding = false
+    @State private var capture: CaptureRequest?
+    @State private var addedCount: Int?
     @State private var doneFeedback = 0
     @State private var errorText: String?
 
     private var today: LocalDate { env.clock.today }
 
     private struct Bucket: Identifiable { let id: String; let title: String; let chores: [Chore] }
+    private struct CaptureRequest: Identifiable { let id = UUID(); let listen: Bool }
 
     private var buckets: [Bucket] {
         let visible = chores.filter { c in personFilter.map { c.assigneeId == $0 } ?? true }
@@ -99,9 +103,11 @@ struct ToDosListView: View {
                 ContentUnavailableView {
                     Label("No chores yet", systemImage: "checklist")
                 } description: {
-                    Text("Tap + in a room to add one.")
+                    Text("Tap + to add one, or say or paste a whole list.")
                 } actions: {
                     Button("Add a to-do") { adding = true }.buttonStyle(.borderedProminent)
+                    Button { capture = CaptureRequest(listen: true) } label: { Label("Talk to add several", systemImage: "mic") }
+                    Button { capture = CaptureRequest(listen: false) } label: { Label("Paste a list", systemImage: "doc.on.clipboard") }
                 }
             }
         }
@@ -120,18 +126,61 @@ struct ToDosListView: View {
                     }
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu {
+                    Button { capture = CaptureRequest(listen: true) } label: { Label("Talk to add several", systemImage: "mic") }
+                    Button { capture = CaptureRequest(listen: false) } label: { Label("Paste a list", systemImage: "doc.on.clipboard") }
+                    if !buckets.isEmpty {
+                        ShareLink(item: shareText, subject: Text(title)) { Label("Share list", systemImage: "square.and.arrow.up") }
+                    }
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
+                }
+                Button { capture = CaptureRequest(listen: true) } label: { Label("Add by voice", systemImage: "mic") }
                 Button { adding = true } label: { Label("Add to-do", systemImage: "plus") }
             }
         }
         .sheet(isPresented: $adding) {
             ChoreForm(spaceID: scope?.spaceId, levelID: scope?.levelId ?? levelID)
         }
+        .sheet(item: $capture) { r in
+            QuickCaptureSheet(scope: scope, startListening: r.listen) { n in addedCount = n }
+        }
+        .overlay(alignment: .bottom) {
+            if let n = addedCount {
+                Text(n == 1 ? "Added 1 to-do" : "Added \(n) to-dos")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .background(Capsule().fill(.regularMaterial))
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task {
+                        try? await Task.sleep(for: .seconds(2.5))
+                        withAnimation { addedCount = nil }
+                    }
+            }
+        }
         .sensoryFeedback(.success, trigger: doneFeedback)
         .alert("Something went wrong", isPresented: Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(errorText ?? "") }
         .task { await observe() }
+    }
+
+    /// Plain-text list for Messages / Mail / Notes: open to-dos by bucket, with place and due date.
+    private var shareText: String {
+        var lines = [title]
+        for bucket in buckets where bucket.id != "paused" {
+            lines.append("")
+            lines.append(bucket.title)
+            for c in bucket.chores {
+                var parts = [c.title]
+                if scope == nil { parts.append(names.name(c.scope)) }
+                if c.nextDueOn != nil { parts.append(ScheduleFormat.due(c, today: today)) }
+                lines.append("• " + parts.joined(separator: " · "))
+            }
+        }
+        return lines.joined(separator: "\n")
     }
 
     private func completeAction(_ c: Chore) -> (() -> Void)? {

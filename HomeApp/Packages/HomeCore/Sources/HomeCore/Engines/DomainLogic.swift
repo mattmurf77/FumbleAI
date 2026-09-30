@@ -4,7 +4,7 @@ import Foundation
 public enum ChoreLogic {
     public static func make(from d: ChoreDraft, id: UUID = UUID(), now: Date, engine: RecurrenceEngine) -> Chore {
         Chore(id: id, propertyId: d.propertyId, scope: d.scope, title: d.title, notes: d.notes, assigneeId: d.assigneeId,
-              repeatRule: d.repeatRule, startOn: d.startOn, nextDueOn: engine.firstDue(rule: d.repeatRule, start: d.startOn),
+              repeatRule: d.repeatRule, startOn: d.startOn, nextDueOn: d.noDueDate && d.repeatRule == nil ? nil : engine.firstDue(rule: d.repeatRule, start: d.startOn),
               dueMinutes: d.dueMinutes, remindEnabled: d.remindEnabled, remindOffsetMin: d.remindOffsetMin,
               calendarEnabled: d.calendarEnabled, linkedThingId: d.linkedThingId, createdAt: now, updatedAt: now)
     }

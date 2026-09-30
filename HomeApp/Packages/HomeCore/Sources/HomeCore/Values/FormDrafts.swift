@@ -15,12 +15,16 @@ public struct ChoreDraft: Hashable, Codable, Sendable {
     public var remindOffsetMin: Int
     public var calendarEnabled: Bool
     public var linkedThingId: UUID?
+    /// One-off with no due date (quick capture): lands under "No date" instead of being due on `startOn`.
+    public var noDueDate: Bool
     public init(propertyId: UUID, scope: Scope, title: String, notes: String? = nil, assigneeId: UUID? = nil,
                 repeatRule: RepeatRule? = nil, startOn: LocalDate, dueMinutes: MinuteOfDay? = nil,
-                remindEnabled: Bool = false, remindOffsetMin: Int = 0, calendarEnabled: Bool = false, linkedThingId: UUID? = nil) {
+                remindEnabled: Bool = false, remindOffsetMin: Int = 0, calendarEnabled: Bool = false, linkedThingId: UUID? = nil,
+                noDueDate: Bool = false) {
         self.propertyId = propertyId; self.scope = scope; self.title = title; self.notes = notes; self.assigneeId = assigneeId
         self.repeatRule = repeatRule; self.startOn = startOn; self.dueMinutes = dueMinutes; self.remindEnabled = remindEnabled
         self.remindOffsetMin = remindOffsetMin; self.calendarEnabled = calendarEnabled; self.linkedThingId = linkedThingId
+        self.noDueDate = noDueDate
     }
 }
 
