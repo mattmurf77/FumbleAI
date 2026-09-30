@@ -82,6 +82,10 @@ platform :ios do
         "HOME_TEAM_ID" => team_id,
         "DEVELOPMENT_TEAM" => team_id,
         "CODE_SIGN_STYLE" => "Automatic",
+        # Sign the archive for distribution directly. The default "Apple Development" identity needs a
+        # development profile, which Apple refuses to create for a team with no registered devices.
+        "CODE_SIGN_IDENTITY" => "Apple Distribution",
+        "HOME_APS_ENVIRONMENT" => "production",
         "CURRENT_PROJECT_VERSION" => build_number.to_s
       }
       %w[HOME_SERVER_URL HOME_API_KEY].each do |name|

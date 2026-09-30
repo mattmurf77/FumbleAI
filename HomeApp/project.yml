@@ -27,6 +27,8 @@ settings:
     HOME_TEAM_ID: ""
     HOME_SERVER_URL: ""
     HOME_API_KEY: ""
+    # Push environment in the entitlements: development for local runs, production for Release/TestFlight.
+    HOME_APS_ENVIRONMENT: development
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
@@ -123,7 +125,7 @@ targets:
           - iCloud.$(HOME_BUNDLE_ID)
         com.apple.developer.icloud-services:
           - CloudKit
-        aps-environment: development
+        aps-environment: $(HOME_APS_ENVIRONMENT)
     settings:
       base:
         PRODUCT_NAME: Home
