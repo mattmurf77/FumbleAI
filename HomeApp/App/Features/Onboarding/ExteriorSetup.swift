@@ -29,7 +29,7 @@ enum ExteriorSetup {
     /// Adds the Outside level unless one exists; returns its id (the existing one, or the new one). nil only when
     /// the commit itself failed.
     static func ensureOutside(_ s: Services, propertyId: UUID, address: ResolvedAddress?,
-                              groundOutline: Polygon?) async -> UUID? {
+                              groundOutline: PlanKit.Polygon?) async -> UUID? {
         let levels = ((try? await s.plan.levels(property: propertyId)) ?? []).filter { $0.deletedAt == nil }
         if let existing = levels.first(where: { $0.isExterior }) { return existing.id }
         var outline = groundOutline
@@ -49,14 +49,14 @@ enum ExteriorSetup {
     }
 
     /// Fire-and-forget version for after onboarding's commit (FR-PLN-05: never blocks the canvas).
-    static func start(_ s: Services, propertyId: UUID, address: ResolvedAddress?, groundOutline: Polygon?) {
+    static func start(_ s: Services, propertyId: UUID, address: ResolvedAddress?, groundOutline: PlanKit.Polygon?) {
         Task.detached(priority: .utility) {
             _ = await ensureOutside(s, propertyId: propertyId, address: address, groundOutline: groundOutline)
         }
     }
 
     /// Outline of the property's ground floor (sort order 0, else the lowest floor), from the store.
-    static func groundOutline(_ s: Services, levels: [Level]) async -> Polygon? {
+    static func groundOutline(_ s: Services, levels: [Level]) async -> PlanKit.Polygon? {
         let interior = levels.filter { !$0.isExterior }
         guard let ground = interior.first(where: { $0.sortOrder == 0 })
                 ?? interior.filter({ $0.kind == .floor }).min(by: { $0.sortOrder < $1.sortOrder })

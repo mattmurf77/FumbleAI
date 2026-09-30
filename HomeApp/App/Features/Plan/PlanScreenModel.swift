@@ -23,6 +23,9 @@ final class PlanScreenModel {
     private(set) var propertySummary: PropertySummary?
     private(set) var settings = AppSettings()
     var lens: LensID = .plan
+    /// One-shot floor request (the home hub's "Yard & Exterior" card): used instead of the default floor when the
+    /// levels first load, then cleared.
+    var preferredLevelId: UUID?
 
     @ObservationIgnored private var levelTask: Task<Void, Never>?
     @ObservationIgnored private var geometryVersion = 0
@@ -63,7 +66,9 @@ final class PlanScreenModel {
                 self.levels = sorted
                 if self.levelId == nil || !sorted.contains(where: { $0.id == self.levelId }) {
                     // Cold launch / deleted level: the property's default floor (FR-CNV-13/14).
-                    if let l = sorted.defaultLevel(preferred: self.property?.defaultLevelId) { self.select(level: l.id, env: env) }
+                    let requested = self.preferredLevelId.flatMap { id in sorted.first { $0.id == id } }
+                    if requested != nil { self.preferredLevelId = nil }
+                    if let l = requested ?? sorted.defaultLevel(preferred: self.property?.defaultLevelId) { self.select(level: l.id, env: env) }
                 }
                 await self.refreshPropertySummary(env: env)
             }

@@ -1,8 +1,9 @@
 import SwiftUI
 import HomeCore
 
-/// "Rough it in" inputs (FR-PLN-10): floors 1–3, basement, approx. above-grade sq ft (400–10,000), bedrooms 0–8,
-/// bathrooms in halves 0–6, garage. Continue → `RoughInGenerating.draft` → Review.
+/// "Rough it in" inputs (FR-PLN-10): house type (standard or bi-level), floors 1–3, basement, approx. above-grade
+/// sq ft (400–10,000), bedrooms 0–8, bathrooms in halves 0–6, garage. Continue → `RoughInGenerating.draft` → Review.
+/// Multi-floor results put the stairs at the same spot on every floor; bi-level makes a Main Level over a Lower Level.
 struct RoughFlow: View {
     @Environment(AppEnvironment.self) private var env
     @Bindable var model: OnboardingModel
@@ -13,14 +14,26 @@ struct RoughFlow: View {
     @State private var bedrooms = 3
     @State private var bathrooms = 2.0
     @State private var garage = false
+    /// nil = standard (floors + basement below); `.biLevel` = split foyer.
+    @State private var style: HouseStyle?
 
     var body: some View {
         Form {
             Section {
-                Stepper(value: $floors, in: 1...3) {
-                    LabeledContent("Floors above ground", value: "\(floors)")
+                Picker("House type", selection: $style) {
+                    Text("Standard").tag(HouseStyle?.none)
+                    Text(HouseStyle.biLevel.displayName).tag(HouseStyle?.some(.biLevel))
                 }
-                Toggle("Basement", isOn: $hasBasement)
+                if style == .biLevel {
+                    Text("Split foyer: the front door opens onto a landing with short stairs up to the main level and down to a lower level.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Stepper(value: $floors, in: 1...3) {
+                        LabeledContent("Floors above ground", value: "\(floors)")
+                    }
+                    Toggle("Basement", isOn: $hasBasement)
+                }
             } header: {
                 Text("Floors")
             }
@@ -37,7 +50,7 @@ struct RoughFlow: View {
                 Stepper("Adjust by 100", value: $sqFt, in: 400...10_000, step: 100)
                     .labelsHidden()
             } header: {
-                Text("Approximate size (above ground)")
+                Text(style == .biLevel ? "Approximate size (both levels)" : "Approximate size (above ground)")
             } footer: {
                 Text("A rough number is fine. It's saved as a reference and can be refined later.")
             }
@@ -55,9 +68,9 @@ struct RoughFlow: View {
                 let clamped = min(max(sqFt, 400), 10_000)
                 sqFt = clamped
                 let input = RoughInInput(floors: floors, hasBasement: hasBasement, approxSqFt: clamped,
-                                         bedrooms: bedrooms, bathrooms: bathrooms, includeGarage: garage)
+                                         bedrooms: bedrooms, bathrooms: bathrooms, includeGarage: garage, style: style)
                 model.approxSqFt = clamped
-                model.seedExterior = model.resolved != nil
+                model.seedExterior = true
                 model.useDraft(env.roughIn.draft(input), path: .rough, env: env)
             } label: {
                 Text("Continue").frame(maxWidth: .infinity)

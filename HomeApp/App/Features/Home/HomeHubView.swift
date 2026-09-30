@@ -168,19 +168,12 @@ struct HomeHubView: View {
     /// `PlanScreen` pushed onto the hub's stack. It has no `NavigationStack` of its own (its search / settings /
     /// add flows are sheets), so the system back button ("Home") returns here.
     ///
-    /// INTEGRATION(home-hub): `PlanScreen` can't be told which floor to open yet. Once it takes
-    /// `PlanScreen(initialLevelID:)` (see INTEGRATION_NOTES/home-hub.md), pass `levelID` and drop the hint overlay.
+    /// Opens on `levelID` when given (e.g. the Outside level for "Yard & Exterior").
     @ViewBuilder
     private func planScreen(levelID: UUID?) -> some View {
-        PlanScreen()
+        PlanScreen(initialLevelID: levelID)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(theme.paper, for: .navigationBar)
-            .overlay(alignment: .bottom) {
-                if levelID != nil {
-                    HubPlanHint(text: HomeHubCatalog.levelHint(levelName: model.counts.exteriorLevelName), theme: theme)
-                        .padding(.bottom, 72)
-                }
-            }
     }
 
     /// A notification tap / `home://` link / search hit for a chore or project: the plan consumes

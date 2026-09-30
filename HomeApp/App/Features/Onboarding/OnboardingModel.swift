@@ -183,7 +183,7 @@ final class OnboardingModel {
 
     /// Exterior seeding runs after the commit and never blocks the canvas (FR-PLN-05, FR-EXT-01). A failed lookup
     /// (offline, server timeout, rate limit) no longer skips the yard: it falls back to the house block.
-    static func startExteriorSeeding(env: AppEnvironment, propertyId: UUID, address: ResolvedAddress?, groundOutline: Polygon? = nil) {
+    static func startExteriorSeeding(env: AppEnvironment, propertyId: UUID, address: ResolvedAddress?, groundOutline: PlanKit.Polygon? = nil) {
         ExteriorSetup.start(ExteriorSetup.Services(env), propertyId: propertyId, address: address, groundOutline: groundOutline)
     }
 

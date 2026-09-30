@@ -29,6 +29,12 @@ struct PlanScreen: View {
     @State private var showAddFloor = false
     @State private var footerLink: FooterLinkTarget?
     @State private var listToggle = false
+    @State private var addingYard = false
+
+    /// Floor to open instead of the default one (the home hub passes the exterior level).
+    private let initialLevelID: UUID?
+
+    init(initialLevelID: UUID? = nil) { self.initialLevelID = initialLevelID }
 
     private var theme: PlanTheme { PlanTheme.forScheme(scheme) }
     private var showList: Bool { voiceOver || model.settings.showPlanAsList || listToggle }
@@ -53,6 +59,8 @@ struct PlanScreen: View {
         }
         .feedbackPage((isEditing ? "Plan editor" : "Plan") + " · " + (model.level?.name ?? "Home"), context: ["lens": env.selectedLens.rawValue])
         .background(theme.paper.ignoresSafeArea())
+        // Pushed from the home hub: no "‹ Home" while the editor is open (Done / Cancel leave edit mode first).
+        .navigationBarBackButtonHidden(isEditing)
         .overlay {
             if model.loaded && model.property == nil {
                 ContentUnavailableView("No home yet", systemImage: "house",
@@ -60,7 +68,10 @@ struct PlanScreen: View {
                     .background(theme.paper)
             }
         }
-        .task { await model.run(env: env) }
+        .task {
+            model.preferredLevelId = initialLevelID
+            await model.run(env: env)
+        }
         .onChange(of: env.selectedLens) { _, l in model.setLens(l, env: env) }
         .onChange(of: model.levelId) { _, _ in viewport = .zero }
         .onChange(of: env.pendingDeepLink) { _, ref in if let ref { Task { await handleDeepLink(ref) } } }
@@ -229,10 +240,42 @@ struct PlanScreen: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Add floor")
                 }
+                // No Outside level yet (skipped at onboarding, or created before the yard fix): one tap adds it.
+                if let p = model.property, model.loaded, !model.levels.isEmpty, !model.levels.contains(where: \.isExterior) {
+                    Button { addYard(p) } label: {
+                        HStack(spacing: 4) {
+                            if addingYard { ProgressView().controlSize(.mini) } else { Image(systemName: "leaf") }
+                            Text("Add yard")
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(theme.ink2)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(Capsule().fill(theme.surface))
+                        .overlay(Capsule().strokeBorder(theme.separator, style: StrokeStyle(lineWidth: 0.5, dash: [3, 2])))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(addingYard)
+                    .accessibilityLabel("Add yard")
+                    .accessibilityHint("Adds an Outside floor with your house outline and default yard zones")
+                }
             }
             .padding(.horizontal, 16)
         }
         .padding(.top, 12)
+    }
+
+    /// "Add yard" pill: builds the Outside level (address footprint when saved, else the ground floor's outline)
+    /// and switches to it.
+    private func addYard(_ p: Property) {
+        guard !addingYard else { return }
+        addingYard = true
+        let services = ExteriorSetup.Services(env)
+        Task {
+            let id = await ExteriorSetup.ensureOutside(services, propertyId: p.id, address: ExteriorSetup.address(of: p), groundOutline: nil)
+            addingYard = false
+            if let id { model.select(level: id, env: env) }
+        }
     }
 
     // MARK: Canvas

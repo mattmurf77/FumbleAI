@@ -41,7 +41,7 @@ struct TraceFlow: View {
         let level = LevelDraft(name: "1st Floor", kind: .floor, sortOrder: 0, spaces: trace.rooms,
                                underlay: UnderlayDraft(image: attachment, transform: transform),
                                warnings: trace.stretched ? [.possiblyStretched] : [])
-        model.seedExterior = model.resolved != nil
+        model.seedExterior = true
         model.approxSqFt = nil
         model.useDraft(PlanDraft(levels: [level], source: .trace), path: .trace, env: env)
     }
@@ -347,7 +347,7 @@ struct TraceRoomsView: View {
     @State private var dragEnd: Vec2?
     @State private var message: String?
 
-    static let types: [SpaceType] = [.living, .kitchen, .dining, .bedroom, .bathroom, .halfBath, .hall, .closet, .laundry, .garage, .office, .room]
+    static let types: [SpaceType] = [.living, .kitchen, .dining, .bedroom, .bathroom, .halfBath, .hall, .stairs, .closet, .laundry, .garage, .office, .room]
     static let grid = 6.0
 
     var body: some View {
