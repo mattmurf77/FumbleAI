@@ -17,6 +17,7 @@ struct MainTabView: View {
     @State private var tab: AppTab = .home
     @State private var model = HomeHubModel()
     @State private var sharedText: SharedText?
+    @State private var demoSheet: DemoSheet?
 
     private struct SharedText: Identifiable { let id = UUID(); let text: String }
 
@@ -62,9 +63,24 @@ struct MainTabView: View {
         .tint(theme.accent)
         .task { await model.run(env: env) }
         .onChange(of: env.pendingDeepLink, initial: true) { _, ref in if ref != nil { tab = .plan } }
+        .onAppear { applyDemo() }
+        .sheet(item: $demoSheet) { $0.view }
         .onChange(of: scenePhase, initial: true) { _, phase in if phase == .active { collectShared() } }
         .sheet(item: $sharedText) { shared in
             QuickCaptureSheet(initialText: shared.text)
+        }
+    }
+
+    /// Screenshot mode: open on the requested tab, floor and sheet.
+    private func applyDemo() {
+        guard let demo = DemoLaunch.current else { return }
+        tab = demo.tab
+        if let level = demo.levelID { env.pendingLevelID = level }
+        if let sheet = demo.sheet {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(600))
+                demoSheet = sheet
+            }
         }
     }
 
