@@ -15,17 +15,18 @@ extension Notification.Name {
 /// Shows the floating feedback button on every screen and presents the feedback form above whatever is showing.
 ///
 /// The button lives in its own small `UIWindow` (one level above the app window) sized to the button, so it stays
-/// visible over SwiftUI sheets without intercepting touches anywhere else. Drag it; it snaps to the nearest side
-/// and remembers where it was (bottom-right, above the tab bar, until moved). The form is presented with UIKit from the app window's topmost view controller,
+/// visible over SwiftUI sheets without intercepting touches anywhere else. It's a slim tab against the screen edge,
+/// so it never covers row chevrons, badges or full-width buttons. Drag it; it snaps to the nearest side and
+/// remembers where it was (bottom-right, above the tab bar, until moved). The form is presented with UIKit from the app window's topmost view controller,
 /// so it also works while another sheet is open. Settings › "Show feedback button" hides the button; shaking the
 /// iPhone still opens the form.
 @MainActor
 final class FeedbackPresenter: NSObject, UIAdaptivePresentationControllerDelegate {
     static let shared = FeedbackPresenter()
 
-    // v2: the default moved to the bottom-right corner above the tab bar, so earlier saved positions are ignored.
-    private static let sideKey = "feedback.buttonSide.v2"     // "left" | "right"
-    private static let yFractionKey = "feedback.buttonY.v2"   // 0…1 of the usable height
+    // v3: the button became an edge tab with a new default height, so earlier saved positions are ignored.
+    private static let sideKey = "feedback.buttonSide.v3"     // "left" | "right"
+    private static let yFractionKey = "feedback.buttonY.v3"   // 0…1 of the usable height
 
     private weak var env: AppEnvironment?
     private var buttonWindow: UIWindow?
@@ -33,10 +34,10 @@ final class FeedbackPresenter: NSObject, UIAdaptivePresentationControllerDelegat
     private var shakeObserver: NSObjectProtocol?
     private var wantsButton = true
 
-    private let buttonSize: CGFloat = 44
-    private let edgeMargin: CGFloat = 6
-    /// Default gap above the bottom safe area, so the button sits just above the tab bar.
-    private let tabBarClearance: CGFloat = 58
+    /// The tab sits flush against the screen edge: narrow enough to stay clear of list content.
+    private let tabSize = CGSize(width: 28, height: 46)
+    /// Default gap above the bottom safe area: clear of the tab bar and of full-width bottom buttons.
+    private let bottomClearance: CGFloat = 110
 
     // MARK: Setup
 
@@ -85,6 +86,7 @@ final class FeedbackPresenter: NSObject, UIAdaptivePresentationControllerDelegat
         window.rootViewController = controller
         buttonWindow = window     // set first so `appWindow` never picks this window
         window.frame = restingFrame()
+        controller.side = savedSide
         window.isHidden = false   // visible without becoming key (the app window keeps keyboard focus)
     }
 
@@ -96,19 +98,22 @@ final class FeedbackPresenter: NSObject, UIAdaptivePresentationControllerDelegat
         return bounds.inset(by: UIEdgeInsets(top: insets.top + 8, left: insets.left, bottom: insets.bottom + 8, right: insets.right))
     }
 
+    private var savedSide: FeedbackButtonController.Side {
+        UserDefaults.standard.string(forKey: Self.sideKey) == "left" ? .left : .right
+    }
+
     private func restingFrame() -> CGRect {
-        let defaults = UserDefaults.standard
-        let side = defaults.string(forKey: Self.sideKey) ?? "right"
         let area = usableBounds
-        let x = side == "right" ? area.maxX - buttonSize - edgeMargin : area.minX + edgeMargin
+        let screen = windowScene?.coordinateSpace.bounds ?? UIScreen.main.bounds
+        let x = savedSide == .right ? screen.maxX - tabSize.width : screen.minX
         let y: CGFloat
-        if let fraction = defaults.object(forKey: Self.yFractionKey) as? Double {
-            y = area.minY + CGFloat(min(max(fraction, 0), 1)) * max(0, area.height - buttonSize)
+        if let fraction = UserDefaults.standard.object(forKey: Self.yFractionKey) as? Double {
+            y = area.minY + CGFloat(min(max(fraction, 0), 1)) * max(0, area.height - tabSize.height)
         } else {
-            // Bottom-right by default, just above the tab bar.
-            y = max(area.minY, area.maxY - buttonSize - tabBarClearance)
+            // Bottom-right by default, above the tab bar and bottom buttons.
+            y = max(area.minY, area.maxY - tabSize.height - bottomClearance)
         }
-        return CGRect(x: x, y: y, width: buttonSize, height: buttonSize)
+        return CGRect(x: x, y: y, width: tabSize.width, height: tabSize.height)
     }
 
     private var dragStartOrigin: CGPoint = .zero
@@ -121,16 +126,17 @@ final class FeedbackPresenter: NSObject, UIAdaptivePresentationControllerDelegat
         case .changed:
             let area = usableBounds
             var origin = CGPoint(x: dragStartOrigin.x + delta.x, y: dragStartOrigin.y + delta.y)
-            origin.x = min(max(origin.x, area.minX), area.maxX - buttonSize)
-            origin.y = min(max(origin.y, area.minY), area.maxY - buttonSize)
+            origin.x = min(max(origin.x, area.minX), area.maxX - tabSize.width)
+            origin.y = min(max(origin.y, area.minY), area.maxY - tabSize.height)
             window.frame.origin = origin
         case .ended:
             let area = usableBounds
             let side = window.frame.midX > area.midX ? "right" : "left"
-            let travel = max(1, area.height - buttonSize)
+            let travel = max(1, area.height - tabSize.height)
             let fraction = Double(min(max((window.frame.minY - area.minY) / travel, 0), 1))
             UserDefaults.standard.set(side, forKey: Self.sideKey)
             UserDefaults.standard.set(fraction, forKey: Self.yFractionKey)
+            (window.rootViewController as? FeedbackButtonController)?.side = side == "left" ? .left : .right
             let target = restingFrame()
             UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.3,
                            options: [.allowUserInteraction], animations: { window.frame = target }, completion: nil)
@@ -195,6 +201,10 @@ private final class WeakControllerRef {
 /// Root of the button window: a round translucent button with tap and drag.
 final class FeedbackButtonController: UIViewController {
     enum DragPhase { case began, changed, ended }
+    enum Side { case left, right }
+
+    /// Which screen edge the tab is attached to: only the inner corners are rounded.
+    var side: Side = .right { didSet { applyShape() } }
 
     private let onTap: () -> Void
     private let onDrag: (DragPhase, CGPoint) -> Void
@@ -220,7 +230,7 @@ final class FeedbackButtonController: UIViewController {
 
         var config = UIButton.Configuration.plain()
         config.image = UIImage(systemName: "exclamationmark.bubble",
-                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
+                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold))
         config.baseForegroundColor = .label
         let button = UIButton(configuration: config)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -254,7 +264,15 @@ final class FeedbackButtonController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        blur?.layer.cornerRadius = min(view.bounds.width, view.bounds.height) / 2
+        applyShape()
+    }
+
+    private func applyShape() {
+        guard let blur else { return }
+        blur.layer.cornerRadius = 14
+        blur.layer.maskedCorners = side == .right
+            ? [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+            : [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
     }
 
     /// Screen-space finger position (the window moves under the finger, so window coordinates would drift).

@@ -65,8 +65,8 @@ public enum SampleHome {
         space(id(47), outsideId, "Backyard", .backyard, rect(-10, -30, 60, 30), exterior: true, source: .autoseed, color: "#CFE8C4")
         space(id(48), outsideId, "Garden Bed", .gardenBed, rect(2, -12, 12, 6), exterior: true, source: .manual, color: "#E6D3B3")
 
-        s.openings[frontDoorOpeningId] = Opening(id: frontDoorOpeningId, propertyId: pid, levelId: firstFloorId, spaceId: halfBathId,
-                                                 kind: .door, segment: Segment(Vec2(20 * ft, 30 * ft), Vec2(23 * ft, 30 * ft)),
+        s.openings[frontDoorOpeningId] = Opening(id: frontDoorOpeningId, propertyId: pid, levelId: firstFloorId, spaceId: hallId,
+                                                 kind: .door, segment: Segment(Vec2(26 * ft, 18 * ft), Vec2(29 * ft, 18 * ft)),
                                                  heightIn: 80, swing: .leftIn, isExteriorDoor: true, source: .manual, createdAt: t, updatedAt: t)
         s.openings[id(73)] = Opening(id: id(73), propertyId: pid, levelId: firstFloorId, spaceId: kitchenId, kind: .window,
                                      segment: Segment(Vec2(20 * ft, 0), Vec2(24 * ft, 0)), heightIn: 48, sillIn: 36, createdAt: t, updatedAt: t)
