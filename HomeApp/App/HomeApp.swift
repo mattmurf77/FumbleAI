@@ -11,7 +11,8 @@ struct HomeApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     #endif
     @Environment(\.scenePhase) private var scenePhase
-    @State private var env = AppEnvironment.live()
+    /// Screenshot runs (`-HomeDemo YES`) use the in-memory sample house; see `DemoLaunch`.
+    @State private var env = DemoLaunch.current?.makeEnvironment() ?? AppEnvironment.live()
 
     var body: some Scene {
         WindowGroup {

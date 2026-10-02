@@ -1,0 +1,80 @@
+name: Screenshots
+
+# Real screenshots of the app in the iOS Simulator (demo mode, sample house), uploaded as the "screenshots"
+# artifact (PNGs + index.html). Run from the Actions tab or by an agent following .claude/skills/app-screenshots.
+on:
+  # Also runs on PRs that change the screenshot tooling, so a change to it is checked before it lands.
+  pull_request:
+    paths:
+      - ".github/workflows/screenshots.yml"
+      - ".github/scripts/take-screenshots.sh"
+      - "HomeApp/App/Features/Demo/**"
+  workflow_dispatch:
+    inputs:
+      screens:
+        description: "Space-separated DemoLaunch screen ids, or 'all'"
+        required: false
+        default: all
+      appearance:
+        description: "light, dark or both"
+        required: false
+        default: light
+      device:
+        description: "Simulator model"
+        required: false
+        default: iPhone 16 Pro
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    name: Capture screenshots
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      SPM_DIR: ${{ github.workspace }}/.spm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            .spm
+            HomeApp/Packages/*/.build
+          key: spm-${{ runner.os }}-${{ hashFiles('HomeApp/project.yml', 'HomeApp/**/Package.swift', 'HomeApp/**/Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Generate Xcode project
+        working-directory: HomeApp
+        run: xcodegen generate
+
+      - name: Build, launch and capture
+        env:
+          SCREENS: ${{ inputs.screens || 'all' }}
+          APPEARANCE: ${{ inputs.appearance || 'light' }}
+          DEVICE: ${{ inputs.device || 'iPhone 16 Pro' }}
+          OUT_DIR: ${{ github.workspace }}/screenshots
+        run: .github/scripts/take-screenshots.sh
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots
+          retention-days: 14
+          if-no-files-found: warn
