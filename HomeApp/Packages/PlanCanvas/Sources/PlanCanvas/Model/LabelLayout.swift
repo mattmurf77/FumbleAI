@@ -3,9 +3,10 @@ import PlanKit
 
 /// Level of detail for a room label at the current zoom (LLD §6.7 visibility rules, `r_pt = radius · scale`).
 public enum LabelLOD: Int, Hashable, Sendable, Comparable {
-    /// < 18 pt: nothing drawn (room still tappable).
+    /// < 11 pt: nothing drawn (room still tappable).
     case hidden = 0
-    /// 18–30 pt: name only (caption2); "+" hidden (the room sheet header has one).
+    /// 11–30 pt: name only (caption2); "+" hidden (the room sheet header has one). Halls and small yard zones
+    /// land here: a caption fits in a 22 pt band, so they keep their name.
     case nameOnly = 1
     /// 30–48 pt: name + "+"; the chip replaces the dimensions.
     case medium = 2
@@ -18,7 +19,7 @@ public enum LabelLOD: Int, Hashable, Sendable, Comparable {
         switch r {
         case 48...: return .full
         case 30..<48: return .medium
-        case 18..<30: return .nameOnly
+        case 11..<30: return .nameOnly
         default: return .hidden
         }
     }

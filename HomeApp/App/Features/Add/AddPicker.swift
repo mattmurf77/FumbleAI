@@ -46,7 +46,8 @@ struct AddPicker: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
         }
-        .presentationDetents([.medium, .large])
+        // Six choices: at half height the last two were hidden below the fold.
+        .presentationDetents([.large])
     }
 
     private func row(_ kind: AddKind) -> some View {
