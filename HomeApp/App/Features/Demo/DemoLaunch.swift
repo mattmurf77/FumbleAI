@@ -23,6 +23,7 @@ struct DemoLaunch: Equatable {
     }()
 
     /// The sample house, or an empty home for the onboarding screen.
+    @MainActor
     func makeEnvironment() -> AppEnvironment {
         AppEnvironment.preview(sample: screen != .onboarding)
     }
@@ -68,7 +69,7 @@ enum DemoSheet: String, Identifiable {
     - Seal the deck
     """
 
-    @ViewBuilder
+    @MainActor @ViewBuilder
     var view: some View {
         switch self {
         case .quickAdd:
