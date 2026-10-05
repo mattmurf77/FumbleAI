@@ -10,6 +10,8 @@ enum AddDestination: Hashable, Identifiable {
     case thing(spaceID: UUID?)
     /// Thing form in outdoor mode (Outside level): Outdoor category and outdoor templates first.
     case outdoorThing(spaceID: UUID?)
+    /// Thing form that opens the "Scan label" photo flow right away (Stuff tab "Scan an appliance label").
+    case scannedThing(spaceID: UUID?)
     case inventory(spaceID: UUID?)
     case measurement(spaceID: UUID?)
 
@@ -29,7 +31,7 @@ enum AddDestination: Hashable, Identifiable {
         case .todo: return .todo
         case .futureProject: return .futureProject
         case .pastWork: return .pastWork
-        case .thing, .outdoorThing: return .thing
+        case .thing, .outdoorThing, .scannedThing: return .thing
         case .inventory: return .inventory
         case .measurement: return .measurement
         }
@@ -43,6 +45,8 @@ enum AddDestination: Hashable, Identifiable {
             return "\(kind.rawValue):\(s?.uuidString ?? "-")"
         case .outdoorThing(let s):
             return "\(kind.rawValue)-outdoor:\(s?.uuidString ?? "-")"
+        case .scannedThing(let s):
+            return "\(kind.rawValue)-scan:\(s?.uuidString ?? "-")"
         }
     }
 }
@@ -66,6 +70,8 @@ struct AddRouter: View {
             ThingForm(spaceID: spaceID)
         case .outdoorThing(let spaceID):
             ThingForm(spaceID: spaceID, outdoor: true)
+        case .scannedThing(let spaceID):
+            ThingForm(spaceID: spaceID, startWithScan: true)
         case .inventory(let spaceID):
             InventoryForm(spaceID: spaceID)
         case .measurement(let spaceID):

@@ -271,6 +271,8 @@ enum HomeHubCatalog {
             HubRowSection(id: "add", title: "Record something", rows: [
                 HubRow(id: "thing", title: "Appliance, electronic or furniture", detail: "Specs, warranty, filters and bulbs",
                        symbol: "sofa", action: .add(.thing(spaceID: nil))),
+                HubRow(id: "scanLabel", title: "Scan an appliance label", detail: "Snap the model sticker; brand, model and serial fill in",
+                       symbol: "text.viewfinder", action: .add(.scannedThing(spaceID: nil))),
                 HubRow(id: "outdoor", title: "Plant or outdoor feature", detail: "Trees, flowers, patio, fire pit, shed, pool",
                        symbol: "tree", action: .add(.outdoorThing(spaceID: nil))),
                 HubRow(id: "inventory", title: "Pantry, clothing or stored item", detail: "What you have and where it’s kept",
