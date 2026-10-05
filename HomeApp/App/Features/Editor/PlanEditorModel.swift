@@ -16,6 +16,8 @@ final class PlanEditorModel {
         case merge
         case door
         case window
+        /// Tap a room's wall to put a closet inside the room against it (placed like a door).
+        case closet
     }
 
     var session: PlanEditSession
@@ -293,6 +295,14 @@ final class PlanEditorModel {
             let kind: Opening.Kind = tool == .door ? .door : .window
             apply(env: env, { $0.addOpening(kind: kind, near: m, scale: scale) != nil },
                   failure: "Tap on a wall to place the \(kind == .door ? "door" : "window").")
+        case .closet:
+            var added = false
+            apply(env: env, { s in
+                added = s.addCloset(near: m, scale: scale) != nil
+                return added
+            }, failure: "Tap a room’s wall where the closet goes. It needs about 2 × 2 ft of free floor.")
+            // The new closet is selected: back to Select so it can be resized, renamed or moved right away.
+            if added { tool = .select }
         case .split(let vertical):
             guard let sel = session.selection else { message = "Select a room to split first."; return }
             apply(env: env, { $0.split(sel, at: m, vertical: vertical) != nil },
@@ -315,6 +325,7 @@ final class PlanEditorModel {
         case .merge: return "Tap the room to merge into \(selectedSpace?.name ?? "the selected room")."
         case .door: return "Tap a wall to place a door (display only)."
         case .window: return "Tap a wall to place a window (display only)."
+        case .closet: return "Tap a room’s wall to add a closet inside the room."
         }
     }
 }

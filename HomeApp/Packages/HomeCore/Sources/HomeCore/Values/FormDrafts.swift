@@ -155,7 +155,8 @@ public struct LevelGeometry: Hashable, Sendable {
     public init(level: Level, spaces: [Space], openings: [Opening]) { self.level = level; self.spaces = spaces; self.openings = openings }
     public var interiorSpaces: [Space] { spaces.filter { !$0.isExterior } }
     public var bounds: Rect { spaces.reduce(Rect.null) { $0.union($1.bounds) } }
-    public var totalAreaSqIn: Double { interiorSpaces.reduce(0) { $0 + $1.areaSqIn } }
+    /// Interior floor area; a closet nested in a room is counted once (`SpaceNesting`).
+    public var totalAreaSqIn: Double { SpaceNesting.floorAreaSqIn(interiorSpaces) }
 }
 
 public enum RepositoryError: Error, Hashable, Sendable {

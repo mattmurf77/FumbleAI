@@ -187,3 +187,26 @@ final class TreemapTests: XCTestCase {
         XCTAssertEqual(rects.reduce(0) { $0 + $1.area }, r.area, accuracy: 1e-6)
     }
 }
+
+final class ContainmentTests: XCTestCase {
+    func testClosetFlushAgainstWallIsContained() {
+        let room = PlanKit.Polygon(rect: PlanKit.Rect(x: 0, y: 0, width: 120, height: 120))
+        let flush = PlanKit.Polygon(rect: PlanKit.Rect(x: 30, y: 0, width: 60, height: 24))
+        let corner = PlanKit.Polygon(rect: PlanKit.Rect(x: 0, y: 0, width: 60, height: 24))
+        XCTAssertTrue(Clip.isContained(flush, in: room))
+        XCTAssertTrue(Clip.isContained(corner, in: room))
+        XCTAssertTrue(Clip.isContained(room, in: room))
+    }
+
+    func testPokingOutIsNotContained() {
+        let room = PlanKit.Polygon(rect: PlanKit.Rect(x: 0, y: 0, width: 120, height: 120))
+        let out = PlanKit.Polygon(rect: PlanKit.Rect(x: 100, y: 0, width: 60, height: 24))   // 20 in inside, 40 out
+        let apart = PlanKit.Polygon(rect: PlanKit.Rect(x: 200, y: 0, width: 60, height: 24))
+        XCTAssertFalse(Clip.isContained(out, in: room))
+        XCTAssertFalse(Clip.isContained(apart, in: room))
+        // L-shaped room: a closet across the notch is outside it.
+        let l = PlanKit.Polygon(unchecked: [Vec2(0, 0), Vec2(120, 0), Vec2(120, 60), Vec2(60, 60), Vec2(60, 120), Vec2(0, 120)])
+        XCTAssertFalse(Clip.isContained(PlanKit.Polygon(rect: PlanKit.Rect(x: 40, y: 50, width: 40, height: 24)), in: l))
+        XCTAssertTrue(Clip.isContained(PlanKit.Polygon(rect: PlanKit.Rect(x: 0, y: 96, width: 60, height: 24)), in: l))
+    }
+}

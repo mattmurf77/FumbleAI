@@ -248,6 +248,6 @@ public struct LensStatsQueries: LensStatsService {
         return LensStats(levelId: level, today: today, spaces: perSpace, levelScope: stats[.levelScope]!, floorTotal: stats[.floorTotal]!,
                          propertyScope: stats[.propertyScope]!, propertyTotal: stats[.propertyTotal]!,
                          thingPins: thingPins, spotPins: spotPins, roomCount: interior.count,
-                         interiorAreaSqIn: interior.reduce(0) { $0 + $1.areaSqIn })
+                         interiorAreaSqIn: SpaceNesting.floorAreaSqIn(interior))
     }
 }

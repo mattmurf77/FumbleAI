@@ -92,10 +92,9 @@ public struct InMemoryPlanRepository: PlanRepository, PlanCommitting {
             }
             // Level rule: interior spaces may not overlap by more than 1 sq in.
             for level in levels {
+                // A closet nested inside its room is allowed (SpaceNesting).
                 let interior = work.liveSpaces.filter { $0.levelId == level && !$0.isExterior }
-                for i in interior.indices { for j in interior.indices where j > i {
-                    if Clip.overlaps(interior[i].polygon, interior[j].polygon) { throw RepositoryError.overlap([interior[i].id, interior[j].id]) }
-                } }
+                if let (a, b) = SpaceNesting.overlappingPairs(interior).first { throw RepositoryError.overlap([a, b]) }
             }
             s = work
         }

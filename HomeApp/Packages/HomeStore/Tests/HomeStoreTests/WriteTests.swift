@@ -162,6 +162,26 @@ final class WriteTests: XCTestCase {
         XCTAssertTrue(items.allSatisfy { $0.storageSpotId == nil })
     }
 
+    func testNestedClosetIsAllowedAndNotWelded() async throws {
+        let f = try await Fixture.sample()
+        let living = try await f.store.plan.space(SampleHome.livingId)!
+        // A reach-in closet against the Living Room's top wall, 1 in off the left wall (inside the weld tolerance).
+        let closet = Space(propertyId: f.pid, levelId: SampleHome.firstFloorId, name: "Coat Closet", spaceType: .closet,
+                           polygon: Polygon(rect: Rect(x: 1, y: 0, width: 60, height: 24)))
+        try await f.store.plan.updateSpaces([.insert(closet)])
+        let saved = try await f.store.plan.space(closet.id)
+        XCTAssertEqual(saved?.polygon, closet.polygon, "nested closets stay out of the weld")
+        let livingAfter = try await f.store.plan.space(SampleHome.livingId)
+        XCTAssertEqual(livingAfter?.polygon, living.polygon)
+        let g = try await f.store.plan.geometry(level: SampleHome.firstFloorId)
+        XCTAssertEqual(SpaceNesting.hosts(g.spaces)[closet.id], SampleHome.livingId)
+        // Straddling the Living Room / Kitchen wall it is an overlap again.
+        var moved = closet
+        moved.polygon = Polygon(rect: Rect(x: 16 * 12 - 30, y: 0, width: 60, height: 24))
+        do { try await f.store.plan.updateSpaces([.update(moved)]); XCTFail("overlap") }
+        catch RepositoryError.overlap(let ids) { XCTAssertTrue(ids.contains(closet.id)) }
+    }
+
     func testPlanCommitWeldsAndAcceptsSuggestions() async throws {
         let store = try Fixture.empty()
         let prop = Property(name: "New", createdAt: clock.now, updatedAt: clock.now)

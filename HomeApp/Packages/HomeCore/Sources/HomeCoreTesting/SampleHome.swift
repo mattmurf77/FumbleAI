@@ -12,6 +12,8 @@ public enum SampleHome {
     public static let basementId = id(10), firstFloorId = id(11), secondFloorId = id(12), outsideId = id(13)
     public static let livingId = id(20), kitchenId = id(21), diningId = id(22), hallId = id(23), halfBathId = id(24), laundryId = id(25)
     public static let primaryId = id(30), bedroom2Id = id(31), bathId = id(32), hall2Id = id(33)
+    /// Reach-in closet inside the Primary Bedroom (nested, `SpaceNesting`), with a sliding door.
+    public static let primaryClosetId = id(34), primaryClosetDoorId = id(74)
     public static let utilityId = id(40), storageId = id(41)
     public static let mattId = id(50), alexId = id(51)
     public static let fridgeId = id(60), furnaceId = id(61), tvId = id(62), sofaId = id(63), plannedFridgeId = id(64), detectorId = id(65)
@@ -56,6 +58,7 @@ public enum SampleHome {
         space(bedroom2Id, secondFloorId, "Bedroom 2", .bedroom, rect(22, 0, 18, 16))
         space(hall2Id, secondFloorId, "Hall", .hall, rect(18, 0, 4, 30))
         space(bathId, secondFloorId, "Bathroom", .bathroom, rect(0, 16, 18, 14))
+        space(primaryClosetId, secondFloorId, "Closet", .closet, rect(11, 0, 7, 2), source: .manual)
         // Basement.
         space(utilityId, basementId, "Utility", .utility, rect(0, 0, 14, 20))
         space(storageId, basementId, "Storage", .storage, rect(14, 0, 26, 20))
@@ -70,6 +73,10 @@ public enum SampleHome {
                                                  heightIn: 80, swing: .leftIn, isExteriorDoor: true, source: .manual, createdAt: t, updatedAt: t)
         s.openings[id(73)] = Opening(id: id(73), propertyId: pid, levelId: firstFloorId, spaceId: kitchenId, kind: .window,
                                      segment: Segment(Vec2(20 * ft, 0), Vec2(24 * ft, 0)), heightIn: 48, sillIn: 36, createdAt: t, updatedAt: t)
+
+        s.openings[primaryClosetDoorId] = Opening(id: primaryClosetDoorId, propertyId: pid, levelId: secondFloorId, spaceId: primaryClosetId,
+                                                  kind: .door, segment: Segment(Vec2(11.5 * ft, 2 * ft), Vec2(17.5 * ft, 2 * ft)),
+                                                  heightIn: 80, swing: .sliding, source: .manual, createdAt: t, updatedAt: t)
 
         s.people[mattId] = Person(id: mattId, propertyId: pid, name: "Matt", colorHex: "#2F6FDE", sortOrder: 0, createdAt: t, updatedAt: t)
         s.people[alexId] = Person(id: alexId, propertyId: pid, name: "Alex", colorHex: "#D9480F", sortOrder: 1, createdAt: t, updatedAt: t)
