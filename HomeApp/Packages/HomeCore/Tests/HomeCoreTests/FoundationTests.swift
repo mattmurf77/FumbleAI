@@ -82,6 +82,57 @@ final class MoneyAndFormatTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(Thing.Category.self, from: Data(#""outdoor""#.utf8)), .outdoor)
     }
 
+    func testOutdoorUtilityTemplatesAndCommonFields() throws {
+        for k in ["fence", "playset", "power_line", "gas_line", "water_line", "sewer_line", "septic_tank", "sprinkler_system"] {
+            let t = try XCTUnwrap(ThingTemplate.find(k), k)
+            XCTAssertEqual(t.category, .outdoor, k)
+            let keys = t.fields.map(\.key)
+            XCTAssertEqual(Set(keys).count, keys.count, k)
+            for f in ["yearInstalled", "material", "serviceContact"] { XCTAssertTrue(keys.contains(f), "\(k) \(f)") }
+        }
+        for t in ThingTemplate.catalog where t.category == .outdoor {
+            XCTAssertTrue(t.fields.contains { $0.key == "serviceContact" }, t.key)
+            XCTAssertEqual(Set(t.fields.map(\.key)).count, t.fields.count, t.key)
+        }
+        // A template's own material choice is kept, not replaced by the free-text one.
+        XCTAssertEqual(ThingTemplate.find("fence")?.fields.first { $0.key == "material" }?.kind, .choice)
+        XCTAssertEqual(ThingTemplate.find("power_line")?.fields.first { $0.key == "material" }?.kind, .text)
+        XCTAssertEqual(ThingTemplate.find("power_line")?.fields.first { $0.key == "route" }?.choices, ["overhead", "buried"])
+        XCTAssertFalse(ThingTemplate.catalog.contains { $0.category != .outdoor && $0.fields.contains { $0.key == "serviceContact" } })
+
+        let septic = try XCTUnwrap(ThingTemplate.find("septic_tank"))
+        XCTAssertEqual(septic.suggestedChore?.title, "Pump septic tank")
+        XCTAssertEqual(septic.suggestedChore?.rule, RepeatRule(freq: .monthly, interval: 36))
+        XCTAssertTrue(septic.fields.contains { $0.key == "tankSizeGal" && $0.kind == .number })
+        XCTAssertTrue(septic.fields.contains { $0.key == "lastPumped" && $0.kind == .date })
+    }
+
+    func testTemplateSearchAliases() throws {
+        func hits(_ q: String) -> [String] { ThingTemplate.catalog.filter { $0.matches(q) }.map(\.key) }
+        let expected = ["swing": "playset", "Swing set": "playset", "fence": "fence", "gate": "fence", "septic": "septic_tank",
+                        "gas": "gas_line", "power": "power_line", "sewer": "sewer_line", "sewerage": "sewer_line",
+                        "irrigation": "sprinkler_system", "water line": "water_line"]
+        for (q, key) in expected { XCTAssertTrue(hits(q).contains(key), q) }
+        XCTAssertEqual(hits("").count, ThingTemplate.catalog.count)
+        XCTAssertFalse(hits("septic").contains("tree"))
+
+        let old = Data(#"{"key":"x","name":"X","category":"outdoor","symbol":"tree","fields":[]}"#.utf8)
+        XCTAssertEqual(try JSONDecoder().decode(ThingTemplate.self, from: old).aliases, [])
+        let t = try XCTUnwrap(ThingTemplate.find("septic_tank"))
+        XCTAssertEqual(try JSONDecoder().decode(ThingTemplate.self, from: JSONEncoder().encode(t)), t)
+    }
+
+    func testPhoneTextDialable() {
+        XCTAssertEqual(PhoneText.dialable(in: "Ace Septic (555) 123-4567"), "5551234567")
+        XCTAssertEqual(PhoneText.dialable(in: "Bob – +1 555.123.4567, after 5pm"), "+15551234567")
+        XCTAssertEqual(PhoneText.dialable(in: "555 1234"), "5551234")
+        XCTAssertEqual(PhoneText.dialable(in: "Installed 2015, call 555-123-4567"), "5551234567")
+        XCTAssertNil(PhoneText.dialable(in: "Ace Fence Co"))
+        XCTAssertNil(PhoneText.dialable(in: "123 Main St"))
+        XCTAssertNil(PhoneText.dialable(in: ""))
+        XCTAssertEqual(PhoneText.telURL(in: "Joe 555-123-4567")?.absoluteString, "tel:5551234567")
+    }
+
     func testForwardCompatibleEnumsAndScope() throws {
         let decoded = try JSONDecoder().decode([Level.Kind].self, from: Data(#"["floor","mezzanine"]"#.utf8))
         XCTAssertEqual(decoded, [.floor, .unknown])

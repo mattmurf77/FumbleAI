@@ -217,13 +217,28 @@ extension TIK {
         "deck": TemplateExtra(fieldUnits: ["areaSqFt": "sq ft"], integerFields: ["areaSqFt"]),
         "pool": TemplateExtra(fieldUnits: ["gallons": "gal"], integerFields: ["gallons"]),
         "hot_tub": TemplateExtra(fieldUnits: ["gallons": "gal"], integerFields: ["gallons"], spareNameFormat: "Hot tub filter {filterModel}"),
-        "fence": TemplateExtra(fieldUnits: ["lengthFt": "ft", "heightFt": "ft"]),
-        "sprinkler_system": TemplateExtra(integerFields: ["zones"]),
+        "fence": TemplateExtra(defaultName: "Fence", fieldUnits: ["lengthFt": "ft", "heightFt": "ft"]),
+        "playset": TemplateExtra(defaultName: "Swing set"),
+        "sprinkler_system": TemplateExtra(defaultName: "Sprinkler system", integerFields: ["zones"]),
         "outdoor_lighting": TemplateExtra(spareNameFormat: "{bulbBase} bulb"),
+        "power_line": TemplateExtra(fieldUnits: ["amps": "A"], integerFields: ["amps"]),
+        "septic_tank": TemplateExtra(fieldUnits: ["tankSizeGal": "gal"], integerFields: ["tankSizeGal"]),
     ]
 
+    /// Fields shared across templates (HomeCore `commonOutdoorFields`) that are whole numbers.
+    static let commonIntegerFields: Set<String> = ["yearInstalled"]
+
     static func extra(for templateKey: String?) -> TemplateExtra {
-        templateKey.flatMap { templateExtras[$0] } ?? TemplateExtra()
+        var e = templateKey.flatMap { templateExtras[$0] } ?? TemplateExtra()
+        e.integerFields.formUnion(commonIntegerFields)
+        return e
+    }
+
+    /// `tel:` link for the thing's service contact, when it contains a phone number.
+    static func serviceContactCall(_ attributes: [String: JSONValue]) -> (contact: String, url: URL)? {
+        guard let contact = attributes["serviceContact"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let url = PhoneText.telURL(in: contact) else { return nil }
+        return (contact, url)
     }
 
     static func defaultName(for template: ThingTemplate) -> String {

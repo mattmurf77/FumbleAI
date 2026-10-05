@@ -80,6 +80,8 @@ private struct AttributeTextRow: View {
         case "filterSize": return "16x25x1"
         case "merv": return "1–16"
         case "wattage": return "60"
+        case "yearInstalled": return "2015"
+        case "serviceContact": return "Name or company, phone"
         default: return field.kind == .number ? "0" : "Optional"
         }
     }
@@ -124,9 +126,7 @@ struct TemplatePickerSheet: View {
     }
 
     private var filtered: [ThingTemplate] {
-        let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return ThingTemplate.catalog }
-        return ThingTemplate.catalog.filter { $0.name.lowercased().contains(q) || $0.key.contains(q) }
+        ThingTemplate.catalog.filter { $0.matches(filter) }
     }
 
     private func row(title: String, subtitle: String, symbol: String, selected: Bool) -> some View {

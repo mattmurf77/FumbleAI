@@ -78,6 +78,8 @@ public struct ThingTemplate: Hashable, Codable, Sendable, Identifiable {
     public var fields: [Field]
     /// Suggested maintenance chore (FR-THG-13).
     public var suggestedChore: SuggestedChore?
+    /// Extra search words for the template picker ("swing", "gate", "utility"…).
+    public var aliases: [String]
     public var id: String { key }
 
     public struct SuggestedChore: Hashable, Codable, Sendable {
@@ -85,11 +87,33 @@ public struct ThingTemplate: Hashable, Codable, Sendable, Identifiable {
         public var rule: RepeatRule
     }
 
-    public init(key: String, name: String, category: Thing.Category, symbol: String, fields: [Field] = [], suggestedChore: SuggestedChore? = nil) {
+    public init(key: String, name: String, category: Thing.Category, symbol: String, fields: [Field] = [], suggestedChore: SuggestedChore? = nil,
+                aliases: [String] = []) {
         self.key = key; self.name = name; self.category = category; self.symbol = symbol; self.fields = fields; self.suggestedChore = suggestedChore
+        self.aliases = aliases
+    }
+
+    private enum CodingKeys: String, CodingKey { case key, name, category, symbol, fields, suggestedChore, aliases }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = try c.decode(String.self, forKey: .key)
+        name = try c.decode(String.self, forKey: .name)
+        category = try c.decode(Thing.Category.self, forKey: .category)
+        symbol = try c.decode(String.self, forKey: .symbol)
+        fields = try c.decodeIfPresent([Field].self, forKey: .fields) ?? []
+        suggestedChore = try c.decodeIfPresent(SuggestedChore.self, forKey: .suggestedChore)
+        aliases = try c.decodeIfPresent([String].self, forKey: .aliases) ?? []
     }
 
     public static func find(_ key: String) -> ThingTemplate? { catalog.first { $0.key == key } }
+
+    /// Picker search: case-insensitive match on name, key (underscores as spaces) or an alias.
+    public func matches(_ query: String) -> Bool {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return true }
+        return ([name, key, key.replacingOccurrences(of: "_", with: " ")] + aliases).contains { $0.lowercased().contains(q) }
+    }
 
     public static func defaultSymbol(for c: Thing.Category) -> String {
         switch c {
@@ -157,8 +181,26 @@ public struct ThingTemplate: Hashable, Codable, Sendable, Identifiable {
 
     static let sunChoices = ["full sun", "part sun", "shade"]
 
+    /// Details every built outdoor feature can carry: when it went in, what it's made of, who to call.
+    /// A template's own `material` choice wins over the free-text one.
+    static let commonOutdoorFields: [Field] = [
+        Field("yearInstalled", "Year installed", .number), Field("material", "Material", .text), serviceContactField]
+    static let serviceContactField = Field("serviceContact", "Service contact", .text)
+
+    /// Appends the `extra` fields the template doesn't already define (by key).
+    static func outdoor(_ t: ThingTemplate, adding extra: [Field] = commonOutdoorFields) -> ThingTemplate {
+        var t = t
+        let keys = Set(t.fields.map(\.key))
+        t.fields += extra.filter { !keys.contains($0.key) }
+        return t
+    }
+
     /// Yard, garden and outdoor living (the Outside level).
-    static let outdoorCatalog: [ThingTemplate] = [
+    static let outdoorCatalog: [ThingTemplate] = plantCatalog.map { outdoor($0, adding: [serviceContactField]) }
+        + featureCatalog.map { outdoor($0) }
+        + [outdoor(lawnMower, adding: [serviceContactField])]
+
+    static let plantCatalog: [ThingTemplate] = [
         ThingTemplate(key: "tree", name: "Tree", category: .outdoor, symbol: "tree", fields: [
             Field("species", "Species", .text), Field("plantedDate", "Planted", .date), Field("heightFt", "Approx. height (ft)", .number)],
                       suggestedChore: SuggestedChore(title: "Prune tree", rule: RepeatRule(freq: .monthly, interval: 12))),
@@ -174,6 +216,17 @@ public struct ThingTemplate: Hashable, Codable, Sendable, Identifiable {
                       suggestedChore: SuggestedChore(title: "Trim hedge", rule: RepeatRule(freq: .monthly, interval: 3))),
         ThingTemplate(key: "vegetable_garden", name: "Vegetable garden", category: .outdoor, symbol: "carrot", fields: [
             Field("crops", "Crops", .text), Field("raisedBed", "Raised bed", .bool), Field("sun", "Sun", .choice, choices: sunChoices)]),
+    ]
+
+    static let featureCatalog: [ThingTemplate] = [
+        ThingTemplate(key: "fence", name: "Fence / gate", category: .outdoor, symbol: "rectangle.split.3x1", fields: [
+            Field("material", "Material", .choice, choices: ["wood", "vinyl", "chain link", "metal", "aluminum", "wrought iron", "composite"]),
+            Field("lengthFt", "Length (ft)", .number), Field("heightFt", "Height (ft)", .number)],
+                      aliases: ["gate", "railing", "privacy"]),
+        ThingTemplate(key: "playset", name: "Swing set / playset", category: .outdoor, symbol: "figure.play", fields: [
+            Field("material", "Material", .choice, choices: ["wood", "metal", "plastic", "vinyl"])],
+                      suggestedChore: SuggestedChore(title: "Inspect playset", rule: RepeatRule(freq: .monthly, interval: 12)),
+                      aliases: ["swingset", "play structure", "jungle gym", "slide"]),
         ThingTemplate(key: "patio", name: "Patio", category: .outdoor, symbol: "square.grid.3x3.fill", fields: [
             Field("surface", "Surface", .choice, choices: ["concrete", "pavers", "stone", "brick", "gravel"]),
             Field("areaSqFt", "Area (sq ft)", .number)]),
@@ -191,31 +244,55 @@ public struct ThingTemplate: Hashable, Codable, Sendable, Identifiable {
                       suggestedChore: SuggestedChore(title: "Test pool water", rule: RepeatRule(freq: .weekly, interval: 1))),
         ThingTemplate(key: "hot_tub", name: "Hot tub", category: .outdoor, symbol: "bubbles.and.sparkles", fields: [
             Field("gallons", "Volume (gal)", .number), Field("filterModel", "Filter model", .text)],
-                      suggestedChore: SuggestedChore(title: "Clean hot tub filter", rule: RepeatRule(freq: .monthly, interval: 1))),
+                      suggestedChore: SuggestedChore(title: "Clean hot tub filter", rule: RepeatRule(freq: .monthly, interval: 1)),
+                      aliases: ["spa", "jacuzzi"]),
         ThingTemplate(key: "grill", name: "Grill", category: .outdoor, symbol: "frying.pan", fields: [
             Field("fuel", "Fuel", .choice, choices: ["propane", "natural gas", "charcoal", "pellet", "electric"])],
-                      suggestedChore: SuggestedChore(title: "Deep clean grill", rule: RepeatRule(freq: .monthly, interval: 6))),
+                      suggestedChore: SuggestedChore(title: "Deep clean grill", rule: RepeatRule(freq: .monthly, interval: 6)),
+                      aliases: ["bbq", "barbecue", "smoker"]),
         ThingTemplate(key: "outdoor_furniture", name: "Outdoor furniture", category: .outdoor, symbol: "chair.lounge", fields: [
             Field("material", "Material", .choice, choices: ["wood", "metal", "wicker", "plastic"]), Field("hasCushions", "Cushions", .bool)]),
         ThingTemplate(key: "pergola", name: "Pergola / gazebo", category: .outdoor, symbol: "tent", fields: [
             Field("material", "Material", .choice, choices: ["wood", "vinyl", "aluminum", "steel"])]),
-        ThingTemplate(key: "fence", name: "Fence", category: .outdoor, symbol: "rectangle.split.3x1", fields: [
-            Field("material", "Material", .choice, choices: ["wood", "vinyl", "chain link", "metal", "composite"]),
-            Field("lengthFt", "Length (ft)", .number), Field("heightFt", "Height (ft)", .number)]),
-        ThingTemplate(key: "playset", name: "Playset", category: .outdoor, symbol: "figure.play", fields: [
-            Field("material", "Material", .choice, choices: ["wood", "metal", "plastic"])],
-                      suggestedChore: SuggestedChore(title: "Inspect playset", rule: RepeatRule(freq: .monthly, interval: 12))),
-        ThingTemplate(key: "sprinkler_system", name: "Sprinkler system", category: .outdoor, symbol: "sprinkler.and.droplets", fields: [
+        ThingTemplate(key: "sprinkler_system", name: "Sprinkler / irrigation", category: .outdoor, symbol: "sprinkler.and.droplets", fields: [
             Field("zones", "Zones", .number), Field("controller", "Controller", .text)],
-                      suggestedChore: SuggestedChore(title: "Winterize sprinklers", rule: RepeatRule(freq: .monthly, interval: 12))),
+                      suggestedChore: SuggestedChore(title: "Winterize sprinklers", rule: RepeatRule(freq: .monthly, interval: 12)),
+                      aliases: ["irrigation", "drip", "lawn watering"]),
         ThingTemplate(key: "outdoor_lighting", name: "Outdoor lighting", category: .outdoor, symbol: "lamp.floor", fields: [
             Field("type", "Type", .choice, choices: ["path", "flood", "string", "wall", "landscape"]),
             Field("power", "Power", .choice, choices: ["hardwired", "low voltage", "solar", "plug-in"]),
             Field("bulbBase", "Bulb base", .choice, choices: ["E26", "E12", "GU10", "MR16", "integrated LED", "other"]),
             Field("timer", "Timer / sensor", .bool)]),
-        ThingTemplate(key: "lawn_mower", name: "Lawn mower", category: .outdoor, symbol: "leaf.arrow.triangle.circlepath", fields: [
-            Field("type", "Type", .choice, choices: ["push", "self-propelled", "riding", "robotic"]),
-            Field("fuel", "Fuel", .choice, choices: ["gas", "battery", "corded"])],
-                      suggestedChore: SuggestedChore(title: "Service lawn mower", rule: RepeatRule(freq: .monthly, interval: 12))),
+        // Utility lines and septic.
+        ThingTemplate(key: "power_line", name: "Power line", category: .outdoor, symbol: "bolt.horizontal", fields: [
+            Field("route", "Route", .choice, choices: ["overhead", "buried"]), Field("provider", "Utility provider", .text),
+            Field("meterLocation", "Meter location", .text), Field("amps", "Service (amps)", .number)],
+                      aliases: ["electric", "electrical service", "utility", "meter", "overhead", "underground"]),
+        ThingTemplate(key: "gas_line", name: "Gas line", category: .outdoor, symbol: "flame.circle", fields: [
+            Field("gasType", "Gas", .choice, choices: ["natural gas", "propane"]), Field("provider", "Utility provider", .text),
+            Field("meterLocation", "Meter / tank location", .text), Field("shutoffLocation", "Shutoff location", .text),
+            Field("material", "Material", .choice, choices: ["black iron", "CSST", "polyethylene", "copper", "other"])],
+                      aliases: ["natural gas", "propane", "utility", "meter", "shutoff"]),
+        ThingTemplate(key: "water_line", name: "Water line", category: .outdoor, symbol: "drop.circle", fields: [
+            Field("source", "Source", .choice, choices: ["city", "well"]), Field("provider", "Utility provider", .text),
+            Field("shutoffLocation", "Shutoff location", .text),
+            Field("material", "Material", .choice, choices: ["copper", "PEX", "PVC", "galvanized", "polyethylene", "other"])],
+                      aliases: ["water main", "service line", "well", "utility", "shutoff"]),
+        ThingTemplate(key: "sewer_line", name: "Sewer line", category: .outdoor, symbol: "arrow.down.to.line", fields: [
+            Field("connection", "Connects to", .choice, choices: ["city sewer", "septic"]),
+            Field("cleanoutLocation", "Cleanout location", .text), Field("lastInspected", "Last camera inspection", .date),
+            Field("material", "Material", .choice, choices: ["PVC", "ABS", "cast iron", "clay", "Orangeburg", "other"])],
+                      aliases: ["sewerage", "sewage", "main drain", "drain line", "cleanout", "utility"]),
+        ThingTemplate(key: "septic_tank", name: "Septic tank", category: .outdoor, symbol: "cylinder", fields: [
+            Field("tankSizeGal", "Tank size (gal)", .number), Field("lastPumped", "Last pumped", .date),
+            Field("tankLocation", "Tank / lid location", .text), Field("drainField", "Drain field location", .text),
+            Field("material", "Material", .choice, choices: ["concrete", "fiberglass", "plastic", "steel"])],
+                      suggestedChore: SuggestedChore(title: "Pump septic tank", rule: RepeatRule(freq: .monthly, interval: 36)),
+                      aliases: ["septic system", "leach field", "drain field", "sewage", "sewerage"]),
     ]
+
+    static let lawnMower = ThingTemplate(key: "lawn_mower", name: "Lawn mower", category: .outdoor, symbol: "leaf.arrow.triangle.circlepath", fields: [
+        Field("type", "Type", .choice, choices: ["push", "self-propelled", "riding", "robotic"]),
+        Field("fuel", "Fuel", .choice, choices: ["gas", "battery", "corded"])],
+        suggestedChore: SuggestedChore(title: "Service lawn mower", rule: RepeatRule(freq: .monthly, interval: 12)))
 }
