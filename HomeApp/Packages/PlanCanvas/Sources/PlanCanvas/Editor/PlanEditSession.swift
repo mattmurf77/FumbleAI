@@ -242,7 +242,13 @@ public struct PlanEditSession: Sendable {
         guard nrm != .zero else { return .none }
         let raw = t.dot(nrm)
         let others = base.spaces.filter { $0.id != id }
-        let coincident = WallDerivation.coincidentEdges(of: e, excluding: id, in: others.map(\.identifiedPolygon))
+        // Shared walls move together, except around closets nested in a room: dragging a closet's wall resizes only
+        // the closet, and a closet against a room wall that moves slides along with that wall (keeps its depth).
+        let nested = SpaceNesting.hosts(base.spaces)
+        var coincident = nested[id] != nil ? []
+            : WallDerivation.coincidentEdges(of: e, excluding: id, in: others.map(\.identifiedPolygon))
+        let slidingClosets = Set(coincident.map(\.spaceId).filter { nested[$0] != nil })
+        coincident.removeAll { slidingClosets.contains($0.spaceId) }
         let baseOffset = nrm.dot(e.a)
         let sinTol = sin(Geometry.radians(Tolerance.angleDeg))
         let neighborOffsets = others.flatMap(\.polygon.edges)
@@ -268,6 +274,10 @@ public struct PlanEditSession: Sendable {
             base.spaces.first(where: { $0.id == sid }).map { isValid(v, like: $0.polygon) } ?? false
         }) else { return lastSnapKind }  // clamp at the last valid δ
         for (sid, verts) in updated { if let k = index(sid) { spaces[k].polygon = Polygon(unchecked: verts) } }
+        for c in slidingClosets {
+            if let k = index(c), let o = base.spaces.first(where: { $0.id == c }) { spaces[k].polygon = o.polygon.translated(by: move) }
+        }
+        translateOpenings(of: slidingClosets, base: base, by: move)
         let moved = Segment(a: e.a + move, b: e.b + move)
         guides = delta != 0 && abs(delta - Geometry.snap(raw, to: gridIn)) > 1e-9 ? [moved] : []
         return abs(delta - Geometry.snap(raw, to: gridIn)) > 1e-9 ? .edge : .grid
@@ -281,14 +291,22 @@ public struct PlanEditSession: Sendable {
         let snapped = Snapper.snap(candidate: candidate, context: snapContext(excluding: id, scale: scale, in: base))
         let move = t + (snapped.point - candidate)
         spaces[k].polygon = sp.polygon.translated(by: move)
-        // Openings that belong to the room move with it.
-        for j in openings.indices where openings[j].spaceId == id {
+        // Closets inside the room move with it, and so do the openings of the room and those closets.
+        let carried = Set(SpaceNesting.hosts(base.spaces).filter { $0.value == id }.map(\.key))
+        for c in carried {
+            if let ck = index(c), let o = base.spaces.first(where: { $0.id == c }) { spaces[ck].polygon = o.polygon.translated(by: move) }
+        }
+        translateOpenings(of: carried.union([id]), base: base, by: move)
+        guides = snapped.guides
+        return snapped.kind
+    }
+
+    private mutating func translateOpenings(of ids: Set<UUID>, base: EditorSnapshot, by move: Vec2) {
+        for j in openings.indices where openings[j].spaceId.map(ids.contains) == true {
             if let o = base.openings.first(where: { $0.id == openings[j].id }) {
                 openings[j].segment = Segment(a: o.segment.a + move, b: o.segment.b + move)
             }
         }
-        guides = snapped.guides
-        return snapped.kind
     }
 
     // MARK: Typed dimensions (FR-PLN-45)
@@ -483,6 +501,80 @@ public struct PlanEditSession: Sendable {
         return o.id
     }
 
+    /// Default reach-in closet: 5 ft along the wall × 2 ft deep.
+    public static let closetSize = Vec2(60, 24)
+
+    /// Places a closet the way a door is placed (founder feedback): tap a room's wall and a closet is created inside
+    /// that room, flush against the wall and centered on the tap (snapped to the grid along the wall), with a sliding
+    /// door on its open side. Width is clamped to the wall, depth to what fits in the room. The closet is its own
+    /// space (`.closet`, "Closet", "Closet 2", …) nested in the room, so it is not an overlap (`SpaceNesting`).
+    /// Returns the new closet's id (selected), or nil, changing nothing, when no room wall is within 44 pt or no
+    /// closet of at least 4 sq ft (2 ft wide, 1 ft deep) fits there.
+    @discardableResult
+    public mutating func addCloset(near point: Vec2, scale: Double, size: Vec2 = PlanEditSession.closetSize) -> UUID? {
+        guard !level.isExterior else { return nil }
+        let radius = 44 / max(scale, 1e-6)
+        let nested = SpaceNesting.hosts(spaces)
+        // Wall nearest the tap among rooms that can hold a closet; a room containing the tap wins a shared wall.
+        var best: (room: Space, edge: Segment, inside: Bool, d: Double)?
+        for s in spaces where !s.isExterior && SpaceNesting.canHost(s.spaceType) && nested[s.id] == nil {
+            let inside = s.polygon.contains(point)
+            for e in s.polygon.edges where e.length > 1e-6 {
+                let d = e.distance(to: point)
+                guard d <= radius else { continue }
+                if let b = best, (b.inside ? 0 : 1, b.d) <= (inside ? 0 : 1, d) { continue }
+                best = (s, e, inside, d)
+            }
+        }
+        guard let (room, e, _, _) = best, e.length >= 24 else { return nil }
+
+        // Inward normal: the side of the wall the room is on.
+        let u = e.direction
+        var n = u.perpendicular
+        if !room.polygon.contains(e.midpoint + n * 1, tolerance: 0) { n = -n }
+
+        // Along the wall: clamp the width to the wall, center on the tap (grid-snapped on axis-aligned walls).
+        let width = min(max(size.x, 24), e.length)
+        var center = e.point(at: e.projectionParameter(of: point))
+        if abs(u.x) < 1e-9 || abs(u.y) < 1e-9 {
+            center = Vec2(x: abs(u.y) < 1e-9 ? Geometry.snap(center.x, to: gridIn) : center.x,
+                          y: abs(u.x) < 1e-9 ? Geometry.snap(center.y, to: gridIn) : center.y)
+        }
+        let half = width / 2 / e.length
+        let tc = min(max(e.projectionParameter(of: center), half), 1 - half)
+        let a = e.point(at: tc - half), b = e.point(at: tc + half)
+
+        // Depth: the default, or less where the room (or something already in it) is shallower (≥ 1 ft and 4 sq ft).
+        let others = spaces.filter { !$0.isExterior && $0.id != room.id }
+        var depth = max(size.y, 12)
+        var closet: Polygon?
+        while depth >= 12 {
+            if let p = try? Polygon([a, b, b + n * depth, a + n * depth], minArea: minArea),
+               Clip.isContained(p, in: room.polygon),
+               !others.contains(where: { Clip.overlaps($0.polygon, p) }) {
+                closet = p
+                break
+            }
+            depth -= 6
+        }
+        guard let poly = closet else { return nil }
+
+        pushUndo()
+        let sp = Space(propertyId: level.propertyId, levelId: level.id, name: uniqueName(SpaceType.closet.displayName),
+                       spaceType: .closet, polygon: poly, source: .manual,
+                       sortOrder: (spaces.map(\.sortOrder).max() ?? -1) + 1)
+        spaces.append(sp)
+        // Sliding door across the open side (6 in returns each side; a narrow closet gets one 24 in+ opening).
+        let front = Segment(a: a + n * depth, b: b + n * depth)
+        let doorWidth = width >= 48 ? width - 12 : min(width, max(24, width - 6))
+        let dt = doorWidth / 2 / front.length
+        let door = Segment(a: front.point(at: 0.5 - dt), b: front.point(at: 0.5 + dt))
+        openings.append(Opening(propertyId: level.propertyId, levelId: level.id, spaceId: sp.id, kind: .door, segment: door,
+                                heightIn: 80, swing: .sliding, source: .manual))
+        selection = sp.id
+        return sp.id
+    }
+
     public mutating func deleteOpening(_ id: UUID) {
         guard let k = openings.firstIndex(where: { $0.id == id }) else { return }
         pushUndo()
@@ -491,18 +583,10 @@ public struct PlanEditSession: Sendable {
 
     // MARK: Validation / diff
 
-    /// Interior pairs overlapping by more than 1 sq in (the repository would reject the save).
+    /// Interior pairs overlapping by more than 1 sq in (the repository would reject the save). A closet inside its
+    /// room is not an overlap (`SpaceNesting`).
     public func overlappingPairs() -> [(UUID, UUID)] {
-        let interior = spaces.filter { !$0.isExterior }
-        var out: [(UUID, UUID)] = []
-        for i in interior.indices {
-            for j in interior.indices where j > i {
-                let a = interior[i].polygon, b = interior[j].polygon
-                guard a.bounds.intersects(b.bounds) else { continue }
-                if Clip.overlaps(a, b) { out.append((interior[i].id, interior[j].id)) }
-            }
-        }
-        return out
+        SpaceNesting.overlappingPairs(spaces)
     }
 
     public var canSave: Bool { overlappingPairs().isEmpty }

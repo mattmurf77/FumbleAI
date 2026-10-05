@@ -120,12 +120,13 @@ public struct PlanStore: PlanRepository {
             }
             for level in levels {
                 let interior = try Space.fetchAll(tx.db, where: "level_id = ? AND is_exterior = 0", [level.db])
-                for i in interior.indices { for j in interior.indices where j > i {
-                    if Clip.overlaps(interior[i].polygon, interior[j].polygon) {
-                        throw RepositoryError.overlap([interior[i].id, interior[j].id])
-                    }
-                } }
-                try Self.weld(interior, in: tx)
+                // A closet nested inside its room is allowed (SpaceNesting); any other overlap is rejected.
+                if let (a, b) = SpaceNesting.overlappingPairs(interior).first {
+                    throw RepositoryError.overlap([a, b])
+                }
+                // Nested closets stay out of the weld: their walls sit inside the room, not on the floor's wall graph.
+                let nested = SpaceNesting.hosts(interior)
+                try Self.weld(interior.filter { nested[$0.id] == nil }, in: tx)
                 tx.emit(.geometryChanged(levelId: level))
             }
         }

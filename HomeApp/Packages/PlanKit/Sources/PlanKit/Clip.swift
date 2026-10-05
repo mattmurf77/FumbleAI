@@ -28,6 +28,14 @@ public enum Clip {
         intersectionArea(a, b) > maxOverlap
     }
 
+    /// True if `inner` lies inside `outer`, i.e. at most `tolerance` sq in of `inner` sticks out (default 1 sq in,
+    /// the same slack as the overlap rule). Shared edges count as inside (a closet flush against a room's wall).
+    public static func isContained(_ inner: Polygon, in outer: Polygon, tolerance: Double = Tolerance.maxInteriorOverlap) -> Bool {
+        let ib = inner.bounds, ob = outer.bounds
+        guard ib.minX >= ob.minX - 1, ib.minY >= ob.minY - 1, ib.maxX <= ob.maxX + 1, ib.maxY <= ob.maxY + 1 else { return false }
+        return inner.area - intersectionArea(inner, outer) <= tolerance
+    }
+
     /// Ear-clipping triangulation of a simple ring (either winding). Returns CCW (positive-area) triangles.
     public static func triangulate(_ ring: [Vec2]) -> [[Vec2]] {
         var v = ring

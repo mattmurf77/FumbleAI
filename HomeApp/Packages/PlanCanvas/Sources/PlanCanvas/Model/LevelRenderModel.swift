@@ -45,14 +45,17 @@ public struct SpaceRender: Hashable, Sendable, Identifiable {
     public var allowsAdd: Bool
     /// Stairs only: tread lines and walk line (model inches), drawn over the fill. Empty for other rooms.
     public var treads: [Segment]
+    /// A closet sitting inside a room (`SpaceNesting`): the room it is in. Drawn after (on top of) that room and not
+    /// counted again in the floor area.
+    public var hostId: UUID?
 
     public init(id: UUID, name: String, shortName: String, spaceType: SpaceType, isExterior: Bool, isApproximate: Bool,
                 polygon: Polygon, bbox: Rect, pole: Vec2, poleRadius: Double, dimsText: String, spokenDims: String,
-                areaSqIn: Double, fillStyle: RoomFill, allowsAdd: Bool, treads: [Segment] = []) {
+                areaSqIn: Double, fillStyle: RoomFill, allowsAdd: Bool, treads: [Segment] = [], hostId: UUID? = nil) {
         self.id = id; self.name = name; self.shortName = shortName; self.spaceType = spaceType; self.isExterior = isExterior
         self.isApproximate = isApproximate; self.polygon = polygon; self.bbox = bbox; self.pole = pole; self.poleRadius = poleRadius
         self.dimsText = dimsText; self.spokenDims = spokenDims; self.areaSqIn = areaSqIn; self.fillStyle = fillStyle; self.allowsAdd = allowsAdd
-        self.treads = treads
+        self.treads = treads; self.hostId = hostId
     }
 }
 
@@ -96,7 +99,8 @@ public struct LevelGeometryRender: Hashable, Sendable {
 
     public func space(_ id: UUID) -> SpaceRender? { spaces.first { $0.id == id } }
     public var identifiedPolygons: [IdentifiedPolygon] { spaces.map { IdentifiedPolygon(id: $0.id, polygon: $0.polygon) } }
-    public var interiorAreaSqIn: Double { spaces.filter { !$0.isExterior }.reduce(0) { $0 + $1.areaSqIn } }
+    /// Nested closets are inside their room's polygon, so they are not added again.
+    public var interiorAreaSqIn: Double { spaces.filter { !$0.isExterior && $0.hostId == nil }.reduce(0) { $0 + $1.areaSqIn } }
     public var roomCount: Int { spaces.filter { !$0.isExterior }.count }
     public var zoneCount: Int { spaces.filter { $0.isExterior && $0.spaceType != .footprint }.count }
 }
