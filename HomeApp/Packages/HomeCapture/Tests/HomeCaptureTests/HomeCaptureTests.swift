@@ -302,6 +302,15 @@ final class ReceiptParserTests: XCTestCase {
         catch { XCTAssertEqual(error as? ReceiptReader.ReaderError, .unavailable) }
         #endif
     }
+
+    func testLabelRecognizerWithoutVisionThrowsOnLinux() async {
+        #if !canImport(Vision)
+        do { _ = try await LabelTextRecognizer.rows(images: [Data()]); XCTFail("expected unavailable") }
+        catch { XCTAssertEqual(error as? LabelTextRecognizer.RecognizerError, .unavailable) }
+        #endif
+        let empty = try? await LabelTextRecognizer.rows(images: [])
+        XCTAssertEqual(empty, [])
+    }
 }
 
 // MARK: - RoomPlan import
