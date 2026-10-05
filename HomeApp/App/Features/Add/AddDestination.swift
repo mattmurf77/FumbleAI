@@ -83,7 +83,7 @@ struct AddKindInfo {
     static func of(_ kind: AddKind, outdoor: Bool = false) -> AddKindInfo {
         if outdoor {
             switch kind {
-            case .thing: return AddKindInfo(title: "Plant or outdoor feature", detail: "Trees, flowers, patio, fire pit, shed, pool…", symbol: "tree")
+            case .thing: return AddKindInfo(title: "Plant or outdoor feature", detail: "Trees, fence, swing set, pool, septic, utility lines…", symbol: "tree")
             case .inventory: return AddKindInfo(title: "Inventory item", detail: "Tools, garden supplies, seasonal gear", symbol: "shippingbox")
             default: break
             }

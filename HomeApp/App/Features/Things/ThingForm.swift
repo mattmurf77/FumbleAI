@@ -235,6 +235,16 @@ struct ThingForm: View {
                 Label(badge.text, systemImage: badge.tone == .expired ? "xmark.seal" : "checkmark.seal")
                     .foregroundStyle(badge.tone == .ok ? Color.green : badge.tone == .warn ? Color.orange : Color.secondary)
             }
+            if let call = TIK.serviceContactCall(state.attributes) {
+                Link(destination: call.url) {
+                    HStack {
+                        Label("Call", systemImage: "phone.fill")
+                        Spacer()
+                        Text(call.contact).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                .accessibilityLabel("Call service contact, \(call.contact)")
+            }
         }
     }
 
