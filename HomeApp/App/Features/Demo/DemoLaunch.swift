@@ -8,7 +8,7 @@ import HomeCoreTesting
 struct DemoLaunch: Equatable {
     /// Screens the screenshot workflow captures. Keep in sync with SCREENS in `.github/workflows/screenshots.yml`.
     enum Screen: String, CaseIterable {
-        case onboarding, home, plan, planOutside = "plan-outside", todos, quickAdd = "quick-add", projects, stuff
+        case onboarding, home, plan, planOutside = "plan-outside", todos, quickAdd = "quick-add", projects, tellHome = "tell-home", stuff
         case addOutside = "add-outside", outdoorTemplates = "outdoor-templates", settings
     }
 
@@ -33,7 +33,7 @@ struct DemoLaunch: Equatable {
         case .onboarding, .home, .settings: return .home
         case .plan, .planOutside, .addOutside, .outdoorTemplates: return .plan
         case .todos, .quickAdd: return .todos
-        case .projects: return .projects
+        case .projects, .tellHome: return .projects
         case .stuff: return .stuff
         }
     }
@@ -49,6 +49,7 @@ struct DemoLaunch: Equatable {
     var sheet: DemoSheet? {
         switch screen {
         case .quickAdd: return .quickAdd
+        case .tellHome: return .tellHome
         case .addOutside: return .addOutside
         case .outdoorTemplates: return .outdoorTemplates
         case .settings: return .settings
@@ -58,7 +59,7 @@ struct DemoLaunch: Equatable {
 }
 
 enum DemoSheet: String, Identifiable {
-    case quickAdd, addOutside, outdoorTemplates, settings
+    case quickAdd, tellHome, addOutside, outdoorTemplates, settings
     var id: String { rawValue }
 
     static let sampleList = """
@@ -69,11 +70,17 @@ enum DemoSheet: String, Identifiable {
     - Seal the deck
     """
 
+    /// The founder's own words, so the Tell Home screenshot shows a project card with amount and date.
+    static let tellHomeSentence =
+        "hey we're thinking of getting a new fence in 3 months & wanna spend 10k, could u put in that idea in"
+
     @MainActor @ViewBuilder
     var view: some View {
         switch self {
         case .quickAdd:
             QuickCaptureSheet(initialText: Self.sampleList)
+        case .tellHome:
+            TellHomeSheet(initialText: Self.tellHomeSentence)
         case .addOutside:
             AddPicker(spaceID: nil, levelID: SampleHome.outsideId, preselected: nil, placeName: "Backyard", outdoor: true)
         case .outdoorTemplates:
