@@ -6,6 +6,7 @@ import HomeCoreTesting
 ///
 /// - `ThingForm(spaceID:)` — "+" → Appliance/Electronic/Furniture, defaults to that room (nil = whole house).
 /// - `ThingForm(spaceID:outdoor: true)` — "+" on Outside: Outdoor category, outdoor templates first.
+/// - `ThingForm(spaceID:startWithScan: true)` — "Scan an appliance label": opens the label scan right away.
 /// - `ThingForm(thingID:)` — edit; adds spare stock ("Track spares"), maintenance chore and delete.
 /// Self-contained: presents its own `NavigationStack`; show it in a sheet.
 struct ThingForm: View {
@@ -16,6 +17,7 @@ struct ThingForm: View {
 
     private let mode: Mode
     private let outdoor: Bool
+    private let startWithScan: Bool
     private let onSaved: ((Thing) -> Void)?
 
     @State private var state = TIK.ThingFormState()
@@ -38,10 +40,17 @@ struct ThingForm: View {
     @State private var confirmChore = false
     @State private var choreNote: String?
     @State private var errorText: String?
+    // "Scan label" (create only)
+    @State private var scanRequested = false
+    @State private var scanning = false
+    @State private var scanStarted = false
+    @State private var lastScan: ScannedLabel?
+    @State private var scanNote: ScanNote?
 
-    init(spaceID: UUID?, outdoor: Bool = false, onSaved: ((Thing) -> Void)? = nil) {
+    init(spaceID: UUID?, outdoor: Bool = false, startWithScan: Bool = false, onSaved: ((Thing) -> Void)? = nil) {
         mode = .create(spaceID)
         self.outdoor = outdoor
+        self.startWithScan = startWithScan
         self.onSaved = onSaved
         var initial = TIK.ThingFormState()
         if outdoor { initial.category = .outdoor }
@@ -51,6 +60,7 @@ struct ThingForm: View {
     init(thingID: UUID, onSaved: ((Thing) -> Void)? = nil) {
         mode = .edit(thingID)
         self.outdoor = false
+        self.startWithScan = false
         self.onSaved = onSaved
     }
 
@@ -140,7 +150,17 @@ struct ThingForm: View {
             } message: {
                 Text(errorText ?? "")
             }
-            .task { await load() }
+            .labelScanner(isPresented: $scanRequested, working: $scanning, today: today,
+                          onScanned: { applyScan($0) },
+                          onFailed: { scanNote = ScanNote(text: $0, warning: true) })
+            .task {
+                await load()
+                if startWithScan && !scanStarted {
+                    scanStarted = true
+                    try? await Task.sleep(for: .milliseconds(500))   // let the sheet finish presenting first
+                    if !Task.isCancelled { scanRequested = true }
+                }
+            }
             .onChange(of: state.scope) { _, _ in Task { await reloadTargets() } }
         }
         .feedbackPage("Thing form")
@@ -150,6 +170,7 @@ struct ThingForm: View {
 
     private var templateSection: some View {
         Section {
+            if !isEdit { scanLabelRow }
             Button { showTemplates = true } label: {
                 HStack {
                     Image(systemName: state.template?.symbol ?? ThingTemplate.defaultSymbol(for: state.category))
@@ -166,6 +187,29 @@ struct ThingForm: View {
             Text(state.category == .outdoor
                  ? "A template sets the category, icon and extra fields like species, bloom season or pool size."
                  : "A template sets the category, icon, fit-check clearances and extra fields like bulb base or filter size.")
+        }
+    }
+
+    @ViewBuilder
+    private var scanLabelRow: some View {
+        Button { scanRequested = true } label: {
+            HStack {
+                Image(systemName: "text.viewfinder").frame(width: 28).foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(lastScan == nil ? "Scan label" : "Scan again").foregroundStyle(.primary)
+                    Text("A photo of the model / serial sticker fills in the details")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if scanning { ProgressView() }
+            }
+        }
+        .disabled(scanning)
+        .accessibilityIdentifier("thingForm.scanLabel")
+        if let scanNote {
+            Label(scanNote.text, systemImage: scanNote.warning ? "exclamationmark.triangle" : "text.viewfinder")
+                .font(.caption)
+                .foregroundStyle(scanNote.warning ? Color.orange : Color.secondary)
         }
     }
 
@@ -373,12 +417,90 @@ struct ThingForm: View {
                 saved = t
             } else {
                 saved = try await env.things.create(state.draft(propertyId: property.id, currency: property.currencyCode))
+                await saveLabelPhoto(for: saved, property: property.id)
             }
             onSaved?(saved)
             dismiss()
         } catch {
             errorText = "Couldn’t save. \(error.localizedDescription)"
         }
+    }
+
+    // MARK: Scan label
+
+    struct ScanNote: Equatable {
+        var text: String
+        var warning = false
+    }
+
+    /// Fills empty fields (or ones the previous scan filled) from the label; sets a template only when none is
+    /// chosen yet (or the previous scan chose it). Everything stays editable; nothing is saved here.
+    private func applyScan(_ scan: ScannedLabel) {
+        let g = scan.guess
+        let previous = lastScan?.guess
+        lastScan = scan
+        guard !g.isEmpty else {
+            scanNote = ScanNote(text: "Couldn’t find a brand, model or serial number in that photo. Try a closer, straight-on photo of the label, or type them in.",
+                                warning: true)
+            return
+        }
+        var filled: [String] = []
+        func fill(_ field: inout String, _ value: String?, _ old: String?, _ label: String) {
+            guard let value, !value.isEmpty else { return }
+            let current = field.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard current.isEmpty || current == old else { return }
+            if current != value { filled.append(label) }
+            field = value
+        }
+
+        let templateIsOurs = state.templateKey == nil || (previous != nil && state.templateKey == previous?.templateKey)
+        if templateIsOurs, let key = g.templateKey, state.templateKey != key, let template = ThingTemplate.find(key) {
+            state.apply(template: template)
+            filled.append("type (\(template.name))")
+        } else if state.templateKey == nil, g.templateKey == nil, let category = g.category, state.category != .outdoor {
+            state.category = category
+        }
+        if let template = state.template, state.templateKey == g.templateKey {
+            for (key, value) in g.attributes where state.attributes[key] == nil && template.fields.contains(where: { $0.key == key }) {
+                state.attributes[key] = value
+            }
+        }
+
+        if let name = g.name {
+            let current = state.trimmedName
+            let defaultName = state.template.map(TIK.defaultName(for:))
+            if current != name && (current.isEmpty || current == defaultName || current == previous?.name) {
+                state.name = name
+                filled.append("name")
+            }
+        }
+        fill(&state.brand, g.brand, previous?.brand, "brand")
+        fill(&state.model, g.model, previous?.model, "model")
+        fill(&state.serial, g.serial, previous?.serial, "serial")
+        if let made = g.manufactureDate, state.purchaseDate == nil || state.purchaseDate == previous?.manufactureDate,
+           state.purchaseDate != made {
+            state.purchaseDate = made
+            filled.append("purchase date (from the manufacture date)")
+        }
+
+        scanNote = filled.isEmpty
+            ? ScanNote(text: "Nothing new to fill in from that photo. Your entries are unchanged.")
+            : ScanNote(text: "Filled from photo: \(filled.joined(separator: ", ")). Check them before saving.")
+    }
+
+    /// Keeps the label photo with the new item (kind photo, with its OCR text). A failure here doesn't undo the save.
+    private func saveLabelPhoto(for thing: Thing, property: UUID) async {
+        guard let scan = lastScan, !scan.guess.isEmpty, let photo = scan.photo else { return }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("label-\(UUID().uuidString).jpg")
+        do {
+            try photo.write(to: url)
+            let draft = AttachmentDraft(fileURL: url, kind: .photo, fileExt: "jpg", uti: "public.jpeg", caption: "Label",
+                                        ocrText: scan.lines.joined(separator: "\n"), capturedAt: env.clock.now)
+            _ = try await env.attachments.add(draft, ownerType: .thing, ownerId: thing.id, property: property)
+        } catch {
+            // The item is saved; the photo is a nice-to-have.
+        }
+        try? FileManager.default.removeItem(at: url)
     }
 
     private func delete(alsoSpares: Bool) async {
