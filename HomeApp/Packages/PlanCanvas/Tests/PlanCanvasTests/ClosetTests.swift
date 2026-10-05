@@ -199,6 +199,15 @@ final class ClosetTests: XCTestCase {
         _ = b
     }
 
+    func testSampleUpstairsClosetIsNestedInPrimaryBedroom() {
+        let g = Fixture.geometry(SampleHome.secondFloorId)
+        XCTAssertEqual(SpaceNesting.hosts(g.spaces)[SampleHome.primaryClosetId], SampleHome.primaryId)
+        XCTAssertTrue(PlanEditSession(geometry: g).canSave)
+        let m = Fixture.model(SampleHome.secondFloorId, lens: .plan)
+        XCTAssertEqual(m.geometry.interiorAreaSqIn, (288 + 288 + 120 + 252) * 144, accuracy: 1e-6)   // the 4 rooms; closet not added
+        XCTAssertEqual(m.geometry.space(SampleHome.primaryClosetId)?.hostId, SampleHome.primaryId)
+    }
+
     func testShortNamesForNumberedClosets() {
         XCTAssertEqual(ShortNames.short("Closet"), "Cl.")
         XCTAssertEqual(ShortNames.short("Closet 2"), "Cl. 2")
