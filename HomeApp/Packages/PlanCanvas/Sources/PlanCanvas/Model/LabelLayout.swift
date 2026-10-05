@@ -76,8 +76,19 @@ public enum ShortNames {
     public static let narrowThresholdIn: Double = 66
 
     public static func short(_ name: String) -> String {
-        let key = name.lowercased().trimmingCharacters(in: .whitespaces)
-        switch key {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        if let s = known(trimmed) { return s }
+        // "Closet 2" → "Cl. 2" (the editor numbers repeated names).
+        if let sp = trimmed.lastIndex(of: " "), Int(trimmed[trimmed.index(after: sp)...]) != nil,
+           let s = known(String(trimmed[..<sp])) {
+            return s + trimmed[sp...]
+        }
+        if name.count <= 6 { return name }
+        return String(name.prefix(4)) + "."
+    }
+
+    private static func known(_ name: String) -> String? {
+        switch name.lowercased() {
         case "half bath", "half bathroom", "powder room": return "½ Bath"
         case "closet", "coat closet", "linen closet": return "Cl."
         case "laundry", "laundry room": return "Ldy."
@@ -87,9 +98,7 @@ public enum ShortNames {
         case "pantry": return "Pan."
         case "mudroom": return "Mud"
         case "utility": return "Util."
-        default:
-            if name.count <= 6 { return name }
-            return String(name.prefix(4)) + "."
+        default: return nil
         }
     }
 }

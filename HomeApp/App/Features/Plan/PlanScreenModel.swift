@@ -148,7 +148,9 @@ final class PlanScreenModel {
     private func refreshPropertySummary(env: AppEnvironment) async {
         guard let p = property else { return }
         let spaces = (try? await env.plan.spaces(property: p.id)) ?? []
-        let area = spaces.filter { !$0.isExterior && $0.deletedAt == nil }.reduce(0) { $0 + $1.areaSqIn }
+        // Per floor so a closet nested in a room is counted once (SpaceNesting works within one level).
+        let interior = spaces.filter { !$0.isExterior && $0.deletedAt == nil }
+        let area = Dictionary(grouping: interior, by: \.levelId).values.reduce(0.0) { $0 + SpaceNesting.floorAreaSqIn($1) }
         let summary = PropertySummary(name: "Property", levelCount: levels.filter { !$0.isExterior }.count,
                                       interiorAreaSqIn: area, yearBuilt: p.yearBuilt)
         if summary != propertySummary {

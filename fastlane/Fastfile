@@ -73,16 +73,14 @@ platform :ios do
     end
 
     # Each CI run creates a fresh distribution certificate (its private key lives only in the temporary
-    # keychain), and Apple allows only a few. Revoke the ones earlier CI runs created (issued within the
-    # last ~2 days) before making a new one. Certificates listed in HOME_KEEP_CERT_IDS are never touched.
-    # Revoking a distribution certificate does not affect builds already uploaded to TestFlight.
+    # keychain and is gone when the run ends), and Apple allows only a few. Revoke every distribution
+    # certificate except the ones in HOME_KEEP_CERT_IDS (the owner's own) before making a new one: a CI
+    # certificate can never be used again anyway. Revoking does not affect builds already on TestFlight.
     keep_ids = ENV.fetch("HOME_KEEP_CERT_IDS", "S4WRTF4QAG").split(",").map(&:strip)
     begin
       Spaceship::ConnectAPI::Certificate.all(filter: { certificateType: "DISTRIBUTION,IOS_DISTRIBUTION" }).each do |c|
         next if keep_ids.include?(c.id)
-        expires = (Time.parse(c.expiration_date) rescue nil)
-        next unless expires && expires > Time.now + (363 * 24 * 3600)
-        UI.important("Revoking distribution certificate #{c.id} created by an earlier CI run")
+        UI.important("Revoking distribution certificate #{c.id} (expires #{c.expiration_date}) left by an earlier CI run")
         c.delete!
       end
     rescue => e

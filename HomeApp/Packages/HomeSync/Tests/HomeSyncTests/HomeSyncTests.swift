@@ -55,7 +55,7 @@ final class MapperAndMergeTests: XCTestCase {
         try await seedSample(d)
         let mappers = d.sync.processor.mappers
         let refs = try await d.store.sync.outbox().map(\.ref)
-        XCTAssertEqual(refs.count, 54)
+        XCTAssertEqual(refs.count, 56)
         for ref in refs {
             let row = try await d.store.sync.perform { try $0.row(ref) }!
             let m = mappers[ref.type]!
@@ -129,7 +129,7 @@ final class TwoDeviceSyncTests: XCTestCase {
         try await a.syncNow()
         let pendingA = try await a.store.sync.outboxCount()
         XCTAssertEqual(pendingA, 0, "everything sent")
-        XCTAssertEqual(cloud.recordCount, 54)
+        XCTAssertEqual(cloud.recordCount, 56)
         let restore = await b.sync.restoreCheck(timeout: 2)
         XCTAssertEqual(restore, .existingHomeFound(propertyId: SampleHome.propertyId))
         b.engine.childrenFirst = true
@@ -253,7 +253,7 @@ final class TwoDeviceSyncTests: XCTestCase {
         if case .pending(let n) = status { XCTAssertEqual(n, 1) } else { XCTFail("\(status)") }
         try await a.syncNow()
         XCTAssertTrue(cloud.zones.contains(Property.zoneName(for: SampleHome.propertyId)))
-        XCTAssertEqual(cloud.recordCount, 54, "zoneNotFound → zone re-created and every row re-uploaded")
+        XCTAssertEqual(cloud.recordCount, 56, "zoneNotFound → zone re-created and every row re-uploaded")
         let pending = try await a.store.sync.outboxCount()
         XCTAssertEqual(pending, 0)
     }

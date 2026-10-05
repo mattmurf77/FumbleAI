@@ -10,6 +10,8 @@ struct DemoLaunch: Equatable {
     enum Screen: String, CaseIterable {
         case onboarding, home, plan, planOutside = "plan-outside", todos, quickAdd = "quick-add", projects, tellHome = "tell-home", stuff
         case addOutside = "add-outside", outdoorTemplates = "outdoor-templates", settings
+        /// 2nd floor: the Primary Bedroom's reach-in closet sits inside the room.
+        case planUpstairs = "plan-upstairs"
     }
 
     let screen: Screen
@@ -31,7 +33,7 @@ struct DemoLaunch: Equatable {
     var tab: AppTab {
         switch screen {
         case .onboarding, .home, .settings: return .home
-        case .plan, .planOutside, .addOutside, .outdoorTemplates: return .plan
+        case .plan, .planOutside, .addOutside, .outdoorTemplates, .planUpstairs: return .plan
         case .todos, .quickAdd: return .todos
         case .projects, .tellHome: return .projects
         case .stuff: return .stuff
@@ -42,6 +44,7 @@ struct DemoLaunch: Equatable {
     var levelID: UUID? {
         switch screen {
         case .planOutside, .addOutside, .outdoorTemplates: return SampleHome.outsideId
+        case .planUpstairs: return SampleHome.secondFloorId
         default: return nil
         }
     }

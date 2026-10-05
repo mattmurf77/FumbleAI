@@ -155,7 +155,7 @@ public struct InMemoryLensStatsService: LensStatsService {
                          propertyScope: stats { $0 == .property },
                          propertyTotal: stats { _ in true },
                          thingPins: thingPins, spotPins: spotPins,
-                         roomCount: interior.count, interiorAreaSqIn: interior.reduce(0) { $0 + $1.areaSqIn })
+                         roomCount: interior.count, interiorAreaSqIn: SpaceNesting.floorAreaSqIn(interior))
     }
 }
 

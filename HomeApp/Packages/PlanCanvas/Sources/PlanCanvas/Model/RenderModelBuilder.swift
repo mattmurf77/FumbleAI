@@ -54,15 +54,41 @@ public enum RenderModelBuilder {
         // Exterior zones draw on top of bigger zones: sort by area descending (garden bed over backyard).
         if g.level.isExterior { spaces.sort { $0.areaSqIn > $1.areaSqIn } }
 
-        let interior = spaces.filter { !$0.isExterior }
         let live = g.openings.filter { $0.deletedAt == nil }
-        let walls: [WallSegment] = g.level.isExterior ? [] :
-            WallDerivation.walls(spaces: interior.map { IdentifiedPolygon(id: $0.id, polygon: $0.polygon) },
-                                 openings: live.map(\.segment))
+        var walls: [WallSegment] = []
+        if !g.level.isExterior {
+            // Closets nested inside a room draw on top of it (painter's order) and get their own thin walls.
+            let hosts = SpaceNesting.hosts(spaces.filter { !$0.isExterior }.map {
+                SpaceNesting.Shape(id: $0.id, spaceType: $0.spaceType, polygon: $0.polygon)
+            })
+            if !hosts.isEmpty {
+                for i in spaces.indices { spaces[i].hostId = hosts[spaces[i].id] }
+                let order = Dictionary(uniqueKeysWithValues: spaces.enumerated().map { ($1.id, $0) })
+                spaces.sort { ($0.hostId == nil ? 0 : 1, order[$0.id]!) < ($1.hostId == nil ? 0 : 1, order[$1.id]!) }
+            }
+            let interior = spaces.filter { !$0.isExterior && $0.hostId == nil }
+            walls = WallDerivation.walls(spaces: interior.map { IdentifiedPolygon(id: $0.id, polygon: $0.polygon) },
+                                         openings: live.map(\.segment))
+            for c in spaces where c.hostId != nil {
+                if let host = spaces.first(where: { $0.id == c.hostId }) {
+                    walls += nestedWalls(c, in: host, openings: live.map(\.segment))
+                }
+            }
+        }
         let openings = live.compactMap { glyph(for: $0, spaces: spaces) }
         let bounds = spaces.reduce(Rect.null) { $0.union($1.bbox) }
         return LevelGeometryRender(levelId: g.level.id, levelName: g.level.name, isExterior: g.level.isExterior,
                                    bounds: bounds, spaces: spaces, walls: walls, openings: openings, skippedSpaceIds: skipped)
+    }
+
+    /// Interior walls of a closet nested in `host`: its edges that don't lie on one of the host's walls (those are
+    /// already drawn as the room's wall), with door/window gaps.
+    static func nestedWalls(_ closet: SpaceRender, in host: SpaceRender, openings: [Segment]) -> [WallSegment] {
+        let hostEdges = [IdentifiedPolygon(id: host.id, polygon: host.polygon)]
+        let ids = [closet.id, host.id].sorted { $0.uuidString < $1.uuidString }
+        return WallDerivation.walls(spaces: [IdentifiedPolygon(id: closet.id, polygon: closet.polygon)], openings: openings)
+            .filter { WallDerivation.coincidentEdges(of: $0.seg, excluding: closet.id, in: hostEdges).isEmpty }
+            .map { WallSegment(seg: $0.seg, kind: .interior, thicknessIn: WallSegment.interiorThickness, gaps: $0.gaps, spaceIds: ids) }
     }
 
     /// "13 by 11 feet" / "about 12 by 9 feet" / "4 by 3 meters".

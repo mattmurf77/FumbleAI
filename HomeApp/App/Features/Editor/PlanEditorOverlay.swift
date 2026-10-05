@@ -8,7 +8,7 @@ import PlanCanvas
 ///
 /// Header "Cancel / Edit {Floor} / Done"; the floor pills stay (passed in as `accessory`) so another floor can be
 /// edited; a 1 ft grid, handles and snap guides are drawn by the canvas; an inspector card (name, W × D chips for
-/// typed dimensions, Rename, type, delete) and a toolbar (Room, Split, Merge, Door, Window, Fine, Undo, Redo)
+/// typed dimensions, Rename, type, delete) and a toolbar (Room, Split, Merge, Door, Window, Closet, Fine, Undo, Redo)
 /// replace the summary strip. Drag the selected room's corner (reshape), edge (resize; shared walls move together)
 /// or inside (move). Edits save when the finger lifts.
 struct PlanEditorOverlay<Accessory: View>: View {
@@ -269,7 +269,7 @@ struct PlanEditorOverlay<Accessory: View>: View {
 
     private func inspector(_ space: Space) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: space.spaceType == .stairs ? "stairs" : "square.dashed")
+            Image(systemName: space.spaceType == .stairs ? "stairs" : space.spaceType == .closet ? "cabinet" : "square.dashed")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(theme.accent)
                 .frame(width: 36, height: 36)
@@ -347,6 +347,7 @@ struct PlanEditorOverlay<Accessory: View>: View {
             toolButton("Merge", "rectangle.compress.vertical", tool: .merge).disabled(editor.selectedSpace == nil)
             toolButton("Door", "door.left.hand.open", tool: .door)
             toolButton("Window", "window.vertical.closed", tool: .window)
+            toolButton("Closet", "cabinet", tool: .closet).disabled(geometry.level.isExterior)
             Button { editor.session.fineGrid.toggle() } label: {
                 toolLabel("Fine", "grid", active: editor.session.fineGrid)
             }
@@ -376,7 +377,7 @@ struct PlanEditorOverlay<Accessory: View>: View {
     private func toolLabel(_ title: String, _ symbol: String, active: Bool) -> some View {
         VStack(spacing: 3) {
             Image(systemName: symbol).font(.system(size: 18, weight: .medium))
-            Text(title).font(.system(size: 10, weight: .medium))
+            Text(title).font(.system(size: 10, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
         }
         .foregroundStyle(active ? theme.accent : theme.ink)
         .frame(maxWidth: .infinity, minHeight: 44)
@@ -385,6 +386,12 @@ struct PlanEditorOverlay<Accessory: View>: View {
     }
 
     private func addRoom(_ type: SpaceType) {
+        // Closets go inside a room, placed like a door: Room › Closet starts the Closet tool (tap a wall).
+        if type == .closet && !geometry.level.isExterior {
+            editor.tool = .closet
+            editor.message = nil
+            return
+        }
         let center = viewport.toModel(CGPoint(x: viewport.size.width / 2, y: viewport.size.height / 2))
         // Stairs: a straight run, 3 ft 6 in wide × 10 ft long (drawn with treads).
         let size = geometry.level.isExterior ? Vec2(120, 96)
