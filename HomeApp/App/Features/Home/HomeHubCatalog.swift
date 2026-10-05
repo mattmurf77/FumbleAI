@@ -35,7 +35,8 @@ enum HubRoute: Hashable {
 
 /// Screens that manage their own `NavigationStack` and are therefore shown as sheets.
 enum HubSheet: String, Identifiable, Hashable {
-    case search, settings, addYard
+    /// `tellHome`: say or type a to-do or project idea (`TellHomeSheet`).
+    case search, settings, addYard, tellHome
     var id: String { rawValue }
 }
 
@@ -246,6 +247,7 @@ enum HomeHubCatalog {
     static func projectSections(_ c: HubCounts) -> [HubRowSection] {
         [
             HubRowSection(id: "add", title: "Add", rows: [
+                tellHome,
                 HubRow(id: "newProject", title: "New project or idea", detail: "An improvement or repair, with an estimate",
                        symbol: "plus.circle", action: .add(.futureProject(spaceID: nil, levelID: nil))),
                 HubRow(id: "logWork", title: "Log finished work", detail: "What was done, the cost and the receipt",
@@ -263,6 +265,10 @@ enum HomeHubCatalog {
             ]),
         ]
     }
+
+    /// Say or type an idea ("new fence in 3 months, about 10k") and Home files it as a project or to-do.
+    static let tellHome = HubRow(id: "tellHome", title: "Tell Home", detail: "Say it: “a new fence in 3 months, about $10k”",
+                                 symbol: "mic.fill", action: .sheet(.tellHome))
 
     // MARK: Stuff tab ("Record your stuff")
 

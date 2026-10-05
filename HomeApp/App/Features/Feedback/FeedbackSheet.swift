@@ -4,7 +4,8 @@ import HomeCore
 import UIKit
 #endif
 
-/// The feedback form: Bug / Polish / Idea, a required message, the page (auto-filled, editable) and Send.
+/// The feedback form: Bug / Polish / Idea, a required message (typed or dictated with the mic — only the text is
+/// sent, never audio), the page (auto-filled, editable) and Send.
 /// Presented by `FeedbackPresenter` above whatever is on screen (including other sheets).
 struct FeedbackSheet: View {
     let env: AppEnvironment
@@ -18,6 +19,7 @@ struct FeedbackSheet: View {
     @State private var sending = false
     @State private var outcome: FeedbackReceipt.Status?
     @State private var errorText: String?
+    @State private var dictation = SpeechDictation()
     @FocusState private var messageFocused: Bool
 
     private var trimmedCount: Int { message.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count }
@@ -51,6 +53,7 @@ struct FeedbackSheet: View {
                             .frame(minHeight: 140)
                             .accessibilityLabel("Message")
                     }
+                    dictationRow
                 } header: {
                     Text("Message")
                 } footer: {
@@ -66,14 +69,14 @@ struct FeedbackSheet: View {
                 } header: {
                     Text("Page")
                 } footer: {
-                    Text("Sends your message, this page name, the app and iOS version and your iPhone model. No screenshots, names or home data.")
+                    Text("Sends your message, this page name, the app and iOS version and your iPhone model. No screenshots, recordings, names or home data — dictation is sent as text only.")
                 }
             }
             .navigationTitle("Send feedback")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onClose).disabled(sending)
+                    Button("Cancel") { dictation.stop(); onClose() }.disabled(sending)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if sending {
@@ -102,6 +105,53 @@ struct FeedbackSheet: View {
             page = initialPage
             messageFocused = true
         }
+        .onDisappear { dictation.stop() }
+        .onChange(of: dictation.transcript) { _, words in
+            if dictation.isRecording { message = words }
+        }
+    }
+
+    /// Mic: dictates into the message (appended to what is already typed).
+    private var dictationRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Button { Task { await toggleDictation() } } label: {
+                    Label(dictation.isRecording ? "Stop" : "Dictate",
+                          systemImage: dictation.isRecording ? "stop.circle.fill" : "mic.fill")
+                }
+                .buttonStyle(.bordered)
+                .tint(dictation.isRecording ? .red : .accentColor)
+                .disabled(sending || outcome != nil)
+                .accessibilityLabel(dictation.isRecording ? "Stop dictating" : "Dictate your message")
+                if dictation.isRecording {
+                    Label("Listening…", systemImage: "waveform")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .symbolEffect(.variableColor.iterative, options: .repeating)
+                }
+                Spacer(minLength: 0)
+            }
+            if let err = dictation.errorText {
+                Text(err).font(.footnote).foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func toggleDictation() async {
+        if dictation.isRecording {
+            stopDictation()
+        } else {
+            messageFocused = false
+            await dictation.start(prefix: message)
+        }
+    }
+
+    /// Stops listening and keeps what was heard.
+    private func stopDictation() {
+        guard dictation.isRecording else { return }
+        let words = dictation.transcript
+        dictation.stop()
+        message = words
     }
 
     private func confirmation(_ status: FeedbackReceipt.Status) -> some View {
@@ -116,6 +166,7 @@ struct FeedbackSheet: View {
     }
 
     private func send() async {
+        stopDictation()
         guard canSend else { return }
         sending = true
         messageFocused = false
