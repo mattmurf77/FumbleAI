@@ -99,6 +99,10 @@ struct QuickCaptureSheet: View {
             Text("Say or paste a list. Separate items with commas, “and then”, or new lines — you’ll check them before they’re added.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            Label("Tip: in Notes, Mail or Photos, tap Share → Home Blueprint to send a list, a receipt or an email here.",
+                  systemImage: "square.and.arrow.up")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             ZStack(alignment: .topLeading) {
                 TextEditor(text: dictation.isRecording ? .constant(dictation.transcript) : $text)

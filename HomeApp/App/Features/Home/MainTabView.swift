@@ -8,7 +8,8 @@ import PlanCanvas
 ///
 /// Plan lenses and floors are chosen through `env.selectedLens` / `env.pendingLevelID` before switching to the
 /// Plan tab, which applies them. Deep links (`env.pendingDeepLink`) switch to the Plan tab, which consumes them.
-/// Lists shared into the share extension (Notes, Messages…) open in Quick add when the app comes to the foreground.
+/// Lists shared into the share extension (Notes, Messages…) open in Quick add when the app comes to the foreground;
+/// receipts, documents and notes (from Mail, Photos, Files…) open the "File it" sheet, one share at a time.
 struct MainTabView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.colorScheme) private var scheme
@@ -17,6 +18,8 @@ struct MainTabView: View {
     @State private var tab: AppTab = .home
     @State private var model = HomeHubModel()
     @State private var sharedText: SharedText?
+    @State private var sharedItem: SharedInboxItem?
+    @State private var sharedQueue: [SharedInboxItem] = []
     @State private var demoSheet: DemoSheet?
 
     private struct SharedText: Identifiable { let id = UUID(); let text: String }
@@ -66,8 +69,11 @@ struct MainTabView: View {
         .onAppear { applyDemo() }
         .sheet(item: $demoSheet) { $0.view }
         .onChange(of: scenePhase, initial: true) { _, phase in if phase == .active { collectShared() } }
-        .sheet(item: $sharedText) { shared in
+        .sheet(item: $sharedText, onDismiss: showNextShared) { shared in
             QuickCaptureSheet(initialText: shared.text)
+        }
+        .sheet(item: $sharedItem, onDismiss: showNextShared) { item in
+            SharedInboxSheet(item: item)
         }
     }
 
@@ -84,13 +90,27 @@ struct MainTabView: View {
         }
     }
 
-    /// Text waiting from the share extension → Quick add (review step) on the To-Dos tab.
+    /// Shares waiting from the share extension: to-do text → Quick add (review step) on the To-Dos tab; receipts,
+    /// documents and notes → "File it" on the Projects tab (after Quick add, one at a time).
     private func collectShared() {
-        guard sharedText == nil else { return }
-        let entries = SharedCaptureInbox.takeAll()
-        guard !entries.isEmpty else { return }
-        tab = .todos
-        sharedText = SharedText(text: entries.map(\.text).joined(separator: "\n"))
+        guard sharedText == nil, sharedItem == nil, demoSheet == nil else { return }
+        let taken = SharedCaptureInbox.takeAll()
+        guard !taken.isEmpty else { return }
+        let todoText = taken.filter(\.entry.isTodoList).map(\.entry.text).filter { !$0.isEmpty }
+        sharedQueue += taken.filter { !$0.entry.isTodoList }.compactMap(SharedInboxItem.make(from:))
+        if !todoText.isEmpty {
+            tab = .todos
+            sharedText = SharedText(text: todoText.joined(separator: "\n"))
+        } else {
+            showNextShared()
+        }
+    }
+
+    /// The next receipt / document / note waiting to be filed, if any.
+    private func showNextShared() {
+        guard sharedText == nil, sharedItem == nil, !sharedQueue.isEmpty else { return }
+        tab = .projects
+        sharedItem = sharedQueue.removeFirst()
     }
 
         private func tabLabel(_ t: AppTab) -> some View {

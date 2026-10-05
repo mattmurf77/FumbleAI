@@ -194,8 +194,17 @@ targets:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
           NSExtensionAttributes:
-            NSExtensionActivationRule:
-              NSExtensionActivationSupportsText: true
+            # Text of any kind (lists, selected email text, messages), web links, photos/screenshots and PDFs (receipts and
+            # invoices from Mail, Files or Photos). Other file types don't show Home Blueprint in the share sheet.
+            NSExtensionActivationRule: >-
+              SUBQUERY (extensionItems, $extensionItem,
+              SUBQUERY ($extensionItem.attachments, $attachment,
+              ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image"
+              || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.adobe.pdf"
+              || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.text"
+              || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.url"
+              ).@count >= 1
+              ).@count >= 1
     entitlements:
       path: ShareExtension/HomeShare.entitlements
       properties:

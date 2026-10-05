@@ -9,6 +9,8 @@ struct DemoLaunch: Equatable {
     /// Screens the screenshot workflow captures. Keep in sync with SCREENS in `.github/workflows/screenshots.yml`.
     enum Screen: String, CaseIterable {
         case onboarding, home, plan, planOutside = "plan-outside", todos, quickAdd = "quick-add", projects, tellHome = "tell-home", stuff
+        /// A receipt photo shared from Mail/Photos, open in the "File it" sheet.
+        case sharedReceipt = "shared-receipt"
         case addOutside = "add-outside", outdoorTemplates = "outdoor-templates", settings
         /// 2nd floor: the Primary Bedroom's reach-in closet sits inside the room.
         case planUpstairs = "plan-upstairs"
@@ -35,7 +37,7 @@ struct DemoLaunch: Equatable {
         case .onboarding, .home, .settings: return .home
         case .plan, .planOutside, .addOutside, .outdoorTemplates, .planUpstairs: return .plan
         case .todos, .quickAdd: return .todos
-        case .projects, .tellHome: return .projects
+        case .projects, .tellHome, .sharedReceipt: return .projects
         case .stuff: return .stuff
         }
     }
@@ -53,6 +55,7 @@ struct DemoLaunch: Equatable {
         switch screen {
         case .quickAdd: return .quickAdd
         case .tellHome: return .tellHome
+        case .sharedReceipt: return .sharedReceipt
         case .addOutside: return .addOutside
         case .outdoorTemplates: return .outdoorTemplates
         case .settings: return .settings
@@ -62,7 +65,7 @@ struct DemoLaunch: Equatable {
 }
 
 enum DemoSheet: String, Identifiable {
-    case quickAdd, tellHome, addOutside, outdoorTemplates, settings
+    case quickAdd, tellHome, sharedReceipt, addOutside, outdoorTemplates, settings
     var id: String { rawValue }
 
     static let sampleList = """
@@ -84,6 +87,8 @@ enum DemoSheet: String, Identifiable {
             QuickCaptureSheet(initialText: Self.sampleList)
         case .tellHome:
             TellHomeSheet(initialText: Self.tellHomeSentence)
+        case .sharedReceipt:
+            SharedInboxSheet(item: SharedInboxItem.demoReceipt)
         case .addOutside:
             AddPicker(spaceID: nil, levelID: SampleHome.outsideId, preselected: nil, placeName: "Backyard", outdoor: true)
         case .outdoorTemplates:
