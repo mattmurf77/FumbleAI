@@ -110,12 +110,12 @@ struct ProjectDetailView: View {
                 }
             }
 
-            Section("Receipts") {
+            Section {
                 ForEach(receipts) { r in
                     HStack(spacing: 12) {
-                        Image(systemName: "doc.text.fill").font(.title2).foregroundStyle(.secondary)
+                        Image(systemName: r.kind == .document ? "doc.fill" : "doc.text.fill").font(.title2).foregroundStyle(.secondary)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(r.caption ?? "Receipt").fontWeight(.semibold)
+                            Text(r.caption ?? (r.kind == .document ? "Document" : "Receipt")).fontWeight(.semibold)
                             Text(receiptSubtitle(r)).font(.footnote).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -124,6 +124,10 @@ struct ProjectDetailView: View {
                     }
                 }
                 ReceiptScanButton { scanned = $0 }
+            } header: {
+                Text("Receipts & documents")
+            } footer: {
+                Text("Got one by email? Share it from Mail (or Photos, Files) to Home Blueprint, then file it here.")
             }
 
             if let notes = p.notes, !notes.isEmpty { Section("Notes") { Text(notes) } }
@@ -279,7 +283,7 @@ struct ProjectDetailView: View {
     @MainActor
     private func loadReceipts() async {
         var all = ((try? await env.attachments.attachments(ownerType: .project, ownerId: projectID)) ?? [])
-            .filter { $0.kind == .receipt && $0.deletedAt == nil }
+            .filter { ($0.kind == .receipt || $0.kind == .document) && $0.deletedAt == nil }
         for item in lineItems where item.receiptAttachmentId != nil {
             let more = (try? await env.attachments.attachments(ownerType: .costLineItem, ownerId: item.id)) ?? []
             all += more.filter { $0.kind == .receipt && $0.deletedAt == nil }
