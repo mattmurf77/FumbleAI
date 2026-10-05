@@ -9,7 +9,7 @@
 #      DEVICE (simulator model, default "iPhone 16 Pro"), OUT_DIR (default ./screenshots), SETTLE (seconds, default 6)
 set -euo pipefail
 
-ALL_SCREENS="onboarding home plan plan-outside todos quick-add projects stuff add-outside outdoor-templates settings"
+ALL_SCREENS="onboarding home plan plan-outside todos quick-add projects tell-home stuff add-outside outdoor-templates settings"
 SCREENS="${SCREENS:-$ALL_SCREENS}"
 [ "$SCREENS" = "all" ] && SCREENS="$ALL_SCREENS"
 APPEARANCE="${APPEARANCE:-light}"

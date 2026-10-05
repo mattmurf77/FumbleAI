@@ -70,6 +70,7 @@ struct HomeHubView: View {
                         .padding(.top, 12)
                 }
                 Spacer(minLength: 0)
+                HubTellHomeButton(theme: theme) { sheet = .tellHome }
                 HubCircleButton(symbol: "gearshape", label: "Settings", theme: theme) { sheet = .settings }
             }
             Text("What would you like to do?")
@@ -147,6 +148,8 @@ struct HomeHubView: View {
             SearchView()
         case .settings:
             SettingsView()
+        case .tellHome:
+            TellHomeSheet()
         case .addYard:
             if let property = model.property {
                 YardSetupSheet(property: property) { levelID in
@@ -171,6 +174,7 @@ struct HubRowsScreen: View {
 
     @State private var path: [HubRoute] = []
     @State private var adding: AddDestination?
+    @State private var sheet: HubSheet?
 
     private var theme: PlanTheme { PlanTheme.forScheme(scheme) }
 
@@ -196,6 +200,7 @@ struct HubRowsScreen: View {
         .tint(theme.accent)
         .feedbackPage(feedbackName)
         .sheet(item: $adding) { d in AddRouter(destination: d) }
+        .sheet(item: $sheet) { s in sheetContent(s) }
     }
 
     private func rowView(_ row: HubRow) -> some View {
@@ -222,15 +227,28 @@ struct HubRowsScreen: View {
     }
 
     private func isAdd(_ action: HubAction) -> Bool {
-        if case .add = action { return true }
-        return false
+        switch action {
+        case .add, .sheet(.tellHome): return true
+        default: return false
+        }
     }
 
     private func perform(_ action: HubAction) {
         switch action {
         case .push(let route): path.append(route)
         case .add(let d): adding = d
+        case .sheet(let s): sheet = s
         default: onNavigate(action)
+        }
+    }
+
+    @ViewBuilder
+    private func sheetContent(_ s: HubSheet) -> some View {
+        switch s {
+        case .tellHome: TellHomeSheet()
+        case .search: SearchView()
+        case .settings: SettingsView()
+        case .addYard: EmptyView()     // Only offered on the Home tab, which owns the property.
         }
     }
 
@@ -242,6 +260,27 @@ struct HubRowsScreen: View {
         case .shoppingList: ShoppingListView()
         case .seasonalSwap: SeasonalSwapView()
         }
+    }
+}
+
+/// The Home header's "Tell Home" pill: mic + label, in the accent color so it reads as the main way to add things.
+struct HubTellHomeButton: View {
+    let theme: PlanTheme
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Tell Home", systemImage: "mic.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.onAccent)
+                .padding(.horizontal, 12)
+                .frame(height: 36)
+                .background(Capsule().fill(theme.accent))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Say or type a to-do or project idea")
     }
 }
 
