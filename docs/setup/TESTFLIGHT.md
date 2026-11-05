@@ -89,7 +89,7 @@ This key lets GitHub (or fastlane) sign the app and upload it for you, without y
 2. Click **Generate API Key**, or the **+** button.
 3. Fill in the form and click **Generate**:
    - **Name:** `GitHub TestFlight`
-   - **Access:** **Admin**. The Admin role is needed so Xcode can create and use Apple's cloud-managed signing certificate on GitHub's machines.
+   - **Access:** **Admin** for this release workflow, which manages App Store provisioning profiles and can request a distribution certificate.
 4. Save three things:
    - **Issuer ID:** shown above the list of keys, a long ID like `57246542-96fe-1a63-e053-0824d011072a`. Save it as **APP_STORE_CONNECT_ISSUER_ID**.
    - **Key ID:** shown in the row for your new key, 10 characters like `2X9R4HXF34`. Save it as **APP_STORE_CONNECT_KEY_ID**.
@@ -119,28 +119,34 @@ This key lets GitHub (or fastlane) sign the app and upload it for you, without y
 | `APP_STORE_CONNECT_KEY_P8` | Part 3, step 5 (the clipboard, base64 text) | Yes |
 | `HOME_TEAM_ID` | Part 1.2, Team ID | Yes |
 | `HOME_BUNDLE_ID` | Part 2.1, e.g. `app.fumble.home` | Yes |
+| `HOME_DISTRIBUTION_P12_BASE64` | Base64 of a password-protected PKCS#12 export containing this team's valid Apple Distribution certificate and private key | Optional pair |
+| `HOME_DISTRIBUTION_P12_PASSWORD` | Password used to export the PKCS#12 file | Optional pair |
 | `HOME_SERVER_URL` | [RENDER.md](RENDER.md), Step 4 | Optional |
 | `HOME_API_KEY` | [RENDER.md](RENDER.md), Step 1 | Optional |
 
 Secrets can't be viewed again after saving, only replaced. That's normal.
+
+To reuse an existing signing identity, export it from the Mac holding its private key and set both optional signing secrets. Restrict access to the release branch and these secrets to trusted release maintainers. The upload step imports the identity into its temporary keychain and removes its temporary PKCS#12 file. Never commit the export or its password. [Fastlane certificate import](https://docs.fastlane.tools/actions/import_certificate/)
 
 ### A.2 Run the TestFlight workflow
 
 1. On github.com, open **mattmurf77/FumbleAI** and click the **Actions** tab.
 2. In the left list, click **TestFlight**.
 3. Click the grey **Run workflow** button on the right.
-4. Pick the branch to build (usually `main`) and click the green **Run workflow**.
+4. Pick the release branch or tag containing the verified build and the certificate-reuse lane. Earlier revisions of this workflow revoked distribution certificates. Check the selected revision before clicking the green **Run workflow**.
 5. Refresh after a few seconds, and a yellow dot appears. Click it to watch the progress. It takes about 20–35 minutes.
 6. A **green check** means the build was uploaded. A **red X** means it failed; click into it, open the red step, and see the troubleshooting table at the end of this guide.
 
 What the workflow does for you:
 
 - Generates the Xcode project with XcodeGen.
-- Signs the app with Apple's automatic signing, using your API key.
+- Signs the app and its share extension using App Store provisioning profiles. It can reuse the configured distribution identity, or request a certificate if the runner has none and the team has capacity.
 - Sets the build number: GitHub's run number, and always higher than the last build in TestFlight.
 - Uploads the build to TestFlight.
 
 ### A.3 Wait for Apple's processing
+
+For the optional Home Brief purchase, the draft action prepares the en-US description, US price and US availability. For App Review, use the iPhone attachment named **Home Brief - App Review** from the tested release revision. This screenshot comes from Home → Home history → Home Brief and shows the price returned by the local StoreKit catalog. Verify that the amount matches the live US draft. Attach the PNG in the product's **Review Information**, describe how to reach the purchase and include the first non-consumable alongside the app version when submitting for public review. [Apple review information](https://developer.apple.com/help/app-store-connect/manage-in-app-purchases/view-and-edit-in-app-purchase-information/) · [First In-App Purchase submission](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-in-app-purchase/)
 
 1. In App Store Connect › **Apps** › **Home** › **TestFlight** tab, the new build shows **Processing** for 5–30 minutes. Apple also emails you when it's done.
 2. If the build shows **Missing Compliance**, click **Manage**. Choose **None of the algorithms mentioned above** (the app only uses Apple's standard HTTPS and iCloud encryption) and click **Save**. The developers can add a setting to the app so this question never comes up again.
@@ -275,8 +281,8 @@ Running `xcodegen generate` rebuilds the project file, so repeat steps 3–5 aft
 | Workflow fails at **Check required secrets** | The named secret is missing or misspelled. Check A.1; names are case-sensitive. |
 | `APP_STORE_CONNECT_KEY_P8 does not decode to a .p8 private key` | Re-run the `base64 -i … \| pbcopy` command from Part 3 and replace the secret. |
 | `No profiles for 'app.fumble.home' were found` or `No Account for Team` | The App ID (2.2) doesn't exist, **HOME_BUNDLE_ID** doesn't match it exactly, or **HOME_TEAM_ID** is wrong. |
-| `Cloud signing permission error` or `not allowed to create certificates` | Your API key isn't **Admin**. Make a new Admin key (Part 3) and update the three key secrets. |
-| `You have reached the maximum number of certificates` | Go to <https://developer.apple.com/account/resources/certificates/list>, delete old **Apple Development** certificates named "Created via API", and run again. Each GitHub run can create one. |
+| `Not allowed to create certificates` | Check that the existing team API key has the certificate and provisioning access described in Part 3. An Account Holder or Admin can verify its access in App Store Connect. |
+| `You have reached the maximum number of certificates` | Use the paired signing secrets in A.1 to reuse a valid Apple Distribution identity, or upload from the Mac holding its private key. Leave existing team certificates in place. |
 | `The bundle version must be higher than the previously uploaded version` | Run it again; the workflow reads TestFlight's latest number. On Path B, raise **Build** in the General tab. |
 | iCloud entitlement or container errors | Redo 2.3. The container must be exactly `iCloud.<your bundle ID>` and be checked on the App ID. |
 | The build never appears in TestFlight | Check email from Apple about "ITMS" issues. Processing can take up to an hour. |

@@ -16,7 +16,7 @@ The separate, manual `bundle exec fastlane ios prepare_home_brief` lane uses the
 
 An existing SKU is read back and preserved. If Apple interrupts setup after creating the new product, keep its logged Apple product resource ID. Read the status, then use `bundle exec fastlane ios prepare_home_brief resume_id:APPLE_RESOURCE_ID` to fill missing configuration for that exact MISSING_METADATA draft. Any existing localization, price schedule or availability is preserved. If an existing setting needs a change, review it directly in App Store Connect. Coordinate with other App Store Connect editors during manual setup.
 
-The helper can post only to Apple’s product, localization, price-schedule and availability endpoints. Review screenshots, submission, agreements, tax/banking and release remain separate publisher steps. No automatic workflow triggers the draft helper.
+The helper can post only to Apple’s product, localization, price-schedule and availability endpoints. Review screenshots, submission, agreements, tax/banking and release remain separate publisher steps. The manual TestFlight workflow can run the draft helper independently with `catalog_only=true`, leaving the binary untouched. It can also prepare the draft before an authorized beta upload.
 
 [Apple product API and pricing examples](https://developer.apple.com/documentation/appstoreconnectapi/managing-in-app-purchases) · [Apple availability request](https://developer.apple.com/documentation/appstoreconnectapi/post-v1-inapppurchaseavailabilities) · [Apple product metadata limits](https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-information/)
 

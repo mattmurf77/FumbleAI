@@ -10,6 +10,11 @@ on:
         type: boolean
         required: false
         default: false
+      catalog_only:
+        description: "Prepare only the draft purchase, without signing or uploading a build"
+        type: boolean
+        required: false
+        default: false
       resume_home_brief_id:
         description: "Optional Apple ID of a partially created Home Brief draft"
         type: string
@@ -25,7 +30,7 @@ permissions:
 jobs:
   beta:
     name: Build and upload to TestFlight
-    runs-on: macos-26
+    runs-on: ${{ inputs.catalog_only && 'ubuntu-latest' || 'macos-26' }}
     timeout-minutes: 60
     env:
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -45,19 +50,25 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check required secrets
+        env:
+          CATALOG_ONLY: ${{ inputs.catalog_only }}
         run: |
           missing=0
-          for name in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8 HOME_TEAM_ID HOME_BUNDLE_ID; do
+          names=(APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8 HOME_BUNDLE_ID)
+          if [[ "$CATALOG_ONLY" != true ]]; then names+=(HOME_TEAM_ID); fi
+          for name in "${names[@]}"; do
             if [ -z "${!name}" ]; then echo "::error::Missing GitHub secret $name (see docs/setup/TESTFLIGHT.md)"; missing=1; fi
           done
           exit $missing
 
       - name: Select latest stable Xcode
+        if: ${{ !inputs.catalog_only }}
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
       - name: Install XcodeGen
+        if: ${{ !inputs.catalog_only }}
         run: brew install xcodegen
 
       - name: Set up Ruby and fastlane
@@ -67,11 +78,12 @@ jobs:
           bundler-cache: true
 
       - name: Generate Xcode project
+        if: ${{ !inputs.catalog_only }}
         working-directory: HomeApp
         run: xcodegen generate
 
       - name: Prepare Home Brief draft purchase
-        if: inputs.prepare_home_brief
+        if: inputs.prepare_home_brief || inputs.catalog_only
         env:
           RESUME_DRAFT_ID: ${{ inputs.resume_home_brief_id }}
         run: |
@@ -85,6 +97,10 @@ jobs:
           fi
 
       - name: Build and upload (fastlane beta)
+        if: ${{ !inputs.catalog_only }}
+        env:
+          HOME_DISTRIBUTION_P12_BASE64: ${{ secrets.HOME_DISTRIBUTION_P12_BASE64 }}
+          HOME_DISTRIBUTION_P12_PASSWORD: ${{ secrets.HOME_DISTRIBUTION_P12_PASSWORD }}
         run: bundle exec fastlane beta
 
       - name: Keep the build log if it failed
