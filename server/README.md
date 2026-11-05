@@ -32,6 +32,12 @@ PORT=10000 node src/index.js
 
 Local run with feedback: `DATABASE_URL=postgres://localhost/home HOME_ADMIN_KEY=dev node src/index.js`.
 
+## Public privacy and support pages
+
+The helper serves public `GET` and `HEAD` routes at `/privacy` and `/support`. Both pages work without an API key, database or map service. Home Blueprint bundles the same `data/product-pages.json` for offline reading under Settings › About. Set `HOME_SUPPORT_EMAIL` to a monitored address approved for publication to offer an email contact to people who cannot open the app. The service displays the address on both public pages.
+
+For release, publish the updated helper using the existing deployment procedure. Confirm both URLs return 200 from a signed-out browser and that the public contact works. Use those verified HTTPS URLs for App Store Connect’s Privacy Policy URL and Support URL. An app configured with that HTTPS helper origin also links to the online pages. Rebuild the app when updating the bundled copy.
+
 ## API
 
 ### `GET /health`

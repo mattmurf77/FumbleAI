@@ -1,0 +1,52 @@
+{
+  "privacy": {
+    "title": "Privacy policy",
+    "sections": [
+      {
+        "heading": "Your home records",
+        "text": "Home Blueprint stores your home layout, tasks, projects, items and attached files on your device. When a build supports iCloud sync and iCloud is available, eligible home records and attachments can sync through your private Apple CloudKit database. Check the iCloud status in Settings. Home History uses the projects and expenses you record. Device backups may include app data according to your Apple settings."
+      },
+      {
+        "heading": "Address search and exterior outlines",
+        "text": "If you search for an address, Apple Maps receives your search text to find the property. Looking up its exterior sends coordinates for the selected property to the configured Home Blueprint helper service or directly to an OpenStreetMap Overpass service. The helper uses Overpass and can cache the map result by rounded coordinates in memory for up to 24 hours. These requests can reveal the home’s location to the service receiving them. Network and hosting providers process connection information such as the request address and IP address. You can enter and maintain home records without using an exterior lookup."
+      },
+      {
+        "heading": "Camera, dictation and reminders",
+        "text": "Room scans, selected images and scanned documents help you build your plan or add records. The microphone is used when you start dictation. Home Blueprint requests Apple’s on-device speech recognition where supported. Otherwise Apple may process audio on its servers. You can type instead. The app requests calendar or notification access when those features need it. Manage access in iPhone Settings."
+      },
+      {
+        "heading": "Feedback you send",
+        "text": "Sending feedback submits your category, message, screen name and available screen context, app and build versions, iOS version, device model and a random installation identifier to the configured helper service. Screen context may identify the page or room you were viewing. The service uses the installation identifier and network address to limit repeated submissions. A message that cannot be sent is queued on this device and retried. Sent messages are stored in the service’s feedback database for the publisher to review. They have no automatic deletion date. Please keep private home details out of your message."
+      },
+      {
+        "heading": "Purchases and sharing",
+        "text": "Apple processes Home Brief purchases. Home Blueprint uses StoreKit to obtain the local price, confirm access and restore purchases associated with your Apple Account. Apple handles payment details. For a Home Brief, you select completed work and preview the PDF before choosing a recipient. CSV exports and any attachments you include are shared through the destination you select. The recipient or destination controls the resulting copy."
+      },
+      {
+        "heading": "Removing data and contacting the publisher",
+        "text": "In Settings, Recently Deleted lets you recover eligible home records during their 30-day recovery period or delete them now. Manage exported copies, calendars and device or iCloud backups at their respective destinations. Removing the app clears the local home database on that device. Previously shared files, synced records and feedback already received by the publisher have separate retention. For a feedback deletion or privacy request, use Settings › Send feedback and include the approximate date and a short identifying phrase from the original submission."
+      }
+    ]
+  },
+  "support": {
+    "title": "Support",
+    "sections": [
+      {
+        "heading": "Get help",
+        "text": "Open Settings in Home Blueprint and choose Send feedback. Describe what you tried and what you saw. If the app is offline, it can queue your report and retry later. TestFlight users can also open Home Blueprint in TestFlight and choose Send Beta Feedback. You can include contact details if you want the publisher to follow up."
+      },
+      {
+        "heading": "Recover a deleted record",
+        "text": "Go to Settings › Recently Deleted. Select an eligible home record and choose Restore during its 30-day recovery period. If another device is missing changes, check iCloud status in Home Blueprint Settings and choose Sync now when available."
+      },
+      {
+        "heading": "Restore Home Brief",
+        "text": "Open Home Blueprint Settings and choose Restore Purchase under Home Brief. Use the Apple Account that bought it and check the App Store connection. Apple manages purchase history, billing and refund requests. Your home-management features are available without a Home Brief purchase."
+      },
+      {
+        "heading": "Export a home record",
+        "text": "Settings › Export data (CSV) lets you prepare a property export and choose whether to include attachments. To share selected completed work, open Home Brief from Home History, choose the completed work, preview your PDF, then select the sharing destination. Keep exported files somewhere private."
+      }
+    ]
+  }
+}

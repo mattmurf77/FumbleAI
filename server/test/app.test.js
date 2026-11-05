@@ -156,3 +156,34 @@ test('unknown routes 404 and non-GET 405', async () => {
   assert.equal((await get('/v1/nope')).status, 404);
   assert.equal((await fetch(base + '/v1/templates', { method: 'POST' })).status, 405);
 });
+
+test('public help pages work without app credentials or a database and expose no private service config', async () => {
+  const { base, upstreamCalls } = await start({ env: { HOME_API_KEY: 'test-app-key', HOME_ADMIN_KEY: 'test-admin-key' } });
+  for (const path of ['/privacy', '/support/']) {
+    const response = await fetch(base + path);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /text\/html/);
+    const text = await response.text();
+    assert.match(text, /Home Blueprint/);
+    assert.match(text, path === '/privacy' ? /private Apple CloudKit database/ : /Send Beta Feedback/);
+    assert.match(text, path === '/privacy' ? /href="\/support"/ : /href="\/privacy"/);
+    assert.doesNotMatch(text, /test-app-key|test-admin-key|mailto:/);
+    const head = await fetch(base + path, { method: 'HEAD' });
+    assert.equal(head.status, 200);
+    assert.equal(await head.text(), '');
+    assert.equal(head.headers.get('content-length'), String(Buffer.byteLength(text)));
+  }
+  assert.equal(upstreamCalls.length, 0);
+  assert.equal((await fetch(base + '/privacy', { method: 'POST' })).status, 405);
+  assert.equal((await fetch(base + '/v1/templates')).status, 401);
+});
+
+test('only an explicitly configured valid public support address is shown', async () => {
+  const contact = await start({ env: { HOME_SUPPORT_EMAIL: 'help+beta@example.org' } });
+  const html = await (await fetch(contact.base + '/support')).text();
+  assert.match(html, /mailto:help%2Bbeta%40example\.org/);
+  assert.match(html, /help\+beta@example\.org/);
+  const invalid = await start({ env: { HOME_SUPPORT_EMAIL: 'a@example.org"><script>injected' } });
+  const page = await (await fetch(invalid.base + '/privacy')).text();
+  assert.doesNotMatch(page, /injected|mailto:/);
+});

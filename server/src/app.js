@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { LruCache } from './cache.js';
+import { renderProductPage } from './product-pages.js';
 import { FeedbackStore, RateLimiter, ValidationError, validateFeedback, STATUSES, CATEGORIES, isUuid, createPgPool, renderAdminPage } from './feedback.js';
 import { buildQuery, fetchOverpass, normalize, DEFAULT_OVERPASS_URLS, UpstreamError } from './overpass.js';
 
@@ -296,6 +297,10 @@ export function createApp({ env = process.env, fetchImpl = fetch, now = Date.now
 
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       return send(res, 405, { error: 'method_not_allowed' }, { Allow: 'GET, HEAD' });
+    }
+
+    if (path === '/privacy' || path === '/support') {
+      return sendHtml(res, 200, renderProductPage(path.slice(1), env.HOME_SUPPORT_EMAIL));
     }
 
     if (path === '/health' || path === '/') {
