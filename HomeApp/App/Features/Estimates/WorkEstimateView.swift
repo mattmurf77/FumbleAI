@@ -225,7 +225,7 @@ private struct WorkEstimateEditor: View {
 
     private func addItem(replacing: Bool) {
         replacingWholeJob = replacing
-        lineEditor = WorkEstimateLine(kind: .material, name: "", quantity: 1)
+        lineEditor = WorkEstimateLine(kind: .material, name: "")
     }
 
     private func useRecord(_ line: WorkEstimateLine) {

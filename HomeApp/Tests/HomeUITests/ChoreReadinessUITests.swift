@@ -104,7 +104,10 @@ final class ChoreReadinessUITests: XCTestCase {
                                               object: app.navigationBars["New To-Do"])
         XCTAssertEqual(XCTWaiter.wait(for: [saved], timeout: 8), .completed)
         let persisted = app.descendants(matching: .any).matching(identifier: "maintenance.savedShopping").firstMatch
-        XCTAssertTrue(persisted.waitForExistence(timeout: 8), "The observed saved to-do must retain the request.")
+        if !persisted.waitForExistence(timeout: 2) {
+            for _ in 0..<4 where !persisted.exists { app.swipeUp() }
+        }
+        XCTAssertTrue(persisted.exists, "The observed saved to-do must retain the request.")
         XCTAssertEqual(persisted.value as? String, "Flashlight")
         if !app.navigationBars["All recommendations"].exists {
             app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()

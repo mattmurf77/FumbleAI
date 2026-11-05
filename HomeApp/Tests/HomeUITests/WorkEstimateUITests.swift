@@ -24,7 +24,8 @@ final class WorkEstimateUITests: XCTestCase {
         tap(name, in: app); name.typeText("Wood sealer")
         let quantity = app.textFields["estimate.item.quantity"]
         tap(quantity, in: app)
-        quantity.typeText(XCUIKeyboardKey.delete.rawValue + "2")
+        quantity.typeText("2")
+        XCTAssertEqual(quantity.value as? String, "2", "Use the number of units entered by the owner.")
         let low = app.textFields["estimate.item.low"], high = app.textFields["estimate.item.high"]
         tap(low, in: app); low.typeText("12")
         tap(high, in: app); high.typeText("16")
