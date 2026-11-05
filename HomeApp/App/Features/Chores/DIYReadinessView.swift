@@ -75,10 +75,6 @@ struct DIYReadinessView: View {
                             Stepper("Checked at home: \(count)", value: Binding(get: { supply.confirmedOnHand ?? 0 }, set: { supply.confirmedOnHand = $0 }), in: 0...9_999)
                             Button("Use catalog count") { supply.confirmedOnHand = nil }
                         } else { Button("Enter count checked at home") { supply.confirmedOnHand = Int(min(9_999, stock.onHand ?? 0)) } }
-                        if items != nil && things != nil && (missing > 0 || supply.requested) {
-                            Toggle(missing > 0 ? "Add \(Int(ceil(missing))) \(supply.unit) to Shopping list" : "Requested for Shopping list", isOn: $supply.requested)
-                                .accessibilityIdentifier("supplies.request." + supply.name)
-                        }
                         Button("Remove from this to-do", role: .destructive) { plan.removeAll { $0.id == supply.id } }
                     }.padding(.top, 8).buttonStyle(.borderless)
                 } label: {
@@ -105,6 +101,23 @@ struct DIYReadinessView: View {
                             .font(.footnote)
                     }.buttonStyle(.borderless)
                     .accessibilityIdentifier("supplies.possible." + supply.name)
+                }
+                if items != nil && things != nil && (missing > 0 || supply.requested) {
+                    let action = supply.requested ? "Remove \(supply.name) from shopping list" : "Add \(supply.name) to shopping list"
+                    Button { supply.requested.toggle() } label: {
+                        HStack {
+                            Label(action, systemImage: supply.requested ? "checkmark.circle.fill" : "cart.badge.plus")
+                            Spacer()
+                            if missing > 0 { Text("\(Int(ceil(missing))) \(supply.unit)").foregroundStyle(.secondary) }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(action)
+                    .accessibilityValue(missing > 0 ? "\(Int(ceil(missing))) \(supply.unit)" : "Already on hand")
+                    .accessibilityAddTraits(supply.requested ? .isSelected : [])
+                    .accessibilityIdentifier("supplies.request." + supply.name)
                 }
             }
             HStack {

@@ -77,17 +77,17 @@ final class ChoreReadinessUITests: XCTestCase {
         let owned = supplyRow(homeFilter)
         reveal(owned)
         XCTAssertTrue(owned.label.contains("Ready"), owned.label)
-        XCTAssertFalse(app.switches["supplies.request." + homeFilter].exists)
+        XCTAssertFalse(app.buttons["supplies.request." + homeFilter].exists)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "DIY readiness · homeowner-matched filter in storage"
         shot.lifetime = .keepAlways; add(shot)
 
-        let light = supplyRow("Flashlight")
-        reveal(light); light.tap()
-        let request = app.switches["supplies.request.Flashlight"]
+        let request = app.buttons["supplies.request.Flashlight"]
         reveal(request)
-        XCTAssertEqual(request.value as? String, "0")
+        XCTAssertEqual(request.label, "Add Flashlight to shopping list")
+        XCTAssertEqual(request.value as? String, "1 ea")
         request.tap()
-        let requested = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "1"), object: request)
+        let selected = NSPredicate(format: "label == %@", "Remove Flashlight from shopping list")
+        let requested = XCTNSPredicateExpectation(predicate: selected, object: request)
         XCTAssertEqual(XCTWaiter.wait(for: [requested], timeout: 5), .completed)
         let selectedShot = XCTAttachment(screenshot: app.screenshot())
         selectedShot.name = "DIY readiness · only the missing flashlight selected for shopping"
