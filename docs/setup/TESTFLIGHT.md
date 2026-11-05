@@ -289,3 +289,9 @@ Running `xcodegen generate` rebuilds the project file, so repeat steps 3–5 aft
 | Testers don't get the build | Internal testers: make sure **automatic distribution** is on for the group, or add the build to the group by hand. External testers: the build has to pass Beta App Review first. |
 
 Related: [RENDER.md](RENDER.md) (optional helper service) · [README.md](README.md) (index).
+
+### Attach the Home Brief review screenshot
+
+After reviewing the iPhone capture from a successful **iOS build**, manually run **TestFlight** on that tested release with `catalog_only=true` and `review_screenshot_run` set to the numeric iOS build run ID. Leave `prepare_home_brief` off and `resume_home_brief_id` empty. A later release-tooling commit is accepted when the app, tests and iPhone build workflow match the tested ancestor. The source artifact expires after seven days.
+
+The action reads Xcode's attachment manifest and accepts only the named Home Brief PNG from the passing iPhone purchase-screen test. It attaches that screenshot to Home Blueprint’s existing unsubmitted Home Brief product (app 6817578211, product 6830947832), verifies Apple's processed checksum and fills blank review notes. A complete, identical screenshot can be reused. A different or partial screenshot, an unrecognized upload destination, or a submitted product stops the action. Existing review notes are preserved. Processing can outlast the action's one-minute poll. Once Apple has finished, the same run ID can be retried. This mode performs no build, distribution or review submission. [Apple’s asset upload procedure](https://developer.apple.com/documentation/appstoreconnectapi/uploading-assets-to-app-store-connect)
