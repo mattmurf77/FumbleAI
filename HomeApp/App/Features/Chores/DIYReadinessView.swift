@@ -10,10 +10,26 @@ struct DIYReadinessView: View {
     @State private var things: [Thing]?
     @State private var locations: [UUID: String] = [:]
     @State private var names = SchedulePlaceNames()
+    @State private var matching: ChoreSupply?
     @State private var adding = ""
     @State private var error: String?
 
+    private func optionsKey(_ supply: ChoreSupply) -> String {
+        ChoreSupply.unitKey(supply.unit) + (supply.isEquipment ? "|tool" : "|supply")
+    }
+
+    private var availableOptions: [String: [HomeSupplyOption]] {
+        guard let items, let things else { return [:] }
+        var options: [String: [HomeSupplyOption]] = [:]
+        for supply in plan where options[optionsKey(supply)] == nil {
+            options[optionsKey(supply)] = HomeSupplyOption.options(for: supply, property: propertyId, items: items, things: things,
+                locationOfItem: { locations[$0.id] ?? names.name($0.scope) }, locationOfThing: { names.name($0.scope) })
+        }
+        return options
+    }
+
     var body: some View {
+        let options = availableOptions
         VStack(alignment: .leading, spacing: 14) {
             ForEach($plan) { $supply in
                 let stock = SupplyReadiness(supply, propertyId: propertyId, inventory: items ?? [], things: things ?? [])
@@ -24,12 +40,17 @@ struct DIYReadinessView: View {
                         Stepper("Quantity needed: \(supply.quantity)", value: $supply.quantity, in: 1...9_999)
                         TextField("Unit, e.g. ea or box", text: $supply.unit)
                         Toggle("Reusable equipment", isOn: $supply.isEquipment)
+                        if let choices = options[optionsKey(supply)], !choices.isEmpty {
+                            Button("Choose an item at home") { matching = supply }
+                                .accessibilityIdentifier("supplies.match." + supply.name)
+                        }
                         if let count = supply.confirmedOnHand {
                             Stepper("Checked at home: \(count)", value: Binding(get: { supply.confirmedOnHand ?? 0 }, set: { supply.confirmedOnHand = $0 }), in: 0...9_999)
                             Button("Use catalog count") { supply.confirmedOnHand = nil }
                         } else { Button("Enter count checked at home") { supply.confirmedOnHand = Int(min(9_999, stock.onHand ?? 0)) } }
                         if items != nil && things != nil && (missing > 0 || supply.requested) {
                             Toggle(missing > 0 ? "Add \(Int(ceil(missing))) \(supply.unit) to Shopping list" : "Requested for Shopping list", isOn: $supply.requested)
+                                .accessibilityIdentifier("supplies.request." + supply.name)
                         }
                         Button("Remove from this to-do", role: .destructive) { plan.removeAll { $0.id == supply.id } }
                     }.padding(.top, 8).buttonStyle(.borderless)
@@ -47,6 +68,16 @@ struct DIYReadinessView: View {
                             if supply.requested && missing > 0 { Label("Selected for Shopping list", systemImage: "cart").font(.caption) }
                         }
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("supplies.row." + supply.name)
+                }
+                if stock.onHand == nil,
+                   let candidate = options[optionsKey(supply)]?.first(where: { $0.isPossibleMatch(for: supply) }) {
+                    Button { matching = supply } label: {
+                        Label("Check possible match: " + candidate.name, systemImage: "magnifyingglass")
+                            .font(.footnote)
+                    }.buttonStyle(.borderless)
+                    .accessibilityIdentifier("supplies.possible." + supply.name)
                 }
             }
             HStack {
@@ -54,6 +85,18 @@ struct DIYReadinessView: View {
                 Button("Add", action: add).buttonStyle(.borderless).disabled(adding.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("supplies.add")
             }
             if let error { Text(error).font(.footnote).foregroundStyle(.secondary) }
+        }
+        .sheet(item: $matching) { supply in
+            HomeSupplyPicker(need: supply, options: options[optionsKey(supply)] ?? []) { choice in
+                guard let index = plan.firstIndex(where: { $0.id == supply.id }) else { return }
+                var candidate = plan
+                candidate[index].name = choice.name
+                candidate[index].isEquipment = supply.isEquipment || choice.isEquipment
+                candidate[index].confirmedOnHand = nil
+                candidate[index].requested = false
+                do { try ChoreSupply.validate(candidate); plan = candidate; error = nil }
+                catch { self.error = error.localizedDescription }
+            }
         }
         .task(id: propertyId) {
             names = await SchedulePlaceNames.load(env, property: propertyId)

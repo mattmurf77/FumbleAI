@@ -4,7 +4,7 @@ import HomeCoreTesting
 
 /// Storage tree (spec 08 FR-INV-10..14, mockup 5.1).
 ///
-/// - `StorageTreeView()` — every room with its item count; tap a room for its tree.
+/// - `StorageTreeView()` — whole-property catalog of inventory and owned equipment, plus room-based storage.
 /// - `StorageTreeView(spaceID:)` — one room: nested spots with item counts (incl. descendants), add / rename /
 ///   move / delete spots, "Add item here", and the room's loose items.
 /// Pushable (no own `NavigationStack`); wrap it in one when presenting as a sheet.
@@ -18,15 +18,15 @@ struct StorageTreeView: View {
             RoomStorageTree(spaceID: spaceID)
                 .feedbackPage("Storage · Room")
         } else {
-            StorageRoomsList()
-                .feedbackPage("Storage")
+            EquipmentCatalogView()
+                .feedbackPage("Tools & equipment")
         }
     }
 }
 
 // MARK: - Rooms list
 
-private struct StorageRoomsList: View {
+struct StorageRoomsList: View {
     @Environment(AppEnvironment.self) private var env
     @State private var places = TIK.PlaceIndex()
     @State private var propertyId: UUID?

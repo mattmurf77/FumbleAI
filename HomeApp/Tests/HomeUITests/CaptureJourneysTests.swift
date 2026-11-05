@@ -35,20 +35,23 @@ final class CaptureJourneysTests: XCTestCase {
 
     func testMapSpreadsheetReviewAndConfirmCompletedWorkAppearsInHistory() {
         let app = launch("test-csv-review")
-        let column = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH %@", "csv.column.Project title", "Project title")).firstMatch
+        let column = app.buttons["csv.column.Project title"]
         XCTAssertTrue(column.waitForExistence(timeout: 15))
         reveal(column, in: app); column.tap()
-        let chosen = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "1. Worksheet entry")).firstMatch
-        XCTAssertTrue(chosen.waitForExistence(timeout: 5)); chosen.tap()
-        if app.navigationBars["Project title"].exists { app.navigationBars["Project title"].buttons.element(boundBy: 0).tap() }
+        let chosen = app.buttons["csv.columnChoice.0"]
+        XCTAssertTrue(chosen.waitForExistence(timeout: 5))
+        XCTAssertEqual(chosen.label, "1. Worksheet entry")
+        chosen.tap()
+        let review = app.buttons["csv.review"]
+        reveal(review, in: app)
         let ready = element("csv.readyCount", in: app)
-        reveal(ready, in: app)
         XCTAssertEqual(ready.value as? String, "2")
         capture("Spreadsheet import · mapped columns and two reviewed projects", app)
-        let review = app.buttons["csv.review"]
-        reveal(review, in: app); review.tap()
-        XCTAssertTrue(app.staticTexts["Replaced west gutter guard"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Insulated garage ceiling"].exists)
+        review.tap()
+        let firstRow = app.switches["Include Replaced west gutter guard"]
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 5))
+        XCTAssertEqual(firstRow.value as? String, "1")
+        XCTAssertEqual(app.switches["Include Insulated garage ceiling"].value as? String, "1")
         app.navigationBars["Review rows"].buttons.element(boundBy: 0).tap()
         let start = app.buttons["csv.import"]
         reveal(start, in: app); start.tap()

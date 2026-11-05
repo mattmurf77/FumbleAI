@@ -182,11 +182,11 @@ struct HubRowSection: Identifiable, Hashable {
 }
 
 enum HomeHubCatalog {
-    /// The Home tab: the house itself, then four tasks. Everything else lives in the tabs or the header buttons.
+    /// Lead with everyday household work. The physical plan is available below these actions.
     static func sections(_ c: HubCounts) -> [HubSection] {
         [
+            HubSection(id: "tasks", title: "", cards: [todos(c), projects(c), homeHistory, stuff(c)]),
             HubSection(id: "home", title: "Your home", cards: [floorPlan(c), yard(c)]),
-            HubSection(id: "tasks", title: "Get things done", cards: [todos(c), projects(c), homeHistory, stuff(c)]),
         ]
     }
 
@@ -229,7 +229,7 @@ enum HomeHubCatalog {
     }
 
     static func stuff(_ c: HubCounts) -> HubCard {
-        var card = HubCard(id: .stuff, title: "Record your stuff", detail: "Appliances, furniture, plants and storage",
+        var card = HubCard(id: .stuff, title: "Record your stuff", detail: "Tools, equipment, inventory and storage",
                            symbol: "shippingbox", action: .tab(.stuff))
         if c.lowCount > 0 {
             card.badge = "\(c.lowCount) low"; card.badgeTone = .attention
@@ -276,6 +276,7 @@ enum HomeHubCatalog {
 
     static func stuffSections(_ c: HubCounts) -> [HubRowSection] {
         [
+            HubRowSection(id: "catalog", title: "At home", rows: [inventoryRow(c)]),
             HubRowSection(id: "add", title: "Record something", rows: [
                 HubRow(id: "thing", title: "Appliance, electronic or furniture", detail: "Specs, warranty, filters and bulbs",
                        symbol: "sofa", action: .add(.thing(spaceID: nil))),
@@ -291,8 +292,7 @@ enum HomeHubCatalog {
             HubRowSection(id: "browse", title: "Browse", rows: [
                 HubRow(id: "things", title: "On the floor plan", detail: c.plannedThings > 0 ? "\(c.plannedThings) planned · see what’s in each room" : "See what’s in each room",
                        symbol: LensID.things.symbol, badge: count(c.ownedThings), action: .plan(lens: .things)),
-                inventoryRow(c),
-                HubRow(id: "shopping", title: "Shopping list", detail: "Low supplies and replacements due",
+                HubRow(id: "shopping", title: "Shopping list", detail: "Selected to-do supplies and items running low",
                        symbol: "cart", badge: count(c.shoppingCount), action: .push(.shoppingList)),
                 HubRow(id: "swap", title: "Seasonal swap", detail: swapDetail(c),
                        symbol: "arrow.triangle.2.circlepath", badge: count(c.swapCount), action: .push(.seasonalSwap)),
@@ -301,12 +301,10 @@ enum HomeHubCatalog {
     }
 
     static func inventoryRow(_ c: HubCounts) -> HubRow {
-        var row = HubRow(id: "storage", title: "Storage & inventory", detail: "Pantry, closets and storage spots",
+        var row = HubRow(id: "storage", title: "Tools & equipment", detail: "Find owned equipment and inventory, quantities and locations",
                          symbol: LensID.inventory.symbol, action: .push(.storage))
         if c.lowCount > 0 {
             row.badge = "\(c.lowCount) low"; row.badgeTone = .attention
-        } else {
-            row.badge = count(c.inventoryCount)
         }
         return row
     }

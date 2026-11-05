@@ -643,7 +643,9 @@ extension TIK {
         let supplies = lines.filter { $0.reason == .toDoSupply }
         var out = ["Shopping list"]
         if !supplies.isEmpty {
-            out += ["", "For your to-dos"] + supplies.map { "• " + $0.label + " · " + quantityLabel($0.quantity, unit: $0.unit) }
+            out += ["", "For your to-dos"] + supplies.map { line in
+                "• " + line.label + " · " + (line.conflictingCounts == nil ? quantityLabel(line.quantity, unit: line.unit) : "Check on-hand counts before buying")
+            }
         }
         if !due.isEmpty {
             out.append("")

@@ -3,7 +3,7 @@ import Observation
 
 /// Device-local feedback preferences.
 enum FeedbackSettings {
-    /// UserDefaults Bool (default true) behind Settings › "Show feedback button".
+    /// UserDefaults Bool (default false) behind Settings › "Show feedback button".
     static let showButtonKey = "feedback.showButton"
 }
 

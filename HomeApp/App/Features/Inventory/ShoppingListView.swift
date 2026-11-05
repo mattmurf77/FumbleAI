@@ -14,6 +14,7 @@ struct ShoppingListView: View {
     @State private var locations: [UUID: ItemLocation] = [:]
     @State private var filter: TIK.ShoppingFilter = .all
     @State private var buying: ShoppingLine?
+    @State private var editingStockCheck: ShoppingLine.StockReport?
     @State private var quantityText = ""
     @State private var errorText: String?
 
@@ -35,7 +36,10 @@ struct ShoppingListView: View {
             let supplies = visible.filter { $0.reason == .toDoSupply }
             if !supplies.isEmpty {
                 Section("For your to-dos") {
-                    ForEach(supplies) { line in row(line, subtitle: "Buy " + TIK.quantityLabel(line.quantity, unit: line.unit), symbol: "checklist") }
+                    ForEach(supplies) { line in
+                        if let checks = line.conflictingCounts { countReview(line, checks: checks) }
+                        else { row(line, subtitle: "Buy " + TIK.quantityLabel(line.quantity, unit: line.unit), symbol: "checklist") }
+                    }
                 }
             }
             if !due.isEmpty {
@@ -56,6 +60,7 @@ struct ShoppingListView: View {
                 }
             }
         }
+        .sheet(item: $editingStockCheck) { report in ChoreForm(choreID: report.id) }
         .feedbackPage("Shopping list")
         .navigationTitle("Shopping list")
         .toolbar {
@@ -112,6 +117,7 @@ struct ShoppingListView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Bought \(line.label)")
+            .accessibilityIdentifier((line.reason == .toDoSupply ? "shopping.todo." : "shopping.stock.") + line.label)
             VStack(alignment: .leading, spacing: 2) {
                 Text(line.label)
                 if !subtitle.isEmpty {
@@ -123,6 +129,29 @@ struct ShoppingListView: View {
                 Text(owner).font(.caption).foregroundStyle(.secondary)
             }
             if let symbol { Image(systemName: symbol).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func countReview(_ line: ShoppingLine, checks: [ShoppingLine.StockReport]) -> some View {
+        let quantities = Set(checks.map(\.count)).sorted().map { String($0) }.joined(separator: ", ")
+        return DisclosureGroup {
+            Text("Open a to-do to correct its checked count or switch back to the catalog count.")
+                .font(.footnote).foregroundStyle(.secondary)
+            ForEach(checks) { report in
+                Button {
+                    editingStockCheck = report
+                } label: {
+                    LabeledContent(report.taskTitle, value: TIK.quantityLabel(Double(report.count), unit: line.unit))
+                        .frame(minHeight: 44)
+                }
+                .accessibilityLabel("Review " + report.taskTitle + ", checked " + String(report.count) + " " + (line.unit ?? ""))
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Label(line.label, systemImage: "questionmark.circle")
+                Text("Review checked counts: " + quantities + " " + (line.unit ?? ""))
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
         }
     }
 

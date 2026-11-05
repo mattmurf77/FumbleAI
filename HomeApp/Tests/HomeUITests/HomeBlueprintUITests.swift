@@ -66,9 +66,10 @@ final class HomeBlueprintUITests: XCTestCase {
         ).firstMatch
         open(task, in: app)
         open(app.buttons["Mark done"], in: app)
-        XCTAssertTrue(app.staticTexts["Marked done"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Mark done"].isHittable)
-        open(app.buttons["Undo"], in: app)
+        let reopen = app.buttons["todo.reopen"]
+        XCTAssertTrue(reopen.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["Mark done"].exists)
+        reopen.tap()
         XCTAssertTrue(app.buttons["Mark done"].waitForExistence(timeout: 5))
     }
 

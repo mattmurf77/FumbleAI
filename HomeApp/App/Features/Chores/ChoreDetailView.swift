@@ -121,7 +121,13 @@ struct ChoreDetailView: View {
             Section("Work plan") {
                 LabeledContent("How", value: c.workMode?.label ?? "Decide later")
                 if c.workMode == .diy, let plan = c.supplyPlan, !plan.isEmpty {
-                    ForEach(plan) { item in LabeledContent(item.name, value: "\(item.quantity) \(item.unit)") }
+                    ForEach(plan) { item in
+                        LabeledContent(item.name, value: "\(item.quantity) \(item.unit)")
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(item.name)
+                            .accessibilityValue("\(item.quantity) \(item.unit)")
+                            .accessibilityIdentifier("todo.supplyDetail." + item.name)
+                    }
                     NavigationLink { ShoppingListView() } label: { Label("Shopping list", systemImage: "cart") }
                 }
                 if c.workMode == .hirePro { Button("Prepare a written estimate request") { quoteRequest = true } }
@@ -233,6 +239,12 @@ struct ChoreDetailView: View {
                 if c.isOpen {
                     Button { Task { await act(.done) } } label: { Label("Mark done", systemImage: "checkmark") }
                         .buttonStyle(.borderedProminent)
+                } else if c.closedAt != nil, let latest = completions.first {
+                    Button("Reopen to-do") { Task { await performUndo(latest.id) } }
+                        .buttonStyle(.bordered)
+                        .disabled(acting)
+                        .accessibilityHint("Undoes the last completion and restores its due date.")
+                        .accessibilityIdentifier("todo.reopen")
                 }
             }
             if c.closedAt == nil {
@@ -309,7 +321,7 @@ struct ChoreDetailView: View {
             HStack {
                 Text(undo.message).foregroundStyle(.white)
                 Spacer()
-                Button("Undo") { Task { await performUndo(undo) } }
+                Button("Undo") { Task { await performUndo(undo.completionID) } }
                     .foregroundStyle(.yellow)
                     .bold()
             }
@@ -376,9 +388,15 @@ struct ChoreDetailView: View {
     }
 
     @MainActor
-    private func performUndo(_ state: UndoState) async {
-        withAnimation { undo = nil }
-        do { try await env.chores.undoCompletion(state.completionID); await loadExtras() } catch { errorText = error.localizedDescription }
+    private func performUndo(_ completionID: UUID) async {
+        guard !acting else { return }
+        acting = true
+        defer { acting = false }
+        do {
+            try await env.chores.undoCompletion(completionID)
+            withAnimation { undo = nil }
+            await loadExtras()
+        } catch { errorText = error.localizedDescription }
     }
 
     @MainActor

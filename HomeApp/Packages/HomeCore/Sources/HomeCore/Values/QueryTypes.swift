@@ -156,6 +156,15 @@ public struct ShoppingLine: Hashable, Codable, Sendable, Identifiable {
     public var quantity: Double?
     public var unit: String?
     public var supplyKey: String?
+    /// Existing inventory row this displayed purchase would replenish, nil for new whole-property stock.
+    public var supplyStockID: UUID?
+    /// Task-local checks that disagree about the same requested supply. Such a line has no buy quantity.
+    public struct StockReport: Hashable, Codable, Identifiable, Sendable {
+        public let id: UUID
+        public let taskTitle: String
+        public let count: Int
+    }
+    public var conflictingCounts: [StockReport]?
     public var id: String { reason.rawValue + ":" + (supplyKey ?? ref.id.uuidString) }
     public init(reason: Reason, ref: ItemRef, label: String, quantity: Double? = nil, unit: String? = nil) {
         self.reason = reason; self.ref = ref; self.label = label; self.quantity = quantity; self.unit = unit

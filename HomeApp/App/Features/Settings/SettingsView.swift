@@ -18,7 +18,7 @@ struct SettingsView: View {
     @State private var calendarStatus: PermissionStatus = .unknown
     @State private var calendars: [CalendarInfo] = []
     @State private var errorText: String?
-    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = true
+    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = false
 
     private static let offsets: [(Int, String)] = [
         (0, "At time"), (15, "15 minutes before"), (30, "30 minutes before"), (60, "1 hour before"),

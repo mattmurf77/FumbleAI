@@ -265,7 +265,10 @@ targets:
   HomeUITests:
     type: bundle.ui-testing
     platform: iOS
-    sources: [Tests/HomeUITests]
+    sources:
+      - path: Tests/HomeUITests
+      - path: Tests/StoreKit/HomeBrief.storekit
+        buildPhase: resources
     dependencies:
       - target: Home
     settings:

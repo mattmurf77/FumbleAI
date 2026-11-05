@@ -26,9 +26,15 @@ echo "Using simulator $device for $suite"
 xcrun simctl list devices available | awk -v id="$device" '/-- iOS / {runtime=$0} index($0,id) {print runtime, $0}'
 trap 'xcrun simctl shutdown "$device" >/dev/null 2>&1 || true' EXIT
 xcrun simctl bootstatus "$device" -b
+selection=(-only-testing:"$suite")
+if [[ "$suite" == HomeTests ]]; then
+  selection+=(-only-testing:HomeUITests/HomeBriefReviewScreenshotTests)
+else
+  selection+=(-skip-testing:HomeUITests/HomeBriefReviewScreenshotTests)
+fi
 xcodebuild -project Home.xcodeproj -scheme Home -configuration Debug \
   -destination "platform=iOS Simulator,id=$device" -parallel-testing-enabled NO \
   -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 240 \
   -clonedSourcePackagesDirPath "$SPM_DIR" -skipPackagePluginValidation -skipMacroValidation \
-  -only-testing:"$suite" -resultBundlePath "$RUNNER_TEMP/$suite.xcresult" \
+  "${selection[@]}" -resultBundlePath "$RUNNER_TEMP/$suite.xcresult" \
   test HOME_CLOUD_SYNC=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM=""

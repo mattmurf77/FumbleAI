@@ -14,7 +14,7 @@ struct RootView: View {
     @State private var reviewingCSV: ProjectCSVFile?
     @State private var importError: String?
     @State private var accountError: String?
-    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = true
+    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = false
 
     /// Feedback "Page" when the visible screen doesn't name itself with `.feedbackPage(_:)`.
     private var rootFeedbackPage: String {

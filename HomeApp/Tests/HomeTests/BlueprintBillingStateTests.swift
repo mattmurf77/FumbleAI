@@ -10,6 +10,9 @@ private final class TestCommerce: HomeBriefCommerce {
     var shouldFailPayment = false
     var shouldFailRestore = false
     var suspendPayment = false
+    var suspendEntitlements = false
+    var recovered = false
+    var entitlementReads: [CheckedContinuation<Bool, Never>] = []
     var pendingPayment: CheckedContinuation<Void, Never>?
     var purchases = 0
     var restored = 0
@@ -26,7 +29,17 @@ private final class TestCommerce: HomeBriefCommerce {
         return result
     }
 
-    func isEntitled() async -> Bool { entitled }
+    func isEntitled() async -> Bool {
+        guard suspendEntitlements else { return entitled }
+        return await withCheckedContinuation { entitlementReads.append($0) }
+    }
+
+    func nextEntitlementRead() async throws -> CheckedContinuation<Bool, Never> {
+        for _ in 0..<100 where entitlementReads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        let read = try #require(entitlementReads.first)
+        entitlementReads.removeFirst()
+        return read
+    }
 
     func syncAccount() async throws {
         restored += 1
@@ -34,11 +47,37 @@ private final class TestCommerce: HomeBriefCommerce {
     }
 
     func observe(onChange: @escaping @MainActor () async -> Void) async { self.onChange = onChange }
-    func recoverUnfinished(onChange: @escaping @MainActor () async -> Void) async {}
+    func recoverUnfinished(onChange: @escaping @MainActor () async -> Void) async { recovered = true }
 }
 
 @MainActor
 struct BlueprintBillingStateTests {
+    @Test func overlappingRefreshesApplyVerifiedAccessBeforeReturning() async throws {
+        let commerce = TestCommerce()
+        let store = BlueprintBilling(commerce: commerce)
+        for _ in 0..<100 where !commerce.recovered { try await Task.sleep(for: .milliseconds(5)) }
+        try #require(commerce.recovered)
+        commerce.suspendEntitlements = true
+
+        let first = Task { await store.refreshEntitlements(); return store.unlocked }
+        let firstRead = try await commerce.nextEntitlementRead()
+        var secondStarted = false
+        let second = Task {
+            secondStarted = true
+            await store.refreshEntitlements()
+        }
+        for _ in 0..<100 where !secondStarted { try await Task.sleep(for: .milliseconds(5)) }
+        try #require(secondStarted)
+
+        firstRead.resume(returning: true)
+        let hadAccess = await first.value
+        #expect(hadAccess)
+        let secondRead = try await commerce.nextEntitlementRead()
+        secondRead.resume(returning: false)
+        await second.value
+        #expect(!store.unlocked)
+    }
+
     @Test func demoPurchasesAndRestoreNeverContactApple() async {
         let commerce = TestCommerce()
         commerce.price = "$14.99"

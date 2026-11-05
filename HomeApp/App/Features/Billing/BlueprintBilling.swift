@@ -14,7 +14,8 @@ final class BlueprintBilling: ObservableObject {
     let isDemo: Bool
     private let commerce: HomeBriefCommerce
     private var observer: Task<Void, Never>?
-    private var entitlementRequest = 0
+    private var entitlementRead: Task<Void, Never>?
+    private var purchaseRevision = 0
 
     convenience init(isDemo: Bool = false) { self.init(commerce: AppleHomeBriefCommerce(), isDemo: isDemo) }
 
@@ -42,13 +43,20 @@ final class BlueprintBilling: ObservableObject {
 
     func refreshEntitlements() async {
         guard !isDemo else { return }
-        entitlementRequest += 1
-        let request = entitlementRequest
-        let entitled = await commerce.isEntitled()
-        if request == entitlementRequest {
-            if unlocked != entitled { message = nil }
-            unlocked = entitled
+        // Startup, scene activation, restore and transaction updates can all request a
+        // read. Each caller must return after applying a verified snapshot.
+        while let pending = entitlementRead { await pending.value }
+        let revision = purchaseRevision
+        let read = Task {
+            let entitled = await commerce.isEntitled()
+            if revision == purchaseRevision {
+                if unlocked != entitled { message = nil }
+                unlocked = entitled
+            }
+            entitlementRead = nil
         }
+        entitlementRead = read
+        await read.value
     }
 
     func purchase() async {
@@ -61,7 +69,7 @@ final class BlueprintBilling: ObservableObject {
             case .purchased(let finish):
                 // A newly verified purchase can arrive before the entitlement sequence refreshes.
                 // Deliver immediately and invalidate an older entitlement read already in flight.
-                entitlementRequest += 1
+                purchaseRevision += 1
                 unlocked = true
                 await finish()
                 if unlocked { message = "Home Brief is ready to use." }

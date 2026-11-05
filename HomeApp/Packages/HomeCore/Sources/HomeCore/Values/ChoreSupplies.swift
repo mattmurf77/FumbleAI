@@ -55,7 +55,9 @@ public struct SupplyReadiness: Sendable {
     public let onHand: Double?
     public init(_ supply: ChoreSupply, propertyId: UUID, inventory: [InventoryItem], things: [Thing]) {
         self.inventory = inventory.filter { $0.deletedAt == nil && $0.propertyId == propertyId && supply.matches($0) }
-        equipment = ChoreSupply.unitKey(supply.unit) != "ea" ? [] : things.filter {
+        // An installed asset is not a consumable spare. Only reusable, individually counted tools
+        // can use an owned Thing as evidence; planned purchases never contribute.
+        equipment = !supply.isEquipment || ChoreSupply.unitKey(supply.unit) != "ea" ? [] : things.filter {
             $0.deletedAt == nil && $0.propertyId == propertyId && $0.ownership == .owned && ChoreSupply.normalize($0.name) == ChoreSupply.normalize(supply.name)
         }
         // The same tool may be described both as a Thing and as stock. Use the better-supported count once.
@@ -68,43 +70,90 @@ public struct SupplyReadiness: Sendable {
 public enum ChoreShopping {
     /// Consumables add across open tasks; reusable equipment needs the highest requested count only.
     public static func lines(property: UUID, chores: [Chore], inventory: [InventoryItem], things: [Thing]) -> [ShoppingLine] {
-        let selected = chores.filter { $0.propertyId == property && $0.isOpen && $0.workMode == .diy }.flatMap { c in
-            (c.supplyPlan ?? []).filter(\.requested).map { (c.id, $0) }
+        let openPlans = chores.filter { $0.propertyId == property && $0.isOpen && $0.workMode == .diy }.flatMap { c in
+            (c.supplyPlan ?? []).map { (choreID: c.id, title: c.title, supply: $0) }
         }
-        return Dictionary(grouping: selected, by: { $0.1.key }).compactMap { key, group in
-            guard let first = group.min(by: { $0.1.id.uuidString < $1.1.id.uuidString }) else { return nil }
-            let items = group.map { $0.1 }
-            let required = items.filter { !$0.isEquipment }.reduce(0) { $0 + $1.quantity } + (items.filter(\.isEquipment).map(\.quantity).max() ?? 0)
-            let observed = items.compactMap(\.confirmedOnHand).max().map(Double.init) ?? SupplyReadiness(first.1, propertyId: property, inventory: inventory, things: things).onHand ?? 0
+        return Dictionary(grouping: openPlans, by: { $0.supply.key }).compactMap { key, group in
+            let requested = group.filter { $0.supply.requested }
+            guard let first = requested.min(by: { $0.choreID.uuidString < $1.choreID.uuidString }) else { return nil }
+            var line = ShoppingLine(reason: .toDoSupply, ref: .chore(first.choreID), label: first.supply.name,
+                                    unit: ChoreSupply.unitKey(first.supply.unit))
+            line.supplyKey = key
+            let reports = group.compactMap { task in
+                task.supply.confirmedOnHand.map { ShoppingLine.StockReport(id: task.choreID, taskTitle: task.title, count: $0) }
+            }
+            let counts = Set(reports.map(\.count))
+            if counts.count > 1 {
+                line.conflictingCounts = reports.sorted { ($0.taskTitle, $0.id.uuidString) < ($1.taskTitle, $1.id.uuidString) }
+                return line
+            }
+            let items = requested.map(\.supply)
+            let consumables = items.filter { !$0.isEquipment }.reduce(0) { $0 + $1.quantity }
+            let reusable = items.filter(\.isEquipment).map(\.quantity).max() ?? 0
+            let required = consumables + reusable
+            var catalogMatch = first.supply
+            catalogMatch.isEquipment = reusable > 0
+            let stock = SupplyReadiness(catalogMatch, propertyId: property, inventory: inventory, things: things)
+            let catalogUnits = stock.inventory.reduce(0.0) { $0 + max(0, $1.quantity) }
+            // Owned Things can cover only the reusable demand, even when the same name/unit is
+            // marked reusable in one plan and consumable in another.
+            let available = max(catalogUnits, Double(min(reusable, stock.equipment.count)))
+            let observed = items.compactMap(\.confirmedOnHand).first.map(Double.init) ?? available
             let needed = ceil(max(0, Double(required) - observed))
             guard needed > 0 else { return nil }
-            var line = ShoppingLine(reason: .toDoSupply, ref: .chore(first.0), label: first.1.name, quantity: needed, unit: ChoreSupply.unitKey(first.1.unit))
-            line.supplyKey = key
+            line.quantity = needed
+            line.supplyStockID = destination(for: stock.inventory)?.id
             return line
         }.sorted { ($0.label, $0.id) < ($1.label, $1.id) }
     }
+    private static func destination(for matches: [InventoryItem]) -> InventoryItem? {
+        if matches.count == 1, let only = matches.first, only.ownerId == nil { return only }
+        let shared = matches.filter { $0.scope == .property && $0.storageSpotId == nil && $0.ownerId == nil && $0.linkedThingId == nil }
+        return shared.count == 1 ? shared.first : nil
+    }
+
     public static func merged(existing: [ShoppingLine], supplies: [ShoppingLine]) -> [ShoppingLine] {
-        let requested = Set(supplies.compactMap(\.supplyKey))
-        return supplies + existing.filter { !requested.contains(ChoreSupply(name: $0.label, unit: $0.unit ?? "ea").key) }
+        let replenished = Set(supplies.compactMap(\.supplyStockID))
+        return supplies + existing.filter { line in
+            guard line.reason == .low, case .inventory(let id) = line.ref else { return true }
+            return !replenished.contains(id)
+        }
     }
     /// Produce a single atomic change. A stale/retried tap never increments inventory twice.
     public static func purchase(_ line: ShoppingLine, property: UUID, chores: [Chore], inventory: [InventoryItem], things: [Thing]) throws -> (InventoryItem, [Chore]) {
-        guard line.reason == .toDoSupply, let key = line.supplyKey, let units = line.quantity,
-              let live = lines(property: property, chores: chores, inventory: inventory, things: things).first(where: { $0.supplyKey == key }), live == line else { throw ChoreSupplyError("The list changed. Check the current quantity before recording a purchase.") }
+        let stale = ChoreSupplyError("The list changed. Check the current quantity before recording a purchase.")
+        guard line.reason == .toDoSupply, let key = line.supplyKey,
+              let live = lines(property: property, chores: chores, inventory: inventory, things: things).first(where: { $0.supplyKey == key })
+        else { throw stale }
+        guard live.conflictingCounts == nil else {
+            throw ChoreSupplyError("The saved on-hand counts disagree. Review the matching to-dos in your Shopping list.")
+        }
+        guard live == line, let units = live.quantity else { throw stale }
         let supply = ChoreSupply(name: line.label, unit: line.unit ?? "ea")
-        var changedItem = inventory.filter { $0.propertyId == property && $0.deletedAt == nil && supply.matches($0) }
-            .sorted { ($0.isLow ? 0 : 1, $0.id.uuidString) < ($1.isLow ? 0 : 1, $1.id.uuidString) }.first
-            ?? InventoryItem(propertyId: property, kind: .stored, name: line.label, scope: .property, quantity: 0, unit: line.unit)
-        changedItem.quantity += units; changedItem.isLow = false
+        let matches = inventory.filter { $0.propertyId == property && $0.deletedAt == nil && supply.matches($0) }
+        // Multiple possible bins do not identify where the purchase was put. Keep existing quantities,
+        // owners and storage paths intact and place the new units at whole-property scope.
+        var changedItem = matches.first(where: { $0.id == line.supplyStockID }) ?? InventoryItem(propertyId: property, kind: .stored, name: line.label,
+                                                        scope: .property, quantity: 0, unit: line.unit)
+        changedItem.quantity += units
+        changedItem.isLow = false
+        let afterInventory = matches.filter { $0.id != changedItem.id } + [changedItem]
         let updates: [Chore] = chores.compactMap { chore in
             guard chore.propertyId == property, chore.isOpen, chore.workMode == .diy, var plan = chore.supplyPlan,
-                  plan.contains(where: { $0.key == key && $0.requested }) else { return nil }
-            var updated = chore
-            for i in plan.indices where plan[i].key == key && plan[i].requested {
-                plan[i].requested = false
-                if plan[i].confirmedOnHand != nil { plan[i].confirmedOnHand = nil }
+                  let index = plan.firstIndex(where: { $0.key == key }), plan[index].requested || plan[index].confirmedOnHand != nil else { return nil }
+            let original = plan[index]
+            let before = SupplyReadiness(original, propertyId: property, inventory: matches, things: things).onHand ?? 0
+            plan[index].requested = false
+            plan[index].confirmedOnHand = nil
+            let after = SupplyReadiness(plan[index], propertyId: property, inventory: afterInventory, things: things).onHand ?? 0
+            // Preserve checked stock outside the catalog. A purchase adds just the bought quantity to
+            // inventory. If the catalog alone now accounts for it all, resume live catalog counts.
+            if (original.confirmedOnHand != nil || original.isEquipment), abs(before + units - after) > 0.000_001 {
+                plan[index].confirmedOnHand = Int(min(9_999, max(0, floor(before + units))))
             }
-            updated.supplyPlan = plan; return updated
+            var updated = chore
+            updated.supplyPlan = plan
+            return updated
         }
         return (InventoryLogic.applyLowThreshold(changedItem), updates)
     }

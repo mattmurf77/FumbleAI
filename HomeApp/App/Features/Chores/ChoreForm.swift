@@ -14,6 +14,8 @@ struct ChoreForm: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @FocusState private var titleFocused: Bool
     private let mode: Mode
     /// Called with the saved chore (after the calendar step).
     var onSaved: ((Chore) -> Void)?
@@ -79,6 +81,9 @@ struct ChoreForm: View {
                 Section {
                     TextField("Title, e.g. Change HVAC filter", text: $title)
                         .textInputAutocapitalization(.sentences)
+                        .focused($titleFocused)
+                        .submitLabel(.done)
+                        .onSubmit { titleFocused = false }
                     if trimmedTitle.count > 120 {
                         Text("Keep the title under 120 characters.").font(.footnote).foregroundStyle(.red)
                     }
@@ -90,10 +95,11 @@ struct ChoreForm: View {
                 }
 
                 Section {
-                    Picker("How will you do it?", selection: $workMode) {
-                        Text("Decide later").tag(Chore.WorkMode?.none)
-                        ForEach(Chore.WorkMode.allCases, id: \.self) { Text($0.label).tag(Optional($0)) }
-                    }.accessibilityIdentifier("todo.workMode")
+                    if typeSize.isAccessibilitySize {
+                        workModePicker.pickerStyle(.navigationLink)
+                    } else {
+                        workModePicker.pickerStyle(.segmented)
+                    }
                     if let mode = workMode {
                         if let guide {
                             ChoreTaskGuide(idea: guide, mode: mode, country: country)
@@ -164,6 +170,15 @@ struct ChoreForm: View {
         .feedbackPage("Chore form")
         .sheet(isPresented: $quoteRequest) { ChoreQuoteRequestView(title: trimmedTitle) }
         .task { await load() }
+    }
+
+    private var workModePicker: some View {
+        Picker("How will you do it?", selection: $workMode) {
+            Text("Decide later").tag(Chore.WorkMode?.none)
+            ForEach(Chore.WorkMode.allCases, id: \.self) { Text($0.label).tag(Optional($0)) }
+        }
+        .accessibilityIdentifier("todo.workMode")
+        .onChange(of: workMode) { titleFocused = false }
     }
 
     // MARK: Load

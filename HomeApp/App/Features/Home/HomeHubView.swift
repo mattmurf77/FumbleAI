@@ -38,7 +38,7 @@ struct HomeHubView: View {
                 .background(theme.paper.ignoresSafeArea())
         } else if model.property == nil {
             ContentUnavailableView("No home yet", systemImage: "house",
-                                   description: Text("Create a floor plan to get started."))
+                                   description: Text("Start with a task or a past project."))
                 .background(theme.paper.ignoresSafeArea())
         } else {
             ScrollView {
@@ -89,11 +89,13 @@ struct HomeHubView: View {
     @ViewBuilder
     private func sectionView(_ section: HubSection) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(section.title.uppercased())
-                .font(.system(size: 12, weight: .semibold))
-                .tracking(0.8)
-                .foregroundStyle(theme.ink3)
-                .accessibilityAddTraits(.isHeader)
+            if !section.title.isEmpty {
+                Text(section.title.uppercased())
+                    .font(.system(size: 12, weight: .semibold))
+                    .tracking(0.8)
+                    .foregroundStyle(theme.ink3)
+                    .accessibilityAddTraits(.isHeader)
+            }
             if section.id == "home" {
                 VStack(spacing: 10) {
                     ForEach(section.cards) { card in
@@ -220,6 +222,7 @@ struct HubRowsScreen: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("hub.row." + row.id)
     }
 
     private func isAdd(_ action: HubAction) -> Bool {

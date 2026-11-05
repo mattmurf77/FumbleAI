@@ -24,6 +24,48 @@ struct ProjectCSVFile: Identifiable, Sendable {
     }
 }
 
+private struct SpreadsheetColumnPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let headers: [String]
+    let field: ProjectCSVField
+    let selected: Int?
+    let select: (Int?) -> Void
+
+    var selectedTitle: String { title(selected) }
+
+    private func title(_ index: Int?) -> String {
+        guard let index, headers.indices.contains(index) else {
+            return field == .title ? "Choose column" : "Skip"
+        }
+        return "\(index + 1). " + (headers[index].isEmpty ? "Unnamed column" : headers[index])
+    }
+
+    var body: some View {
+        List {
+            choice(nil)
+            ForEach(headers.indices, id: \.self) { choice($0) }
+        }
+        .navigationTitle(field.rawValue)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func choice(_ index: Int?) -> some View {
+        Button {
+            select(index)
+            dismiss()
+        } label: {
+            HStack {
+                Text(title(index))
+                Spacer()
+                if index == selected { Image(systemName: "checkmark").accessibilityHidden(true) }
+            }
+            .contentShape(Rectangle())
+        }
+        .accessibilityAddTraits(index == selected ? .isSelected : [])
+        .accessibilityIdentifier(index.map { "csv.columnChoice.\($0)" } ?? "csv.columnChoice.none")
+    }
+}
+
 private struct SampleProjectsCSV: FileDocument {
     static let readableContentTypes: [UTType] = [.commaSeparatedText]
     let bytes: Data
@@ -135,15 +177,16 @@ struct ProjectCSVImportView: View {
         Section {
             DisclosureGroup("Match columns", isExpanded: $mappingOpen) {
                 ForEach(ProjectCSVField.allCases) { field in
-                    Picker(field.rawValue, selection: Binding(get: { mapping?.columns[field] ?? -1 }, set: { value in
-                        mapping?.columns[field] = value >= 0 ? value : nil
+                    let picker = SpreadsheetColumnPicker(headers: file.headers, field: field, selected: mapping?.columns[field]) { index in
+                        mapping?.columns[field] = index
                         invalidate()
-                    })) {
-                        Text(field == .title ? "Choose column" : "Skip").tag(-1)
-                        ForEach(file.headers.indices, id: \.self) { i in
-                            Text("\(i + 1). " + (file.headers[i].isEmpty ? "Unnamed column" : file.headers[i])).tag(i)
-                        }
-                    }.accessibilityIdentifier("csv.column." + field.rawValue)
+                    }
+                    NavigationLink {
+                        picker
+                    } label: {
+                        LabeledContent(field.rawValue, value: picker.selectedTitle)
+                    }
+                    .accessibilityIdentifier("csv.column." + field.rawValue)
                 }
                 if mapping?.columns[.date] != nil {
                     Picker("Slash dates", selection: Binding(get: { mapping?.dayFirst ?? false }, set: { mapping?.dayFirst = $0; invalidate() })) {
@@ -155,7 +198,7 @@ struct ProjectCSVImportView: View {
                         Text("1,234.56").tag(false); Text("1.234,56").tag(true)
                     }
                 }
-            }.accessibilityIdentifier("csv.columns")
+            }
         } footer: { Text("Costs use this home’s currency (\(property.currencyCode)). A year alone stays a year.") }
     }
 
@@ -173,7 +216,9 @@ struct ProjectCSVImportView: View {
                         Toggle("Include row", isOn: Binding(get: { !excluded.contains(row.id) }, set: { include in
                             if include { excluded.remove(row.id) } else { excluded.insert(row.id) }
                             invalidate(clearRows: false)
-                        })).disabled(busy)
+                        }))
+                        .disabled(busy)
+                        .accessibilityLabel("Include \(item.title)")
                     }
                 } else {
                     if !row.title.isEmpty { Text(row.title).font(.headline) }
