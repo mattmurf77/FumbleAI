@@ -30,6 +30,12 @@ Suggested and manually created to-dos use the same ownership and supply workflow
 
 Home should show a short list of already-scheduled tasks separately from possible additions. Day, week, month and year controls change the date window. Use the owner’s calendar and display meaningful dates. Keep overdue work recognizable and avoid counting a task twice. A recurring chore should appear against its next actionable occurrence rather than dozens of speculative copies. A row opens the real task, and the full To-Dos view retains access to paused and undated work.
 
+## Estimate a job the homeowner describes
+
+A custom to-do or project has the same path to an estimate as a recommendation. Use an entered scope to suggest a starting calculation the owner can inspect. For example, “paint my 12 × 14 bedroom” provides room length and width. Wall height, coats, openings and which surfaces to paint still need a visible assumption or an owner override.
+
+A homeowner can estimate an unfamiliar job by adding materials, work time, tool rentals and fixed fees. Multiply quantities by low and high unit prices; use purchased pack sizes when supplied. Reduce new spending only for compatible, usable stock the owner confirms. Keep the cash cost of DIY separate from hours spent. A required missing price leaves a visible subtotal and a list of what still needs pricing. A saved written quote and a final receipt remain distinct observations. Show the basis, units, currency and date of any supplied guide so the homeowner can replace it with local prices. A custom cost estimate alone supplies no evidence about the home's resale price.
+
 ## Bring the records the owner already has
 
 - **Spreadsheets.** Accept Excel or Sheets exports as CSV or tab-separated text. Show column mapping, date precision, currency, excluded rows and duplicates before committing. Keep the original year when a day is unknown. A retry must preserve owner edits.
