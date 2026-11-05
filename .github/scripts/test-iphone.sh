@@ -16,11 +16,12 @@ for runtime, entries in json.load(sys.stdin)["devices"].items():
         # Apple FB22237318: the iOS 26.5 headless StoreKit daemon rejects local .storekit files.
         if sys.argv[1] == "HomeTests" and version[:2] != (26, 2):
             continue
-        devices.extend((version, d["name"], d["udid"]) for d in entries
+        # Prefer the largest iPhone so its native screenshots also fit the App Store listing.
+        devices.extend((version, "Pro Max" in d["name"], d["name"], d["udid"]) for d in entries
                        if d["name"].startswith("iPhone") and d.get("isAvailable") and version[0] >= 17)
 if not devices:
     sys.exit("No available iPhone simulator.")
-print(max(devices)[2])
+print(max(devices)[-1])
 ' "$suite")"
 echo "Using simulator $device for $suite"
 xcrun simctl list devices available | awk -v id="$device" '/-- iOS / {runtime=$0} index($0,id) {print runtime, $0}'

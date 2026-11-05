@@ -5,11 +5,13 @@ on:
     paths:
       - "HomeApp/**"
       - ".github/workflows/ios-build.yml"
+      - ".github/scripts/test-iphone.sh"
   push:
     branches: [main]
     paths:
       - "HomeApp/**"
       - ".github/workflows/ios-build.yml"
+      - ".github/scripts/test-iphone.sh"
   workflow_dispatch:
 
 concurrency:
@@ -121,6 +123,10 @@ jobs:
             -archivePath "$RUNNER_TEMP/HomeBlueprint.xcarchive" archive CODE_SIGNING_ALLOWED=NO HOME_CLOUD_SYNC=NO -quiet
           app="$RUNNER_TEMP/HomeBlueprint.xcarchive/Products/Applications/Home.app"
           test -f "$app/Home" && test -f "$app/PrivacyInfo.xcprivacy" && test -d "$app/PlugIns/HomeShare.appex"
+          expected=$(ruby -ryaml -e 'print YAML.load_file("project.yml").fetch("settings").fetch("base").fetch("MARKETING_VERSION")')
+          for info in "$app/Info.plist" "$app/PlugIns/HomeShare.appex/Info.plist"; do
+            test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$info")" = "$expected"
+          done
           test -z "$(find "$app" -name '*.storekit' -print -quit)"
 
   packages:

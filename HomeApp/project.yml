@@ -39,7 +39,7 @@ settings:
     # Provisioning profile for the share extension (TestFlight lane; empty = automatic signing).
     HOME_SHARE_PROFILE_NAME: ""
     HOME_ENTITLEMENTS: App/Home.entitlements
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
     CODE_SIGN_STYLE: Automatic
