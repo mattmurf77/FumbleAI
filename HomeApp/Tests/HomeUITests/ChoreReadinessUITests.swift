@@ -95,11 +95,17 @@ final class ChoreReadinessUITests: XCTestCase {
         add(selectedShot)
         let schedule = app.buttons["maintenance.addTask"]
         reveal(schedule); schedule.tap()
+        let staged = app.descendants(matching: .any).matching(identifier: "todo.shoppingSelections").firstMatch
+        XCTAssertTrue(staged.waitForExistence(timeout: 8), "The new to-do must receive the chosen shopping request.")
+        XCTAssertEqual(staged.value as? String, "Flashlight")
         let save = app.buttons["Save"]
         XCTAssertTrue(save.waitForExistence(timeout: 8)); save.tap()
         let saved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
                                               object: app.navigationBars["New To-Do"])
         XCTAssertEqual(XCTWaiter.wait(for: [saved], timeout: 8), .completed)
+        let persisted = app.descendants(matching: .any).matching(identifier: "maintenance.savedShopping").firstMatch
+        XCTAssertTrue(persisted.waitForExistence(timeout: 8), "The observed saved to-do must retain the request.")
+        XCTAssertEqual(persisted.value as? String, "Flashlight")
         if !app.navigationBars["All recommendations"].exists {
             app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
         }

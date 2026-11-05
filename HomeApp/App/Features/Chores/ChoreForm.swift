@@ -102,6 +102,7 @@ struct ChoreForm: View {
                     } else {
                         workModePicker.pickerStyle(.segmented)
                     }
+                    if workMode == .diy { ShoppingSelectionsSummary(supplies: supplies, identifier: "todo.shoppingSelections") }
                     if let propertyId {
                         WorkEstimateLink(propertyId: propertyId, currency: currency, country: country, title: trimmedTitle,
                                          preferredMode: workMode, owner: original.map { .chore($0.id) }, staged: estimateChanges,
@@ -323,4 +324,20 @@ struct ChoreForm: View {
 #Preview("Edit filter") {
     ChoreForm(choreID: SampleHome.filterId)
         .environment(AppEnvironment.preview())
+}
+
+struct ShoppingSelectionsSummary: View {
+    let supplies: [ChoreSupply]
+    let identifier: String
+
+    var body: some View {
+        let names = supplies.filter(\.requested).map(\.name).joined(separator: ", ")
+        if !names.isEmpty {
+            LabeledContent("Selected for shopping", value: names)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Selected for shopping")
+                .accessibilityValue(names)
+                .accessibilityIdentifier(identifier)
+        }
+    }
 }

@@ -76,8 +76,13 @@ struct MaintenanceRecommendationDetail: View {
     @AppStorage private var hidden: String
     @State private var mode: Chore.WorkMode
     @State private var supplies: [ChoreSupply]
-    @State private var scheduled = false
-    @State private var addTask = false
+    private struct TaskProposal: Identifiable {
+        let id = UUID()
+        let mode: Chore.WorkMode
+        let supplies: [ChoreSupply]
+    }
+    @State private var scheduled: Chore?
+    @State private var taskProposal: TaskProposal?
     @State private var addProject = false
     @State private var confirmation: String?
 
@@ -90,6 +95,7 @@ struct MaintenanceRecommendationDetail: View {
     }
 
     var body: some View {
+        let proposedSupplies = mode == .diy ? supplies : []
         List {
             Section {
                 Text(idea.detail)
@@ -129,9 +135,15 @@ struct MaintenanceRecommendationDetail: View {
                 }
             }
             Section {
-                if scheduled { Label("Already on your to-do list", systemImage: "checkmark.circle") }
-                else {
-                    Button { addTask = true } label: { Label("Add to my to-dos", systemImage: "calendar.badge.plus") }
+                if let scheduled {
+                    Label("Already on your to-do list", systemImage: "checkmark.circle")
+                    if scheduled.workMode == .diy, let plan = scheduled.supplyPlan {
+                        ShoppingSelectionsSummary(supplies: plan, identifier: "maintenance.savedShopping")
+                    }
+                } else {
+                    Button { taskProposal = TaskProposal(mode: mode, supplies: proposedSupplies) } label: {
+                        Label("Add to my to-dos", systemImage: "calendar.badge.plus")
+                    }
                         .accessibilityIdentifier("maintenance.addTask")
                 }
                 if mode == .hirePro {
@@ -148,16 +160,17 @@ struct MaintenanceRecommendationDetail: View {
         .navigationTitle(mode == .diy ? idea.diyTitle : idea.title).navigationBarTitleDisplayMode(.inline)
         .task(id: property.id) {
             for await all in env.chores.observeChores(.init(propertyId: property.id)) {
-                scheduled = all.contains {
+                scheduled = all.first {
                     $0.deletedAt == nil && $0.closedAt == nil &&
                     (idea.matchesTask($0.title) || MaintenanceIdea.titleKey($0.title) == MaintenanceIdea.titleKey(idea.diyTitle))
                 }
             }
         }
-        .sheet(isPresented: $addTask) {
-            ChoreForm(spaceID: nil, levelID: nil, suggestion: idea, suggestedMode: mode, suggestedSupplies: idea.supplySuggestions, suggestedPlan: mode == .diy ? supplies : []) { _ in
+        .sheet(item: $taskProposal) { proposal in
+            ChoreForm(spaceID: nil, levelID: nil, suggestion: idea, suggestedMode: proposal.mode, suggestedPlan: proposal.supplies) { _ in
                 confirmation = "Saved to your to-dos."
             }
+            .id(proposal.id)
         }
         .sheet(isPresented: $addProject) {
             ProjectForm(spaceID: nil, levelID: nil, initialStatus: .planned, suggestion: idea) { _ in confirmation = "Saved to your planned projects." }

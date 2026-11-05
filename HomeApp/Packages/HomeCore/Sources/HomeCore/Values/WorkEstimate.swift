@@ -93,6 +93,9 @@ public struct WorkEstimate: Hashable, Codable, Sendable {
         guard lines.count <= 200, Set(lines.map(\.id)).count == lines.count else {
             throw WorkEstimateError("Use at most 200 distinct estimate lines.")
         }
+        if lines.count > 1 && lines.contains(where: { $0.kind == .wholeJob }) {
+            throw WorkEstimateError("Use a whole-job price on its own or replace it with individual costs.")
+        }
         guard scopeUnit.count <= 80, (assumptions?.count ?? 0) <= 8_000 else { throw WorkEstimateError("Shorten the scope unit or notes.") }
         if let scopeQuantity, scopeQuantity.isNaN || scopeQuantity <= 0 || scopeQuantity > 1_000_000_000 {
             throw WorkEstimateError("Enter a positive scope quantity of at most one billion.")

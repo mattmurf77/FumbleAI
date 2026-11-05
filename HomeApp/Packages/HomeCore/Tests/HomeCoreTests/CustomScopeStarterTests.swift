@@ -64,6 +64,9 @@ struct CustomScopeStarterTests {
             coats: 1, openings: 0, currency: "USD", mode: .hirePro)
         let plan = WorkEstimate(mode: .hirePro, currency: "USD", lines: rows)
         #expect(rows.count == 1); #expect(try plan.totals().knownHigh?.cents == 56800)
+        var duplicate = plan
+        duplicate.lines.append(WorkEstimateLine(kind: .labor, name: "Same visit", quantity: 2, unit: "hr", unitPrice: Money(cents: 4200)))
+        #expect(throws: WorkEstimateError.self) { try duplicate.totals() }
         #expect(throws: WorkEstimateError.self) { try CustomScopeStarter.fullDayHandyman.lines(length: nil, width: nil, heightOrDepth: nil,
             coats: 1, openings: 0, currency: "USD", mode: .diy) }
     }
