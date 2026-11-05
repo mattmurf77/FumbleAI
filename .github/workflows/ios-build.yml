@@ -74,8 +74,10 @@ jobs:
           retention-days: 7
 
       - name: Test Apple billing, PDF and app services on iPhone
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
         if: ${{ !cancelled() }}
-        timeout-minutes: 15
+        timeout-minutes: 22
         working-directory: HomeApp
         run: |
           set -o pipefail

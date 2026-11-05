@@ -169,6 +169,10 @@ final class ShareModel {
     }
 
     func setContent(text t: String, files f: [ReceivedFile], problems p: [String]) {
+        if f.isEmpty, SharedInbox.Spreadsheet.isProjectTablePreview(t) {
+            setSpreadsheet(.problem("Only a text preview was shared. " + SharedInbox.Spreadsheet.openInFiles))
+            return
+        }
         text = t
         items = ListCapture.items(from: t)
         files = f

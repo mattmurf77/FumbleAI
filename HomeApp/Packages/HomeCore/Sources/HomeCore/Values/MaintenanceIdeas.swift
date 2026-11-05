@@ -34,13 +34,16 @@ public enum MaintenanceIdea: String, CaseIterable, Identifiable, Sendable {
         case .dryer: return URL(string: "https://www.angi.com/articles/how-much-does-dryer-vent-cleaning-cost.htm")
         case .closet: return URL(string: "https://www.angi.com/articles/how-much-do-custom-closets-cost.htm")
         case .cooling: return URL(string: "https://www.angi.com/articles/importance-annual-ac-tune.htm")
-        case .filter: return nil
+        case .filter: return URL(string: "https://www.angi.com/articles/how-to-install-furnace-filter.htm")
         }
     }
     public var sourceLabel: String {
-        switch self { case .gutters: return "Thumbtack · March 2026"; case .furnace, .dryer, .cooling, .closet: return "Angi · 2026"; default: return "ENERGY STAR maintenance checklist" }
+        switch self { case .gutters: return "Thumbtack · March 2026"; case .furnace, .dryer, .cooling, .closet, .filter: return "Angi · 2026" }
     }
-    public var costLabel: String? { rangeUSD.map { "$\($0.lowerBound)–$\($0.upperBound) USD" } }
+    public var costLabel: String? {
+        if self == .filter { return "$100–$250 USD/hour · professional labor" }
+        return rangeUSD.map { "$\($0.lowerBound)–$\($0.upperBound) USD" }
+    }
     public var symbol: String {
         switch self { case .gutters: return "cloud.rain"; case .furnace: return "flame"; case .cooling: return "snowflake"; case .dryer: return "wind"; case .filter: return "aqi.medium"; case .closet: return "cabinet" }
     }
@@ -80,10 +83,13 @@ public enum MaintenanceIdea: String, CaseIterable, Identifiable, Sendable {
         case .gutters: return "$0–$50 USD · one ground tool"
         case .furnace, .cooling, .filter: return "$10–$50 USD · replacement filter"
         case .dryer: return "$20–$50 USD · cleaning kit"
-        case .closet: return "$500–$2,000 USD · organizer kit"
+        case .closet: return "$119–$209 USD · two example kits"
         }
     }
+    public var diySourceLabel: String { self == .closet ? "Example kits · Home Depot, November 2026" : "DIY price guide · Angi, 2026" }
+
     public var diySource: URL {
+        if self == .closet { return URL(string: "https://www.homedepot.com/b/Storage-Organization/ClosetMaid/Closet-Kits/N-5yc1vZas7eZd4Z1z0tur0")! }
         let path: String
         switch self {
         case .gutters: path = "tools-keep-gutter-downspouts-clean.htm"
@@ -94,13 +100,22 @@ public enum MaintenanceIdea: String, CaseIterable, Identifiable, Sendable {
         return URL(string: "https://www.angi.com/articles/" + path)!
     }
 
+    public var providerDirectory: URL {
+        switch self {
+        case .gutters: return URL(string: "https://www.thumbtack.com/k/gutter-cleaners/near-me")!
+        case .cooling, .filter, .furnace: return URL(string: "https://www.thumbtack.com/k/hvac-contractors/near-me")!
+        case .closet: return URL(string: "https://remodelingdoneright.nari.org/find-a-remodeler/")!
+        case .dryer: return URL(string: "https://www.thumbtack.com/")!
+        }
+    }
+
     public var diyScope: String {
         switch self {
         case .gutters: return "Assumes an existing hose. You may spend nothing if you own compatible ground tools. Arrange professional help for work at height."
         case .furnace, .cooling: return "DIY covers checking an accessible filter and gathering service records. A professional performs the system tune-up. Confirm the filter size before buying."
         case .filter: return "Inspection uses existing equipment. The guide covers a replacement if needed; confirm the model and size."
         case .dryer: return "The kit budget applies to an accessible vent. Check the manufacturer’s instructions; a long or inaccessible run needs a professional quote."
-        case .closet: return "Kit budget only. Check dimensions, fixings and what is included. Electrical or structural changes need a qualified professional."
+        case .closet: return "Two US retail examples are ShelfTrack models 2087 and 2091 at $119 and $209. Check fit and current local prices. Extra tools, taxes and labor are separate."
         }
     }
 

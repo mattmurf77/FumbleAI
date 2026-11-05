@@ -23,6 +23,9 @@ final class SharedSpreadsheetTests: XCTestCase {
         XCTAssertEqual(SharedInbox.Spreadsheet.fileExtension(name: "work.CsV", type: "public.text"), "csv")
         XCTAssertNil(SharedInbox.Spreadsheet.fileExtension(name: "Notes.txt", type: "public.text"))
         XCTAssertNil(SharedInbox.Spreadsheet.fileExtension(name: nil, type: "public.url"))
+        XCTAssertTrue(SharedInbox.Spreadsheet.isProjectTablePreview("Project title\tActual cost\r\nRoof\t400"))
+        XCTAssertFalse(SharedInbox.Spreadsheet.isProjectTablePreview("Buy paint, brushes and tape\nRepair door"))
+        XCTAssertFalse(SharedInbox.Spreadsheet.isProjectTablePreview("Ask contractor for an estimate"))
         let sheet = try SharedInbox.Spreadsheet(name: "https://provider.example/tenant/path/Receipts.csv?token=secret",
                                                ext: "csv", bytes: Data([1]))
         XCTAssertEqual(sheet.name, "Receipts.csv")

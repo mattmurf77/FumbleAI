@@ -152,6 +152,18 @@ extension SharedInbox {
             return ["csv", "tsv"].contains(ext) ? ext : nil
         }
 
+        /// Some hosts only offer a text preview, with no file URL or type. An identifiable project-table
+        /// header must not turn into dozens of chores, and a preview cannot stand in for original file bytes.
+        public static func isProjectTablePreview(_ text: String) -> Bool {
+            let prefix = text.prefix(4096)
+            guard let newline = prefix.firstIndex(where: \.isNewline) else { return false }
+            let header = String(prefix[..<newline])
+            guard let separator = header.first(where: { $0 == "," || $0 == "\t" || $0 == ";" }),
+                  let file = try? ProjectCSV(data: Data((header + "\nExample" + String(separator) + "1").utf8)) else { return false }
+            let mapping = ProjectCSVMapping(file)
+            return mapping.columns[.title] != nil && mapping.columns.count >= 2
+        }
+
         public init(name input: String?, ext: String, bytes: Data) throws {
             guard ["csv","tsv"].contains(ext), !bytes.isEmpty, bytes.count <= ProjectCSV.maxBytes else {
                 throw ProjectCSVError("Choose a nonempty CSV or TSV file up to 4 MB.")

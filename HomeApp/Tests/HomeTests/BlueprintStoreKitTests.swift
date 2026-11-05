@@ -31,7 +31,7 @@ final class HomeBriefBillingTests: XCTestCase {
         await store.refreshEntitlements()
         XCTAssertFalse(store.unlocked)
         await store.loadProduct()
-        XCTAssertNotNil(store.price)
+        _ = try XCTUnwrap(store.price, "The local StoreKit catalog did not load.")
         await store.purchase()
         try await waitFor(true, in: store)
 
@@ -52,6 +52,7 @@ final class HomeBriefBillingTests: XCTestCase {
         session.askToBuyEnabled = true
         let store = BlueprintBilling()
         await store.loadProduct()
+        _ = try XCTUnwrap(store.price, "The local StoreKit catalog did not load.")
         await store.purchase()
         XCTAssertFalse(store.unlocked)
         XCTAssertTrue(store.message?.contains("awaiting approval") == true)
@@ -66,6 +67,7 @@ final class HomeBriefBillingTests: XCTestCase {
         defer { session.clearTransactions() }
         let store = BlueprintBilling()
         await store.loadProduct()
+        _ = try XCTUnwrap(store.price, "The local StoreKit catalog did not load.")
         session.failTransactionsEnabled = true
         await store.purchase()
         XCTAssertFalse(store.unlocked)

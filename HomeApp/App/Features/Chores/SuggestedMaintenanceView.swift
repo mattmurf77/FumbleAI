@@ -99,7 +99,7 @@ struct MaintenanceRecommendationDetail: View {
                 if mode == .diy {
                     if property.currencyCode == "USD" { Text(idea.diyBudget).font(.headline) }
                     Text(idea.diyScope)
-                    Link("DIY price guide · Angi, 2026", destination: idea.diySource)
+                    Link(idea.diySourceLabel, destination: idea.diySource)
                 } else if let price = idea.costLabel, let source = idea.priceSource, property.currencyCode == "USD" {
                     LabeledContent("US professional guide", value: price)
                     Link(idea.sourceLabel, destination: source)
@@ -122,7 +122,7 @@ struct MaintenanceRecommendationDetail: View {
             } else {
                 Section("Get a quote") {
                     if let partner = ProjectReferral(kind: "Contractor") { ProjectReferralLink(partner: partner) }
-                    Link("Find professionals", destination: idea.priceSource ?? URL(string: "https://www.thumbtack.com/")!)
+                    Link(idea == .closet ? "Find a remodeler in the NARI directory" : "Find local pros on Thumbtack", destination: idea.providerDirectory)
                     ShareLink(item: "Please send a written estimate for \(idea.title). Include labor, materials, exclusions and availability.") {
                         Label("Share a quote request", systemImage: "square.and.arrow.up")
                     }
