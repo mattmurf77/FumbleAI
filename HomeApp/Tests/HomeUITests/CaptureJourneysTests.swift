@@ -59,7 +59,7 @@ final class CaptureJourneysTests: XCTestCase {
         XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
         let outcome = element("csv.outcome", in: app)
         XCTAssertTrue(outcome.waitForExistence(timeout: 10))
-        XCTAssertTrue(outcome.label.contains("Added 2 completed projects"))
+        XCTAssertEqual(outcome.label, "Added 2 completed projects to Maple Street.")
         app.buttons["Done"].tap()
         let history = app.buttons["home.card.homeHistory"]
         XCTAssertTrue(history.waitForExistence(timeout: 10)); reveal(history, in: app); history.tap()

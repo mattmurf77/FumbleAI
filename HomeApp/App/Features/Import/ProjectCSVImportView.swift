@@ -108,7 +108,12 @@ struct ProjectCSVImportView: View {
     var body: some View {
         Form {
             if let summary {
-                Section { Label(summary, systemImage: "checkmark.circle.fill").accessibilityIdentifier("csv.outcome") }
+                Section {
+                    Label(summary, systemImage: "checkmark.circle.fill")
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(summary)
+                        .accessibilityIdentifier("csv.outcome")
+                }
                 Button("Done") { dismiss() }
             } else {
                 Section {

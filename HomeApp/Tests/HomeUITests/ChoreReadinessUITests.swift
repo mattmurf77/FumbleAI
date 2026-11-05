@@ -60,26 +60,41 @@ final class ChoreReadinessUITests: XCTestCase {
         XCTAssertTrue(diy.waitForExistence(timeout: 5)); diy.tap()
 
         func supplyRow(_ name: String) -> XCUIElement {
-            app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH %@", "supplies.row." + name, name + " ·")).firstMatch
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name + " ·")).firstMatch
+        }
+        func reveal(_ control: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+            for _ in 0..<8 {
+                if control.exists, control.isHittable, control.frame.maxY < app.frame.maxY - 80 { return }
+                app.swipeUp()
+            }
+            XCTFail("Expected fully visible control: \(control)", file: file, line: line)
         }
         let match = app.buttons["supplies.possible.Replacement HVAC filter"]
-        show(match, in: app); match.tap()
+        reveal(match); match.tap()
         let homeFilter = "Furnace filter 16x25x1 MERV 11"
         let option = app.buttons["supplies.option." + homeFilter]
         XCTAssertTrue(option.waitForExistence(timeout: 8)); option.tap()
         let owned = supplyRow(homeFilter)
-        show(owned, in: app)
+        reveal(owned)
         XCTAssertTrue(owned.label.contains("Ready"), owned.label)
         XCTAssertFalse(app.switches["supplies.request." + homeFilter].exists)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "DIY readiness · homeowner-matched filter in storage"
         shot.lifetime = .keepAlways; add(shot)
 
         let light = supplyRow("Flashlight")
-        show(light, in: app); light.tap()
+        reveal(light); light.tap()
         let request = app.switches["supplies.request.Flashlight"]
-        show(request, in: app); request.tap()
+        reveal(request)
+        XCTAssertEqual(request.value as? String, "0")
+        request.tap()
+        let requested = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "1"), object: request)
+        XCTAssertEqual(XCTWaiter.wait(for: [requested], timeout: 5), .completed)
+        let selectedShot = XCTAttachment(screenshot: app.screenshot())
+        selectedShot.name = "DIY readiness · only the missing flashlight selected for shopping"
+        selectedShot.lifetime = .keepAlways
+        add(selectedShot)
         let schedule = app.buttons["maintenance.addTask"]
-        show(schedule, in: app); schedule.tap()
+        reveal(schedule); schedule.tap()
         let save = app.buttons["Save"]
         XCTAssertTrue(save.waitForExistence(timeout: 8)); save.tap()
         let saved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),

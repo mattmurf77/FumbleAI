@@ -30,7 +30,34 @@ struct DIYReadinessView: View {
 
     var body: some View {
         let options = availableOptions
-        VStack(alignment: .leading, spacing: 14) {
+        // Let List and Form give each disclosure its own row and hit-testing region.
+        Group {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Check what you have, then select only what you need to buy.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                if items == nil || things == nil { ProgressView("Checking home records…") }
+            }
+            .sheet(item: $matching) { supply in
+                HomeSupplyPicker(need: supply, options: options[optionsKey(supply)] ?? []) { choice in
+                    guard let index = plan.firstIndex(where: { $0.id == supply.id }) else { return }
+                    var candidate = plan
+                    candidate[index].name = choice.name
+                    candidate[index].isEquipment = supply.isEquipment || choice.isEquipment
+                    candidate[index].confirmedOnHand = nil
+                    candidate[index].requested = false
+                    do { try ChoreSupply.validate(candidate); plan = candidate; error = nil }
+                    catch { self.error = error.localizedDescription }
+                }
+            }
+            .task(id: propertyId) {
+                names = await SchedulePlaceNames.load(env, property: propertyId)
+                for await values in env.inventory.observeItems(.init(propertyId: propertyId)) {
+                    items = values
+                    let resolved = (try? await env.inventory.locations(of: values.map(\.id))) ?? []
+                    locations = Dictionary(resolved.map { ($0.id, $0.displayPath) }, uniquingKeysWith: { first, _ in first })
+                }
+            }
+            .task(id: propertyId) { for await values in env.things.observeThings(.init(propertyId: propertyId)) { things = values } }
             ForEach($plan) { $supply in
                 let stock = SupplyReadiness(supply, propertyId: propertyId, inventory: items ?? [], things: things ?? [])
                 let missing = max(0, Double(supply.quantity) - (stock.onHand ?? 0))
@@ -86,28 +113,8 @@ struct DIYReadinessView: View {
             }
             if let error { Text(error).font(.footnote).foregroundStyle(.secondary) }
         }
-        .sheet(item: $matching) { supply in
-            HomeSupplyPicker(need: supply, options: options[optionsKey(supply)] ?? []) { choice in
-                guard let index = plan.firstIndex(where: { $0.id == supply.id }) else { return }
-                var candidate = plan
-                candidate[index].name = choice.name
-                candidate[index].isEquipment = supply.isEquipment || choice.isEquipment
-                candidate[index].confirmedOnHand = nil
-                candidate[index].requested = false
-                do { try ChoreSupply.validate(candidate); plan = candidate; error = nil }
-                catch { self.error = error.localizedDescription }
-            }
-        }
-        .task(id: propertyId) {
-            names = await SchedulePlaceNames.load(env, property: propertyId)
-            for await values in env.inventory.observeItems(.init(propertyId: propertyId)) {
-                items = values
-                let resolved = (try? await env.inventory.locations(of: values.map(\.id))) ?? []
-                locations = Dictionary(resolved.map { ($0.id, $0.displayPath) }, uniquingKeysWith: { first, _ in first })
-            }
-        }
-        .task(id: propertyId) { for await values in env.things.observeThings(.init(propertyId: propertyId)) { things = values } }
     }
+
     private func add() {
         let next = ChoreSupply(name: adding.trimmingCharacters(in: .whitespacesAndNewlines))
         do { try ChoreSupply.validate(plan + [next]); plan.append(next); adding = ""; error = nil }
