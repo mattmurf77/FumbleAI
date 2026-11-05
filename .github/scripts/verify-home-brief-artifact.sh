@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+artifact=${1:-home-brief-review-screenshot}
+case "$artifact" in
+  home-brief-review-screenshot|iphone-screenshots) ;;
+  *) echo "Unexpected iPhone screenshot artifact." >&2; exit 1 ;;
+esac
 
 if [[ "${REVIEW_MODE_ONLY:-}" != true || "${GITHUB_REPOSITORY:-}" != "mattmurf77/FumbleAI" || ! "${REVIEW_RUN_ID:-}" =~ ^[1-9][0-9]*$ ]]; then
-  echo "Use catalog_only=true, one numeric review_screenshot_run and no provisioning inputs." >&2
+  echo "Use catalog_only=true, one numeric iOS screenshot run and no other release operation." >&2
   exit 1
 fi
 
@@ -21,12 +26,12 @@ git diff --quiet "$source_sha" "$GITHUB_SHA" -- HomeApp .github/workflows/ios-bu
   exit 1
 }
 
-gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REVIEW_RUN_ID/artifacts?name=home-brief-review-screenshot" |
-  jq -e --arg sha "$source_sha" --arg id "$REVIEW_RUN_ID" '
+gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REVIEW_RUN_ID/artifacts?name=$artifact" |
+  jq -e --arg sha "$source_sha" --arg id "$REVIEW_RUN_ID" --arg name "$artifact" '
     .total_count == 1 and (.artifacts | length) == 1 and
-    (.artifacts[0] | .name == "home-brief-review-screenshot" and .expired == false and
+    (.artifacts[0] | .name == $name and .expired == false and
       .size_in_bytes > 0 and .workflow_run.head_sha == $sha and (.workflow_run.id | tostring) == $id)' >/dev/null || {
-    echo "The verified run needs exactly one available Home Brief screenshot artifact." >&2
+    echo "The verified run needs exactly one available $artifact artifact." >&2
     exit 1
   }
-echo "Verified Home Brief screenshot source run $REVIEW_RUN_ID at $source_sha."
+echo "Verified $artifact source run $REVIEW_RUN_ID at $source_sha."

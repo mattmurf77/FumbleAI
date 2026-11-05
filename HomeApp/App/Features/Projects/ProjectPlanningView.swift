@@ -22,8 +22,13 @@ struct ProjectPlanningView: View {
 
     var body: some View {
         Form {
+            Section("Work estimate") {
+                WorkEstimateLink(propertyId: project.propertyId, currency: project.currencyCode, country: property?.address?.countryCode,
+                                 title: project.title, owner: .project(project.id), useCostLabel: "Use estimate in this scenario",
+                                 useCost: { budgetText = ProjectInput.text($0) })
+            }
             Section {
-                ProjectMoneyField(title: "Project cost", text: $budgetText, currency: project.currencyCode)
+                ProjectMoneyField(title: "Amount to compare", text: $budgetText, currency: project.currencyCode)
                 if project.currencyCode == "USD" {
                     Picker("Compare with a cost guide", selection: $costGuide) {
                         Text("Choose a project").tag(Optional<ProjectCostGuide>.none)
@@ -37,7 +42,7 @@ struct ProjectPlanningView: View {
                 if !budgetText.isEmpty && budget == nil {
                     Text("Enter a positive amount in \(project.currencyCode).").font(.footnote)
                 }
-            } header: { Text("Planning estimate") } footer: {
+            } header: { Text("Budget scenario") } footer: {
                 Text("Try an amount here or use a saved quote below. Edit the project to change its budget.")
             }
             quoteSection

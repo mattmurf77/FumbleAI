@@ -251,8 +251,12 @@ public struct InMemoryRecentlyDeletedRepository: RecentlyDeletedRepository {
             case .level: s.levels[ref.id] = nil
             case .space: s.spaces[ref.id] = nil
             case .storageSpot: s.spots[ref.id] = nil
-            case .chore: s.chores[ref.id] = nil
-            case .project: s.projects[ref.id] = nil
+            case .chore:
+                s.workEstimates[.chore(ref.id)] = nil
+                s.chores[ref.id] = nil
+            case .project:
+                s.workEstimates[.project(ref.id)] = nil
+                s.projects[ref.id] = nil
             case .thing: s.things[ref.id] = nil
             case .inventoryItem: s.inventory[ref.id] = nil
             case .measurement: s.measurements[ref.id] = nil
@@ -264,7 +268,10 @@ public struct InMemoryRecentlyDeletedRepository: RecentlyDeletedRepository {
                 s.attachments[ref.id] = nil; s.documentDetails[ref.id] = nil
             case .choreCompletion: s.completions[ref.id] = nil
             case .choreCalendarLink: s.calendarLinks[ref.id] = nil
-            case .property: s.properties[ref.id] = nil
+            case .property:
+                for task in s.chores.values where task.propertyId == ref.id { s.workEstimates[.chore(task.id)] = nil }
+                for project in s.projects.values where project.propertyId == ref.id { s.workEstimates[.project(project.id)] = nil }
+                s.properties[ref.id] = nil
             }
         }
     }

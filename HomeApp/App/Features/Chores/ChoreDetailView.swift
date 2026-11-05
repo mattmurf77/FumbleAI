@@ -12,6 +12,8 @@ struct ChoreDetailView: View {
     let choreID: UUID
 
     @State private var chore: Chore?
+    @State private var property: Property?
+    @State private var estimateRevision = 0
     @State private var missing = false
     @State private var names = SchedulePlaceNames()
     @State private var people: [UUID: String] = [:]
@@ -55,7 +57,9 @@ struct ChoreDetailView: View {
                 ToolbarItem(placement: .primaryAction) { Button("Edit") { editing = true } }
             }
         }
-        .sheet(isPresented: $editing) { ChoreForm(choreID: choreID) }
+        .sheet(isPresented: $editing) {
+            ChoreForm(choreID: choreID) { _ in estimateRevision += 1 }
+        }
         .sheet(isPresented: $rescheduling) { rescheduleSheet }
         .sheet(isPresented: $texting) {
             if let c = chore { MessageComposer(text: reminderMessage(c)) { texting = false } }
@@ -120,6 +124,11 @@ struct ChoreDetailView: View {
             Section { dueCard(c) }
             Section("Work plan") {
                 LabeledContent("How", value: c.workMode?.label ?? "Decide later")
+                if let property, property.id == c.propertyId {
+                    WorkEstimateLink(propertyId: property.id, currency: property.currencyCode, country: property.address?.countryCode,
+                                     title: c.title, preferredMode: c.workMode, owner: .chore(c.id))
+                        .id(estimateRevision)
+                }
                 if c.workMode == .diy, let plan = c.supplyPlan, !plan.isEmpty {
                     ForEach(plan) { item in
                         LabeledContent(item.name, value: "\(item.quantity) \(item.unit)")
@@ -341,6 +350,7 @@ struct ChoreDetailView: View {
     @MainActor
     private func observe() async {
         guard let property = try? await env.plan.currentProperty() else { missing = true; return }
+        self.property = property
         names = await SchedulePlaceNames.load(env, property: property.id)
         let list = (try? await env.people.people(property: property.id)) ?? []
         people = Dictionary(list.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })

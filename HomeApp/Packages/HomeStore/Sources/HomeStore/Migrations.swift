@@ -48,6 +48,20 @@ enum Migrations {
                 );
                 """)
         }
+        m.registerMigration("v9_local_work_estimates") { db in
+            try db.execute(sql: """
+                CREATE TABLE work_estimate (
+                    property_id TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+                    chore_id TEXT REFERENCES chore(id) ON DELETE CASCADE,
+                    project_id TEXT REFERENCES project(id) ON DELETE CASCADE,
+                    mode TEXT NOT NULL CHECK(mode IN ('diy', 'hirePro')),
+                    details_json TEXT NOT NULL,
+                    CHECK((chore_id IS NULL) != (project_id IS NULL)),
+                    UNIQUE(chore_id, mode),
+                    UNIQUE(project_id, mode)
+                );
+                """)
+        }
         return m
     }
 

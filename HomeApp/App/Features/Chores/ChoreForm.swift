@@ -41,6 +41,8 @@ struct ChoreForm: View {
     @State private var notes = ""
     @State private var guide: MaintenanceIdea?
     @State private var country: String?
+    @State private var currency = "USD"
+    @State private var estimateChanges: [WorkEstimate] = []
     @State private var quoteRequest = false
     @State private var workMode: Chore.WorkMode?
     @State private var supplies: [ChoreSupply] = []
@@ -99,6 +101,11 @@ struct ChoreForm: View {
                         workModePicker.pickerStyle(.navigationLink)
                     } else {
                         workModePicker.pickerStyle(.segmented)
+                    }
+                    if let propertyId {
+                        WorkEstimateLink(propertyId: propertyId, currency: currency, country: country, title: trimmedTitle,
+                                         preferredMode: workMode, owner: original.map { .chore($0.id) }, staged: estimateChanges,
+                                         stage: { estimateChanges = $0 })
                     }
                     if let mode = workMode {
                         if let guide {
@@ -191,7 +198,7 @@ struct ChoreForm: View {
         let appSettings = await env.settings.load()
         remindOffset = appSettings.defaultRemindOffsetMin
         guard let property = try? await env.plan.currentProperty() else { loaded = true; return }
-        propertyId = property.id; country = property.address?.countryCode
+        propertyId = property.id; country = property.address?.countryCode; currency = property.currencyCode
         people = ((try? await env.people.people(property: property.id)) ?? []).sorted { $0.sortOrder < $1.sortOrder }
         things = ((try? await env.things.things(ThingQuery(propertyId: property.id))) ?? [])
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -263,7 +270,7 @@ struct ChoreForm: View {
                 c.linkedThingId = linkedThingId
                 c.isPaused = isPaused
                 c.calendarEnabled = calendarOn && calendarId != nil
-                try await env.chores.update(c)
+                try await env.chores.update(c, estimates: estimateChanges)
                 saved = (try? await env.chores.chore(c.id)) ?? c
                 if wasCalendarOn && !calendarOn {
                     await env.calendar.disable(chore: c.id)
@@ -278,7 +285,7 @@ struct ChoreForm: View {
                                        startOn: startOn, dueMinutes: hasTime ? dueMinutes : nil, remindEnabled: remindEnabled,
                                        remindOffsetMin: remindOffset, calendarEnabled: false, linkedThingId: linkedThingId)
                 draft.guideID = guide?.rawValue; draft.workMode = workMode; draft.supplyPlan = prepared.isEmpty ? nil : prepared
-                saved = try await env.chores.create(draft)
+                saved = try await env.chores.create(draft, estimates: estimateChanges)
                 if calendarOn, let calendarId {
                     do { try await env.calendar.enable(chore: saved.id, calendarId: calendarId) } catch {
                         failedChore = saved; calendarFailure = saved; return

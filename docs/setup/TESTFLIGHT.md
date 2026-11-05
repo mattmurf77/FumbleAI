@@ -299,3 +299,11 @@ The action reads Xcode's attachment manifest and accepts only the named Home Bri
 ### Fill the blank English 1.0 storefront fields
 
 Run **TestFlight** with only `catalog_only=true` and `fill_storefront_draft=true`. The action requires an existing, uniquely identifiable 1.0 iOS draft and editable app information for Home Blueprint (6817578211), both in **Prepare for Submission** with an existing en-US localization. It fills blank support URL, description and keywords on the version localization and a blank privacy URL on the app-information localization. Each write is read back. Existing text and URLs are preserved, including on retry.
+
+### Select the signed build on the 1.0 draft
+
+After the signed iOS 1.0 binary finishes processing in TestFlight, manually run **TestFlight** with only `catalog_only=true` and `select_build_number` set to its exact numeric build number. The action targets Home Blueprint (6817578211) and verifies the build’s app, 1.0 iOS train, valid state, expiry and App Store eligibility. It selects the build on the existing **Prepare for Submission** version and reads the relationship back. An identical selection is a no-op. A different selection stops the action. Coordinate with anyone editing this draft because Apple exposes a build-link PATCH. Review submission and release are separate actions.
+
+### Attach the three draft listing screenshots
+
+Inspect the iPhone Home, Equipment and imported Home History captures, then run **TestFlight** with only `catalog_only=true` and `listing_screenshot_run` set to the successful **iOS build** run ID. It requires the same tested app and iPhone workflow, verifies the three named demo captures in Xcode's artifact manifest, and attaches the unaltered 1320 × 2868 images to the 1.0 en-US iPhone listing in that order. It verifies each processed file and its checksum. A matching set is reused; an unrelated or incomplete asset stops the action. The purchase-review image uses its separate Home Brief operation.

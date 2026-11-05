@@ -35,6 +35,8 @@ struct ProjectForm: View {
     @State private var loaded = false
     @State private var propertyId: UUID?
     @State private var currency = "USD"
+    @State private var country: String?
+    @State private var estimateChanges: [WorkEstimate] = []
     @State private var original: Project?
     @State private var title = ""
     @State private var notes = ""
@@ -104,8 +106,14 @@ struct ProjectForm: View {
                 }
 
                 if !loggingHistory {
-                    Section("Estimate") {
-                        ProjectMoneyField(title: "Cost", text: $estText, currency: currency)
+                    Section("Costs and timing") {
+                        if let propertyId {
+                            WorkEstimateLink(propertyId: propertyId, currency: currency, country: country, title: trimmedTitle,
+                                             owner: original.map { .project($0.id) }, staged: estimateChanges,
+                                             stage: { estimateChanges = $0 }, useCostLabel: "Use estimate as project budget",
+                                             useCost: { estText = ProjectInput.text($0) })
+                        }
+                        ProjectMoneyField(title: "Budget", text: $estText, currency: currency)
                             .onChange(of: estText) { _, _ in autoPlan() }
                         ProjectHoursField(title: "Hours", text: $estHoursText)
                         Toggle("Target date", isOn: $hasTarget)
@@ -186,6 +194,7 @@ struct ProjectForm: View {
         guard let property = try? await env.plan.currentProperty() else { loaded = true; return }
         propertyId = property.id
         currency = property.currencyCode
+        country = property.address?.countryCode
         switch mode {
         case .create(let spaceID, let levelID, _):
             var spaceLevel: UUID?
@@ -238,7 +247,7 @@ struct ProjectForm: View {
                     p.completedOn = completionPrecision == .day ? completedOn : nil
                     p.completedYear = completionPrecision == .year ? completionYear : nil
                 }
-                try await env.projects.update(p)
+                try await env.projects.update(p, estimates: estimateChanges)
                 saved = p
             } else {
                 let draft = ProjectDraft(propertyId: propertyId, scope: scope, title: trimmedTitle,
@@ -247,7 +256,7 @@ struct ProjectForm: View {
                                          targetOn: hasTarget ? targetOn : nil, completedOn: status == .done && completionPrecision == .day ? completedOn : nil,
                                          completedYear: status == .done && completionPrecision == .year ? completionYear : nil,
                                          vendor: vendorValue.isEmpty ? nil : vendorValue)
-                saved = try await env.projects.create(draft)
+                saved = try await env.projects.create(draft, estimates: estimateChanges)
             }
             onSaved?(saved)
             dismiss()

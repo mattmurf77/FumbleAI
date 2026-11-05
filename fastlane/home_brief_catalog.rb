@@ -60,6 +60,7 @@ module HomeBriefCatalog
         code = (JSON.parse(result.body).dig("errors", 0, "code") rescue nil)
         raise ApiError.new(result.code.to_i, code.to_s[/\A[A-Z0-9_.-]+\z/])
       end
+      return nil if result.is_a?(Net::HTTPNoContent)
       JSON.parse(result.body)
     end
   end

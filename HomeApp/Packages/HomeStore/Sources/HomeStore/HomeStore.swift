@@ -17,6 +17,7 @@ public struct HomeStore: Sendable {
     public let plan: PlanStore
     public let planCommitter: PlanCommitter
     public let chores: ChoreStore
+    public let estimates: WorkEstimateStore
     public let projects: ProjectStore
     public let things: ThingStore
     public let inventory: InventoryStore
@@ -42,6 +43,7 @@ public struct HomeStore: Sendable {
         plan = PlanStore(database)
         planCommitter = PlanCommitter(database, files: files)
         chores = ChoreStore(database)
+        estimates = WorkEstimateStore(database)
         projects = ProjectStore(database, files: files)
         things = ThingStore(database)
         inventory = InventoryStore(database)

@@ -53,9 +53,9 @@ public protocol ChoreRepository: Sendable {
     func chores(_ query: ChoreQuery) async throws -> [Chore]
     func observeChores(_ query: ChoreQuery) -> AsyncStream<[Chore]>
     func completions(chore: UUID) async throws -> [ChoreCompletion]
-    func create(_ draft: ChoreDraft) async throws -> Chore
+    func create(_ draft: ChoreDraft, estimates: [WorkEstimate]) async throws -> Chore
     /// Saves edits; recomputes `nextDueOn` if the rule or start changed.
-    func update(_ chore: Chore) async throws
+    func update(_ chore: Chore, estimates: [WorkEstimate]) async throws
     func complete(_ id: UUID, by person: UUID?, at: Date) async throws -> ChoreCompletion
     @discardableResult func skip(_ id: UUID, at: Date) async throws -> ChoreCompletion
     /// Undo the specific most recent completion, including its history and prior due date.
@@ -81,8 +81,8 @@ public protocol ProjectRepository: Sendable {
     func observeProjects(_ query: ProjectQuery) -> AsyncStream<[Project]>
     /// Completed work with recorded costs and counts of linked evidence, using the same project rows as Past Work.
     func observeHistory(propertyId: UUID) -> AsyncStream<[HomeHistoryEntry]>
-    func create(_ draft: ProjectDraft) async throws -> Project
-    func update(_ project: Project) async throws
+    func create(_ draft: ProjectDraft, estimates: [WorkEstimate]) async throws -> Project
+    func update(_ project: Project, estimates: [WorkEstimate]) async throws
     /// Non-done transitions (stamps startedOn when entering in-progress).
     func setStatus(_ id: UUID, _ status: Project.Status) async throws
     /// The Done sheet: actual cost, completion date, hours and an optional receipt.
@@ -211,4 +211,14 @@ public extension ProjectRepository {
     func upsertLineItem(_ item: CostLineItem) async throws {
         try await upsertLineItem(item, receipt: nil)
     }
+}
+
+public extension ChoreRepository {
+    func create(_ draft: ChoreDraft) async throws -> Chore { try await create(draft, estimates: []) }
+    func update(_ chore: Chore) async throws { try await update(chore, estimates: []) }
+}
+
+public extension ProjectRepository {
+    func create(_ draft: ProjectDraft) async throws -> Project { try await create(draft, estimates: []) }
+    func update(_ project: Project) async throws { try await update(project, estimates: []) }
 }
