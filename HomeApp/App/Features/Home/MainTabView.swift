@@ -51,6 +51,7 @@ struct MainTabView: View {
                           subtitle: "Plan improvements, log finished work and keep an eye on costs.",
                           feedbackName: "Projects",
                           sections: HomeHubCatalog.projectSections(model.counts),
+                          property: model.property,
                           onNavigate: navigate)
                 .tabItem { tabLabel(.projects) }
                 .tag(AppTab.projects)

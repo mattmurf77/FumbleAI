@@ -30,7 +30,7 @@ public struct Project: SyncedModel {
     public var actualHours: Double?
     public var targetOn: LocalDate?
     public var startedOn: LocalDate?
-    /// Required when status == .done (SQL CHECK).
+    /// Owner-reported completion date. Nil when the date of past work is unknown.
     public var completedOn: LocalDate?
     public var vendor: String?
     public var spawnedFromChoreId: UUID?

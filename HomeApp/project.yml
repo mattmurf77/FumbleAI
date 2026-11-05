@@ -231,6 +231,8 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Tests/HomeTests
+      - path: Tests/StoreKit/HomeBrief.storekit
+        buildPhase: resources
     dependencies:
       - target: Home
       - package: HomeCore
@@ -244,19 +246,35 @@ targets:
         DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
         CODE_SIGN_STYLE: Automatic
 
+  HomeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests/HomeUITests]
+    dependencies:
+      - target: Home
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HOME_BUNDLE_ID).uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        TEST_TARGET_NAME: Home
+
 schemes:
   Home:
     build:
       targets:
         Home: all
         HomeTests: [test]
+        HomeUITests: [test]
     run:
       config: Debug
+      storeKitConfiguration: Tests/StoreKit/HomeBrief.storekit
     test:
       config: Debug
       gatherCoverageData: true
       targets:
         - HomeTests
+        - HomeUITests
     profile:
       config: Release
     analyze:

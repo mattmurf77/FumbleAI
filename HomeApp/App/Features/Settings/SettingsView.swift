@@ -54,6 +54,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("Report a bug, suggest polish or share an idea from any screen. Shake your iPhone to send feedback even when the button is hidden.")
                 }
+                HomeBriefPurchaseView()
                 aboutSection
             }
             .navigationTitle("Settings")
@@ -365,5 +366,5 @@ private struct AcknowledgmentsView: View {
 }
 
 #Preview {
-    SettingsView().environment(AppEnvironment.preview())
+    SettingsView().environment(AppEnvironment.preview()).environmentObject(BlueprintBilling(isDemo: true))
 }

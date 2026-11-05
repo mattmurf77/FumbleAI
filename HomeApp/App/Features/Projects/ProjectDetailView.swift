@@ -1,4 +1,6 @@
 import SwiftUI
+import QuickLook
+import UniformTypeIdentifiers
 import HomeCore
 import HomeCoreTesting
 
@@ -22,6 +24,10 @@ struct ProjectDetailView: View {
     @State private var confirmDelete = false
     @State private var errorText: String?
     @State private var receiptsVersion = 0
+    @State private var receiptToItem: ScannedReceipt?
+    @State private var previewURL: URL?
+    @State private var importingReceipt = false
+    @State private var savingAttachment = false
 
     struct LineItemRoute: Identifiable {
         let id = UUID()
@@ -55,10 +61,23 @@ struct ProjectDetailView: View {
         .sheet(item: $lineItemSheet) { route in
             if let project { LineItemEditor(project: project, existing: route.item, receipt: route.receipt) }
         }
-        .sheet(item: $scanned) { r in
+        .sheet(item: $scanned, onDismiss: {
+            if let receiptToItem {
+                lineItemSheet = LineItemRoute(item: nil, receipt: receiptToItem)
+                self.receiptToItem = nil
+            }
+        }) { r in
             ReceiptReviewSheet(receipt: r, currency: project?.currencyCode ?? "USD",
                                onAttach: { Task { await attach(r) } },
-                               onAddLineItem: { lineItemSheet = LineItemRoute(item: nil, receipt: r) })
+                               onAddLineItem: { receiptToItem = r })
+        }
+        .quickLookPreview($previewURL)
+        .fileImporter(isPresented: $importingReceipt, allowedContentTypes: [.pdf, .image]) { result in
+            do {
+                let file = try result.get()
+                Task { await importReceipt(file) }
+            } catch let error as CocoaError where error.code == .userCancelled {}
+            catch { errorText = error.localizedDescription }
         }
         .confirmationDialog("Delete this project?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await delete() } }
@@ -99,7 +118,10 @@ struct ProjectDetailView: View {
                 }
                 .onDelete { idx in
                     let ids = idx.map { lineItems[$0].id }
-                    Task { for id in ids { try? await env.projects.deleteLineItem(id) } }
+                    Task {
+                        do { for id in ids { try await env.projects.deleteLineItem(id) } }
+                        catch { errorText = error.localizedDescription }
+                    }
                 }
                 Button { lineItemSheet = LineItemRoute(item: nil) } label: { Label("Add line item", systemImage: "plus") }
             } header: {
@@ -112,7 +134,9 @@ struct ProjectDetailView: View {
 
             Section {
                 ForEach(receipts) { r in
-                    HStack(spacing: 12) {
+                    Button {
+                        Task { await preview(r) }
+                    } label: { HStack(spacing: 12) {
                         Image(systemName: r.kind == .document ? "doc.fill" : "doc.text.fill").font(.title2).foregroundStyle(.secondary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(r.caption ?? (r.kind == .document ? "Document" : "Receipt")).fontWeight(.semibold)
@@ -121,9 +145,12 @@ struct ProjectDetailView: View {
                         Spacer()
                         if r.ocrText != nil { Text("Scanned").font(.caption).padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Color.orange.opacity(0.15), in: Capsule()).foregroundStyle(.orange) }
-                    }
+                    } }.foregroundStyle(.primary)
                 }
                 ReceiptScanButton { scanned = $0 }
+                Button { importingReceipt = true } label: { Label("Import receipt from Files", systemImage: "doc.badge.plus") }
+                    .disabled(savingAttachment)
+                if savingAttachment { ProgressView("Saving receipt") }
             } header: {
                 Text("Receipts & documents")
             } footer: {
@@ -168,7 +195,7 @@ struct ProjectDetailView: View {
         let spentCents = RollupMath.spentCents(p, lineItems: lineItems)
         let spentHours = RollupMath.spentHours(p, lineItems: lineItems)
         let est = p.estCost?.cents ?? 0
-        let showsSpent = p.status == .inProgress || p.status == .done || spentCents > 0
+        let showsSpent = p.actualCost != nil || !lineItems.isEmpty
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -179,7 +206,7 @@ struct ProjectDetailView: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(p.status == .done ? "Actual" : "Actual so far").font(.caption).foregroundStyle(.secondary)
-                    Text(showsSpent ? Money(cents: spentCents, currency: p.currencyCode).formatted(showCents: false) : "—")
+                    Text(showsSpent ? Money(cents: spentCents, currency: p.currencyCode).formatted() : "Unrecorded")
                         .font(.title3.bold()).foregroundStyle(Color.accentColor)
                     if let h = ScheduleFormat.hours(spentHours) { Text(h).font(.footnote).foregroundStyle(.secondary) }
                 }
@@ -247,6 +274,36 @@ struct ProjectDetailView: View {
     }
 
     @MainActor
+    private func preview(_ attachment: Attachment) async {
+        guard let url = await env.attachments.fileURL(for: attachment) else {
+            errorText = "This attachment is unavailable on this iPhone. Check iCloud sync and try again."
+            return
+        }
+        previewURL = url
+    }
+
+    @MainActor
+    private func importReceipt(_ url: URL) async {
+        guard let project, !savingAttachment else { return }
+        savingAttachment = true
+        defer { savingAttachment = false }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let file = try url.resourceValues(forKeys: [.contentTypeKey, .fileSizeKey, .isRegularFileKey])
+            guard file.isRegularFile == true, let size = file.fileSize, (1...Attachment.maxPDFBytes).contains(size),
+                  let type = file.contentType, type.conforms(to: .image) || type.conforms(to: .pdf),
+                  let ext = type.preferredFilenameExtension else {
+                throw RepositoryError.invalid("Choose an image or PDF up to 25 MB.")
+            }
+            let draft = AttachmentDraft(fileURL: url, kind: .receipt, fileExt: ext, uti: type.identifier,
+                                        caption: url.deletingPathExtension().lastPathComponent, capturedAt: env.clock.now)
+            _ = try await env.attachments.add(draft, ownerType: .project, ownerId: project.id, property: project.propertyId)
+            receiptsVersion += 1
+        } catch { errorText = error.localizedDescription }
+    }
+
+    @MainActor
     private func attach(_ r: ScannedReceipt) async {
         guard let p = project else { return }
         do {
@@ -288,6 +345,7 @@ struct ProjectDetailView: View {
             let more = (try? await env.attachments.attachments(ownerType: .costLineItem, ownerId: item.id)) ?? []
             all += more.filter { $0.kind == .receipt && $0.deletedAt == nil }
         }
+        guard !Task.isCancelled else { return }
         receipts = all.sorted { ($0.capturedAt ?? $0.createdAt) > ($1.capturedAt ?? $1.createdAt) }
     }
 }

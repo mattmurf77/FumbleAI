@@ -86,7 +86,7 @@ public protocol ProjectRepository: Sendable {
     func delete(_ id: UUID) async throws
     func lineItems(project: UUID) async throws -> [CostLineItem]
     func observeLineItems(project: UUID) -> AsyncStream<[CostLineItem]>
-    func upsertLineItem(_ item: CostLineItem) async throws
+    func upsertLineItem(_ item: CostLineItem, receipt: AttachmentDraft?) async throws
     func deleteLineItem(_ id: UUID) async throws
 }
 
@@ -191,3 +191,9 @@ public typealias ChoreServicing = ChoreRepository
 public typealias ProjectServicing = ProjectRepository
 public typealias ThingServicing = ThingRepository
 public typealias InventoryServicing = InventoryRepository
+
+public extension ProjectRepository {
+    func upsertLineItem(_ item: CostLineItem) async throws {
+        try await upsertLineItem(item, receipt: nil)
+    }
+}

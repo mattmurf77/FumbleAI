@@ -68,7 +68,7 @@ public enum ProjectLogic {
                         spawnedFromChoreId: d.spawnedFromChoreId, currencyCode: d.estCost?.currency ?? d.actualCost?.currency ?? "USD",
                         createdAt: now, updatedAt: now)
         p = setStatus(p, d.status, today: today)
-        if d.status == .done, let c = d.completedOn { p.completedOn = c }
+        if d.status == .done { p.completedOn = d.completedOn }
         return p
     }
 

@@ -86,7 +86,7 @@ final class MapperAndMergeTests: XCTestCase {
         XCTAssertEqual(m["deleted_at"], .date(t1))
         m = MergePolicy.merge(.space, server: server, local: local, changed: ["deleted_at"], today: today)
         XCTAssertEqual(m["deleted_at"], .null)
-        // Project status + completed_on paired; done without date gets one.
+        // Project status + completed_on paired; historical work can have an unknown date.
         server = ["status": .string("done"), "completed_on": .string("2026-09-01")]
         local = ["status": .string("in_progress"), "completed_on": .null]
         m = MergePolicy.merge(.project, server: server, local: local, changed: ["status"], today: today)
@@ -94,7 +94,7 @@ final class MapperAndMergeTests: XCTestCase {
         local = ["status": .string("done"), "completed_on": .null]
         server = ["status": .string("planned"), "completed_on": .null]
         m = MergePolicy.merge(.project, server: server, local: local, changed: ["status"], today: today)
-        XCTAssertEqual(m["completed_on"], .string("2026-09-29"))
+        XCTAssertEqual(m["completed_on"], .null)
         // Thing attributes: key-level overlay.
         server = ["attributes_json": .string(#"{"filterSize":"16x25x1","merv":8}"#)]
         local = ["attributes_json": .string(#"{"filterSize":"20x25x1","merv":11}"#)]

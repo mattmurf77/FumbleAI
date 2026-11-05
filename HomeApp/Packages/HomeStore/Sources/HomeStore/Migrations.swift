@@ -19,8 +19,55 @@ enum Migrations {
         m.registerMigration(v1Search) { db in try db.execute(sql: searchSQL) }
         // Rebuilds `thing` (chore / inventory_item reference it); GRDB defers FK checks to the end of the migration.
         m.registerMigration(v2OutdoorThings) { db in try db.execute(sql: outdoorThingsSQL) }
+        m.registerMigration("v3_local_home_value") { db in
+            try db.execute(sql: """
+                CREATE TABLE home_value_reference (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    property_id TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+                    payload TEXT NOT NULL
+                );
+                CREATE INDEX home_value_reference_property ON home_value_reference(property_id);
+                """)
+        }
+        m.registerMigration("v4_undated_past_work") { db in try db.execute(sql: undatedPastWorkSQL) }
         return m
     }
+
+    // Historical improvements can have an unknown completion date. Existing IDs, receipts, foreign keys,
+    // indexes, outbox entries and recorded dates are preserved by GRDB's deferred FK-checked transaction.
+    static let undatedPastWorkSQL = #"""
+CREATE TABLE project_v4 (
+  id                    TEXT PRIMARY KEY NOT NULL,
+  property_id           TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+  scope                 TEXT NOT NULL CHECK (scope IN ('space','level','property')),
+  space_id              TEXT REFERENCES space(id) ON DELETE SET NULL,
+  level_id              TEXT REFERENCES level(id) ON DELETE SET NULL,
+  title                 TEXT NOT NULL,
+  notes                 TEXT,
+  status                TEXT NOT NULL DEFAULT 'idea' CHECK (status IN ('idea','planned','in_progress','done')),
+  priority              INTEGER CHECK (priority IS NULL OR priority BETWEEN 1 AND 3),
+  est_cost_cents        INTEGER CHECK (est_cost_cents IS NULL OR est_cost_cents >= 0),
+  actual_cost_cents     INTEGER CHECK (actual_cost_cents IS NULL OR actual_cost_cents >= 0),
+  currency_code         TEXT NOT NULL DEFAULT 'USD',
+  est_hours             REAL,
+  actual_hours          REAL,
+  target_on             TEXT,                          -- 'YYYY-MM-DD'
+  started_on            TEXT,
+  completed_on          TEXT,                          -- optional for historical work
+  vendor                TEXT,
+  spawned_from_chore_id TEXT REFERENCES chore(id) ON DELETE SET NULL,
+  created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, deleted_at DATETIME,
+  CHECK ((scope='space' AND space_id IS NOT NULL AND level_id IS NOT NULL) OR
+         (scope='level' AND space_id IS NULL AND level_id IS NOT NULL) OR
+         (scope='property' AND space_id IS NULL AND level_id IS NULL))
+);
+INSERT INTO project_v4 SELECT * FROM project;
+DROP TABLE project;
+ALTER TABLE project_v4 RENAME TO project;
+CREATE INDEX project_space_status ON project(space_id, status)    WHERE deleted_at IS NULL;
+CREATE INDEX project_level_status ON project(level_id, status)    WHERE deleted_at IS NULL;
+CREATE INDEX project_prop_status  ON project(property_id, status) WHERE deleted_at IS NULL;
+"""#
 
     // MARK: v1_core — synced domain tables (LLD §3.2)
     static let coreSQL = #"""

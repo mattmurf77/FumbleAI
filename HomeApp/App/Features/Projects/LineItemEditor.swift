@@ -90,7 +90,7 @@ struct LineItemEditor: View {
         scanned = r
         guard let g = r.guess else { return }
         if let total = g.total { amountText = ProjectInput.text(total); fromReceipt = true }
-        if let d = g.date { incurredOn = d; hasDate = true }
+        if let d = g.date, d <= env.clock.today { incurredOn = d; hasDate = true }
         if let v = g.vendor, vendor.isEmpty { vendor = v }
         if label.isEmpty, let v = g.vendor { label = v }
     }
@@ -111,12 +111,7 @@ struct LineItemEditor: View {
         item.incurredOn = hasDate ? incurredOn : nil
         item.hours = ProjectInput.hours(hoursText) ?? nil
         do {
-            if let scanned {
-                let att = try await env.attachments.add(scanned.attachmentDraft, ownerType: .costLineItem, ownerId: item.id,
-                                                        property: project.propertyId)
-                item.receiptAttachmentId = att.id
-            }
-            try await env.projects.upsertLineItem(item)
+            try await env.projects.upsertLineItem(item, receipt: scanned?.attachmentDraft)
             dismiss()
         } catch {
             errorText = error.localizedDescription

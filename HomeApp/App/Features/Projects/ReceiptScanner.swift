@@ -71,9 +71,17 @@ struct ReceiptScanButton: View {
             guard !items.isEmpty else { return }
             Task {
                 var datas: [Data] = []
-                for item in items { if let d = try? await item.loadTransferable(type: Data.self) { datas.append(d) } }
-                photoItems = []
-                await process(datas)
+                working = true
+                defer { working = false; photoItems = [] }
+                do {
+                    for item in items {
+                        guard let data = try await item.loadTransferable(type: Data.self) else {
+                            throw RepositoryError.invalid("One of the selected pages could not be read. Please select the pages again.")
+                        }
+                        datas.append(data)
+                    }
+                    await process(datas)
+                } catch { errorText = error.localizedDescription }
             }
         }
         .alert("Camera access is off", isPresented: $cameraDenied) {
@@ -131,7 +139,7 @@ enum ReceiptPDF {
     static func write(images: [Data]) -> URL? {
         #if canImport(UIKit)
         let pages = images.compactMap { UIImage(data: $0) }
-        guard !pages.isEmpty else { return nil }
+        guard !pages.isEmpty, pages.count == images.count else { return nil }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("receipt-\(UUID().uuidString).pdf")
         let pageWidth: CGFloat = 612   // US Letter width in points
         let first = pages[0]

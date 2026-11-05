@@ -19,6 +19,7 @@ public struct InMemorySnapshot: Sendable, Equatable {
     public var lineItems: [UUID: CostLineItem] = [:]
     public var inventory: [UUID: InventoryItem] = [:]
     public var attachments: [UUID: Attachment] = [:]
+    public var valueReferences: [UUID: HomeValueReference] = [:]
     public var settings = AppSettings()
     public init() {}
 

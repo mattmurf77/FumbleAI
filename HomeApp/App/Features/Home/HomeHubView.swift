@@ -71,10 +71,11 @@ struct HomeHubView: View {
                 }
                 Spacer(minLength: 0)
                 HubTellHomeButton(theme: theme) { sheet = .tellHome }
+                HubCircleButton(symbol: "magnifyingglass", label: "Search", theme: theme) { sheet = .search }
                 HubCircleButton(symbol: "gearshape", label: "Settings", theme: theme) { sheet = .settings }
             }
             Text("What would you like to do?")
-                .font(.system(size: 28, weight: .bold))
+                .font(.title.bold())
                 .tracking(-0.6)
                 .foregroundStyle(theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
@@ -83,7 +84,7 @@ struct HomeHubView: View {
                 Image(systemName: "sparkles")
                     .font(.system(size: 12, weight: .semibold))
                 Text(model.summary)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.footnote.weight(.medium))
                     .lineLimit(2)
             }
             .foregroundStyle(theme.accent)
@@ -144,6 +145,8 @@ struct HomeHubView: View {
     @ViewBuilder
     private func sheetContent(_ s: HubSheet) -> some View {
         switch s {
+        case .homeValue:
+            HomeValueSheet(property: model.property)
         case .search:
             SearchView()
         case .settings:
@@ -170,6 +173,7 @@ struct HubRowsScreen: View {
     let subtitle: String
     let feedbackName: String
     let sections: [HubRowSection]
+    var property: Property? = nil
     let onNavigate: (HubAction) -> Void
 
     @State private var path: [HubRoute] = []
@@ -246,6 +250,7 @@ struct HubRowsScreen: View {
     private func sheetContent(_ s: HubSheet) -> some View {
         switch s {
         case .tellHome: TellHomeSheet()
+        case .homeValue: HomeValueSheet(property: property)
         case .search: SearchView()
         case .settings: SettingsView()
         case .addYard: EmptyView()     // Only offered on the Home tab, which owns the property.
@@ -293,7 +298,7 @@ struct HubCircleButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.headline)
                 .foregroundStyle(theme.ink)
                 .frame(width: 36, height: 36)
                 .background(Circle().fill(theme.surface))
@@ -327,12 +332,12 @@ struct HubCardView: View {
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(card.title)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.headline)
                             .foregroundStyle(theme.ink)
                             .lineLimit(3)
                             .minimumScaleFactor(0.85)
                         Text(card.detail)
-                            .font(.system(size: 13))
+                            .font(.subheadline)
                             .foregroundStyle(theme.ink2)
                             .lineLimit(3)
                     }
@@ -344,6 +349,7 @@ struct HubCardView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(HubPressStyle())
+            .accessibilityIdentifier("home.card." + card.id.rawValue)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .frame(minHeight: 132)
@@ -368,7 +374,7 @@ struct HubWideCardView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(theme.ink)
                     Text(card.detail)
-                        .font(.system(size: 13))
+                        .font(.subheadline)
                         .foregroundStyle(theme.ink2)
                         .lineLimit(2)
                 }
@@ -585,7 +591,7 @@ struct YardSetupSheet: View {
             }
             GridRow {
                 HubCardView(card: HomeHubCatalog.stuff(counts), theme: .light, onTap: { _ in })
-                HubCardView(card: HomeHubCatalog.search, theme: .light, onTap: { _ in })
+                HubCardView(card: HomeHubCatalog.homeValue, theme: .light, onTap: { _ in })
             }
         }
         HubWideCardView(card: HomeHubCatalog.yard(counts), theme: .light, onTap: { _ in })
@@ -599,4 +605,22 @@ struct YardSetupSheet: View {
         YardSetupSheet(property: Property(name: "Maple Street")) { _ in }
     }
     .environment(AppEnvironment.preview())
+}
+
+
+private struct HomeValueSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let property: Property?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let property { HomeValueView(property: property) }
+                else { ContentUnavailableView("Home unavailable", systemImage: "house") }
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+        }
+    }
 }

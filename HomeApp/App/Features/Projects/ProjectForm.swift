@@ -44,6 +44,7 @@ struct ProjectForm: View {
     @State private var actualHoursText = ""
     @State private var hasTarget = false
     @State private var targetOn = LocalDate(2026, 1, 1)
+    @State private var hasCompletionDate = false
     @State private var completedOn = LocalDate(2026, 1, 1)
     @State private var vendor = ""
     @State private var saving = false
@@ -93,8 +94,11 @@ struct ProjectForm: View {
                 if status == .done || status == .inProgress || !actualText.isEmpty {
                     Section {
                         if status == .done {
-                            DatePicker("Completed", selection: $completedOn.scheduleDate(env.clock.calendar),
-                                       in: ...Date(), displayedComponents: .date)
+                            Toggle("Include completion date", isOn: $hasCompletionDate)
+                            if hasCompletionDate {
+                                DatePicker("Completed", selection: $completedOn.scheduleDate(env.clock.calendar),
+                                           in: ...env.clock.now, displayedComponents: .date)
+                            }
                         }
                         ProjectMoneyField(title: "Actual cost", text: $actualText, currency: currency)
                         ProjectHoursField(title: "Actual hours", text: $actualHoursText)
@@ -152,6 +156,7 @@ struct ProjectForm: View {
             title = p.title; notes = p.notes ?? ""; scope = p.scope; status = p.status == .unknown ? .idea : p.status
             priority = p.priority; estText = ProjectInput.text(p.estCost); estHoursText = ProjectInput.text(p.estHours)
             actualText = ProjectInput.text(p.actualCost); actualHoursText = ProjectInput.text(p.actualHours)
+            hasCompletionDate = p.completedOn != nil
             hasTarget = p.targetOn != nil; targetOn = p.targetOn ?? targetOn; completedOn = p.completedOn ?? today
             vendor = p.vendor ?? ""; currency = p.currencyCode
             statusTouched = true
@@ -185,14 +190,14 @@ struct ProjectForm: View {
                 p.targetOn = hasTarget ? targetOn : nil
                 p.vendor = vendorValue.isEmpty ? nil : vendorValue
                 if p.status != status { p = ProjectLogic.setStatus(p, status, today: today) }
-                if status == .done { p.completedOn = completedOn }
+                if status == .done { p.completedOn = hasCompletionDate ? completedOn : nil }
                 try await env.projects.update(p)
                 saved = p
             } else {
                 let draft = ProjectDraft(propertyId: propertyId, scope: scope, title: trimmedTitle,
                                          notes: notesValue.isEmpty ? nil : notesValue, status: status, priority: priority,
                                          estCost: estMoney, actualCost: actualMoney, estHours: estHours, actualHours: actualHours,
-                                         targetOn: hasTarget ? targetOn : nil, completedOn: status == .done ? completedOn : nil,
+                                         targetOn: hasTarget ? targetOn : nil, completedOn: status == .done && hasCompletionDate ? completedOn : nil,
                                          vendor: vendorValue.isEmpty ? nil : vendorValue)
                 saved = try await env.projects.create(draft)
             }

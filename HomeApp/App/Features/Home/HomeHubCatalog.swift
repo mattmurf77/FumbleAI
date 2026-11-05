@@ -36,7 +36,7 @@ enum HubRoute: Hashable {
 /// Screens that manage their own `NavigationStack` and are therefore shown as sheets.
 enum HubSheet: String, Identifiable, Hashable {
     /// `tellHome`: say or type a to-do or project idea (`TellHomeSheet`).
-    case search, settings, addYard, tellHome
+    case search, settings, addYard, tellHome, homeValue
     var id: String { rawValue }
 }
 
@@ -145,7 +145,7 @@ struct HubCounts: Hashable, Sendable {
 
 struct HubCard: Identifiable, Hashable {
     enum ID: String, Hashable, CaseIterable {
-        case floorPlan, yard, todos, projects, stuff, search
+        case floorPlan, yard, todos, projects, stuff, homeValue
     }
     enum Tone: Hashable { case neutral, attention }
 
@@ -186,7 +186,7 @@ enum HomeHubCatalog {
     static func sections(_ c: HubCounts) -> [HubSection] {
         [
             HubSection(id: "home", title: "Your home", cards: [floorPlan(c), yard(c)]),
-            HubSection(id: "tasks", title: "Get things done", cards: [todos(c), projects(c), stuff(c), search]),
+            HubSection(id: "tasks", title: "Get things done", cards: [todos(c), projects(c), homeValue, stuff(c)]),
         ]
     }
 
@@ -239,8 +239,8 @@ enum HomeHubCatalog {
         return card
     }
 
-    static let search = HubCard(id: .search, title: "Find something", detail: "“Where’s the winter coat?”",
-                                symbol: "magnifyingglass", action: .sheet(.search))
+    static let homeValue = HubCard(id: .homeValue, title: "Home value", detail: "Past improvements and dated estimates",
+                                   symbol: "chart.line.uptrend.xyaxis", action: .sheet(.homeValue))
 
     // MARK: Projects tab
 
@@ -260,6 +260,8 @@ enum HomeHubCatalog {
                 HubRow(id: "past", title: LensID.pastWork.title,
                        detail: c.lifetimeCents > 0 ? "\(c.lifetime.compact) spent on finished jobs" : "Finished jobs, receipts and costs",
                        symbol: LensID.pastWork.symbol, badge: count(c.pastCount), action: .plan(lens: .pastWork)),
+                HubRow(id: "homeValue", title: "Home value", detail: "Review improvements, estimates and your Home Brief",
+                       symbol: "chart.line.uptrend.xyaxis", action: .sheet(.homeValue)),
                 HubRow(id: "budget", title: LensID.budget.title, detail: "Planned, spent and remaining by floor",
                        symbol: LensID.budget.symbol, badge: c.plannedCents > 0 ? c.planned.compact : nil, action: .push(.budget)),
             ]),

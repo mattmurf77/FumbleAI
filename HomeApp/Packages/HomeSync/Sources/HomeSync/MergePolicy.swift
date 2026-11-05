@@ -25,8 +25,8 @@ public enum MergePolicy {
     }
 
     /// Merged row for `type`. `server` is the fetched/conflicting server row, `local` the current local row,
-    /// `changed` the outbox changed-field set. `today` is the fallback for a done project without a completion date.
-    public static func merge(_ type: RecordType, server: SyncRow, local: SyncRow, changed: Set<String>, today: LocalDate) -> SyncRow {
+    /// `changed` the outbox changed-field set.
+    public static func merge(_ type: RecordType, server: SyncRow, local: SyncRow, changed: Set<String>, today _: LocalDate) -> SyncRow {
         var merged = server
         var overlay = changed.filter { !$0.contains(".") }
         // Groups.
@@ -56,11 +56,6 @@ public enum MergePolicy {
         }
         // deleted_at: delete wins unless the local side changed it (explicit restore or local delete) — the overlay
         // above already implements that; nothing else to do.
-        // Project: done needs completed_on.
-        if type == .project, merged["status"] == .string("done"), merged["completed_on"]?.isNull ?? true {
-            let other = [server["completed_on"], local["completed_on"]].compactMap { $0 }.first { !$0.isNull }
-            merged["completed_on"] = other ?? .string(today.description)
-        }
         return merged
     }
 

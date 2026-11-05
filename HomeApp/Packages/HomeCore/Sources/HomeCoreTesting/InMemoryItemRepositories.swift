@@ -123,9 +123,8 @@ public struct InMemoryProjectRepository: ProjectRepository {
     public func update(_ project: Project) async throws {
         var p = project
         p.updatedAt = store.now
-        if p.status == .done && p.completedOn == nil { p.completedOn = store.today }
         try store.write(events: [.updated(.project(p.id))]) { s in
-            guard s.projects[p.id] != nil else { throw notFound(.project, p.id) }
+            guard let old = s.projects[p.id], old.deletedAt == nil else { throw notFound(.project, p.id) }
             s.projects[p.id] = p
         }
     }
@@ -154,10 +153,27 @@ public struct InMemoryProjectRepository: ProjectRepository {
     public func lineItems(project: UUID) async throws -> [CostLineItem] { store.read { $0.liveLineItems.filter { $0.projectId == project } } }
     public func observeLineItems(project: UUID) -> AsyncStream<[CostLineItem]> { store.observe { $0.liveLineItems.filter { $0.projectId == project } } }
 
-    public func upsertLineItem(_ item: CostLineItem) async throws {
+    public func upsertLineItem(_ item: CostLineItem, receipt: AttachmentDraft?) async throws {
         guard item.amount.cents >= 0 else { throw RepositoryError.invalid("amount must be ≥ 0") }
-        var i = item; i.updatedAt = store.now
-        store.write(events: [.updated(.project(i.projectId))]) { $0.lineItems[i.id] = i }
+        let staged = try receipt.map {
+            try InMemoryAttachmentRepository.prepare($0, ownerType: .costLineItem, ownerId: item.id,
+                                                     property: item.propertyId, now: store.now)
+        }
+        try store.write(events: [.updated(.project(item.projectId))]) { s in
+            guard let project = s.projects[item.projectId], project.deletedAt == nil,
+                  project.propertyId == item.propertyId else { throw notFound(.project, item.projectId) }
+            var i = item; i.updatedAt = store.now
+            if let old = s.lineItems[i.id] {
+                guard old.deletedAt == nil else { throw notFound(.costLineItem, i.id) }
+                i.createdAt = old.createdAt
+            }
+            if let staged {
+                s.attachments[staged.id] = staged
+                i.receiptAttachmentId = staged.id
+            }
+            s.lineItems[i.id] = i
+        }
+        if let staged, let receipt { InMemoryAttachmentRepository.files.set(staged.id, receipt.fileURL) }
     }
 
     public func deleteLineItem(_ id: UUID) async throws {
@@ -318,15 +334,19 @@ public struct InMemoryAttachmentRepository: AttachmentRepository {
     }
 
     public func add(_ d: AttachmentDraft, ownerType: Attachment.OwnerType, ownerId: UUID, property: UUID) async throws -> Attachment {
-        let size = (try? FileManager.default.attributesOfItem(atPath: d.fileURL.path)[.size] as? Int) ?? 0
-        let now = store.now
-        let a = Attachment(propertyId: property, ownerType: ownerType, ownerId: ownerId, kind: d.kind, fileExt: d.fileExt,
-                           uti: d.uti, byteSize: size, widthPx: d.widthPx, heightPx: d.heightPx,
-                           sha256: String(PlannedNotification.stableHash(d.fileURL.absoluteString), radix: 16),
-                           caption: d.caption, ocrText: d.ocrText, capturedAt: d.capturedAt, createdAt: now, updatedAt: now)
+        let a = try Self.prepare(d, ownerType: ownerType, ownerId: ownerId, property: property, now: store.now)
         store.write(events: [.recordsChanged([RecordRef(.attachment, a.id)])]) { $0.attachments[a.id] = a }
         InMemoryAttachmentRepository.files.set(a.id, d.fileURL)
         return a
+    }
+
+    static func prepare(_ d: AttachmentDraft, ownerType: Attachment.OwnerType, ownerId: UUID,
+                        property: UUID, now: Date) throws -> Attachment {
+        let size = try d.fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        return Attachment(propertyId: property, ownerType: ownerType, ownerId: ownerId, kind: d.kind, fileExt: d.fileExt,
+                           uti: d.uti, byteSize: size, widthPx: d.widthPx, heightPx: d.heightPx,
+                           sha256: String(PlannedNotification.stableHash(d.fileURL.absoluteString), radix: 16),
+                           caption: d.caption, ocrText: d.ocrText, capturedAt: d.capturedAt, createdAt: now, updatedAt: now)
     }
 
     public func delete(_ id: UUID) async throws {

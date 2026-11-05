@@ -9,6 +9,7 @@ struct RootView: View {
     @State private var property: Property?
     @State private var loaded = false
     @State private var showOnboarding = false
+    @State private var recordPastWork = false
     @State private var accountError: String?
     @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = true
 
@@ -20,22 +21,35 @@ struct RootView: View {
     var body: some View {
         @Bindable var env = env
         Group {
-            if !loaded {
+            if env.storageUnavailable {
+                ContentUnavailableView {
+                    Label("Your home could not be opened", systemImage: "externaldrive.badge.exclamationmark")
+                } description: {
+                    Text("Unlock your iPhone, check its available storage, then reopen Home Blueprint to try again. Keep the app installed to preserve your local records.")
+                }
+            } else if !loaded {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if showOnboarding {
-                OnboardingFlow(onFinished: { showOnboarding = false })
+                OnboardingFlow(recordPastWork: {
+                    showOnboarding = false
+                    recordPastWork = true
+                }, onFinished: { showOnboarding = false })
             } else {
                 MainTabView()
             }
         }
+        .sheet(isPresented: $recordPastWork) {
+            ProjectForm(spaceID: nil, levelID: nil, initialStatus: .done)
+        }
         .onChange(of: rootFeedbackPage, initial: true) { _, page in FeedbackPageTracker.shared.rootPage = page }
         #if canImport(UIKit)
         // Floating feedback button on every screen (own window, above sheets) + shake to send feedback.
-        .onAppear { FeedbackPresenter.shared.install(env: env) }
+        .onAppear { if !env.storageUnavailable { FeedbackPresenter.shared.install(env: env) } }
         .onChange(of: showFeedbackButton) { _, show in FeedbackPresenter.shared.setButtonVisible(show) }
         #endif
         .task {
+            guard !env.storageUnavailable else { return }
             for await p in env.plan.observeCurrentProperty() {
                 property = p
                 if p == nil { showOnboarding = true }
@@ -60,7 +74,7 @@ struct RootView: View {
                              secondaryButton: .cancel(Text("Not now")) { env.accountPrompt = nil })
             }
         }
-        .alert("Something needs attention", isPresented: Binding(get: { env.startupError != nil }, set: { if !$0 { env.startupError = nil } })) {
+        .alert("Something needs attention", isPresented: Binding(get: { !env.storageUnavailable && env.startupError != nil }, set: { if !$0 { env.startupError = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(env.startupError ?? "")

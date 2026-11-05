@@ -169,11 +169,9 @@ public struct ProjectStore: ProjectRepository {
 
     public func update(_ project: Project) async throws {
         try await db.write { tx in
-            var p = project
-            _ = try tx.require(Project.self, p.id, includeDeleted: true)
-            if p.status == .done && p.completedOn == nil { p.completedOn = tx.today }
-            try tx.save(p)
-            tx.emit(.updated(.project(p.id)))
+            _ = try tx.require(Project.self, project.id)
+            try tx.save(project)
+            tx.emit(.updated(.project(project.id)))
         }
     }
 
@@ -189,12 +187,14 @@ public struct ProjectStore: ProjectRepository {
             prepared = try AttachmentStore.prepare(receipt, ownerType: .project, ownerId: id, property: pid, files: files, now: db.clock.now)
         }
         let attachment = prepared
-        try await db.write { tx in
-            var p = try tx.require(Project.self, id)
-            p = ProjectLogic.markDone(p, actual: actual, completedOn: completedOn, hours: hours)
-            try tx.save(p)
-            if let attachment { try AttachmentStore.insert(attachment, in: tx) }
-            tx.emit(.updated(.project(id)))
+        try await AttachmentStore.committing(attachment, files: files) {
+            try await db.write { tx in
+                var p = try tx.require(Project.self, id)
+                p = ProjectLogic.markDone(p, actual: actual, completedOn: completedOn, hours: hours)
+                try tx.save(p)
+                if let attachment { try AttachmentStore.insert(attachment, in: tx) }
+                tx.emit(.updated(.project(id)))
+            }
         }
     }
 
@@ -213,13 +213,28 @@ public struct ProjectStore: ProjectRepository {
     public func lineItems(project: UUID) async throws -> [CostLineItem] { try await db.read { try Self.lineItems($0, project: project) } }
     public func observeLineItems(project: UUID) -> AsyncStream<[CostLineItem]> { db.observe { try Self.lineItems($0, project: project) } }
 
-    public func upsertLineItem(_ item: CostLineItem) async throws {
+    public func upsertLineItem(_ item: CostLineItem, receipt: AttachmentDraft?) async throws {
         guard item.amount.cents >= 0 else { throw RepositoryError.invalid("amount must be ≥ 0") }
-        try await db.write { tx in
-            var i = item
-            if let old = try tx.get(CostLineItem.self, i.id, includeDeleted: true) { i.createdAt = old.createdAt }
-            try tx.save(i)
-            tx.emit(.updated(.project(i.projectId)))
+        let staged = try receipt.map {
+            try AttachmentStore.prepare($0, ownerType: .costLineItem, ownerId: item.id,
+                                        property: item.propertyId, files: files, now: db.clock.now)
+        }
+        try await AttachmentStore.committing(staged, files: files) {
+            try await db.write { tx in
+                let project = try tx.require(Project.self, item.projectId)
+                guard project.propertyId == item.propertyId else { throw RepositoryError.invalid("Project belongs to a different home") }
+                var i = item
+                if let old = try tx.get(CostLineItem.self, i.id, includeDeleted: true) {
+                    guard old.deletedAt == nil else { throw RepositoryError.notFound(RecordRef(.costLineItem, i.id)) }
+                    i.createdAt = old.createdAt
+                }
+                if let staged {
+                    try AttachmentStore.insert(staged, in: tx)
+                    i.receiptAttachmentId = staged.id
+                }
+                try tx.save(i)
+                tx.emit(.updated(.project(i.projectId)))
+            }
         }
     }
 

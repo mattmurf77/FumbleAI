@@ -12,13 +12,16 @@ struct HomeApp: App {
     #endif
     @Environment(\.scenePhase) private var scenePhase
     /// Screenshot runs (`-HomeDemo YES`) use the in-memory sample house; see `DemoLaunch`.
+    @StateObject private var billing = BlueprintBilling(isDemo: DemoLaunch.current != nil)
     @State private var env = DemoLaunch.current?.makeEnvironment() ?? AppEnvironment.live()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(env)
+                .environmentObject(billing)
                 .task {
+                    guard !env.storageUnavailable else { return }
                     #if canImport(UIKit)
                     // Notification actions (DONE / SNOOZE_1H) and body taps need the live services.
                     appDelegate.notificationHandler.configure(
@@ -31,6 +34,7 @@ struct HomeApp: App {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                Task { await billing.refreshEntitlements() }
                 Task { await env.sceneBecameActive() }   // also retries queued feedback
                 #if canImport(UIKit)
                 FeedbackPresenter.shared.sceneBecameActive()
