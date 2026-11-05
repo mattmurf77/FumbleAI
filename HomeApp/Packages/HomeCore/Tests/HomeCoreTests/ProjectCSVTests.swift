@@ -30,6 +30,16 @@ struct ProjectCSVTests {
         #expect(try review("sep=;\r\nProject;Cost\r\nFence;0.00").first?.item?.cost?.cents == 0)
     }
 
+    @Test func manuallyLoggedYearNeverBecomesAnExactDay() {
+        let draft = ProjectDraft(propertyId: UUID(), scope: .property, title: "Insulation", status: .done, completedYear: 2019)
+        let project = ProjectLogic.make(from: draft, now: .now, today: .init(2026, 11, 4))
+        #expect(project.completedYear == 2019 && project.completedOn == nil)
+        let preserved = ProjectLogic.setStatus(project, .done, today: .init(2026, 11, 4))
+        #expect(preserved.completedYear == 2019 && preserved.completedOn == nil)
+        let actual = ProjectLogic.markDone(project, actual: nil, completedOn: .init(2019, 3, 4), hours: nil)
+        #expect(actual.completedYear == nil && actual.completedOn == LocalDate(2019, 3, 4))
+    }
+
     @Test func templateRoundTripAndNativeCompletedProjectExport() throws {
         let example = try ProjectCSV(data: ProjectCSV.sample(currency: "CAD"))
         let mapped = try example.review(mapping: .init(example), currency: "CAD")

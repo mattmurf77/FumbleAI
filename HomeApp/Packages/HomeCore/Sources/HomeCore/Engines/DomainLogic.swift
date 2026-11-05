@@ -3,10 +3,12 @@ import Foundation
 /// Pure chore rules shared by HomeStore and the in-memory store (LLD §9.1–9.2, §5.4).
 public enum ChoreLogic {
     public static func make(from d: ChoreDraft, id: UUID = UUID(), now: Date, engine: RecurrenceEngine) -> Chore {
-        Chore(id: id, propertyId: d.propertyId, scope: d.scope, title: d.title, notes: d.notes, assigneeId: d.assigneeId,
+        var chore = Chore(id: id, propertyId: d.propertyId, scope: d.scope, title: d.title, notes: d.notes, assigneeId: d.assigneeId,
               repeatRule: d.repeatRule, startOn: d.startOn, nextDueOn: d.noDueDate && d.repeatRule == nil ? nil : engine.firstDue(rule: d.repeatRule, start: d.startOn),
               dueMinutes: d.dueMinutes, remindEnabled: d.remindEnabled, remindOffsetMin: d.remindOffsetMin,
               calendarEnabled: d.calendarEnabled, linkedThingId: d.linkedThingId, createdAt: now, updatedAt: now)
+        chore.guideID = d.guideID; chore.workMode = d.workMode; chore.supplyPlan = d.supplyPlan
+        return chore
     }
 
     /// Applies a done/skip action. Returns the updated chore and the new completion row.
@@ -87,7 +89,10 @@ public enum ProjectLogic {
                         spawnedFromChoreId: d.spawnedFromChoreId, currencyCode: d.estCost?.currency ?? d.actualCost?.currency ?? propertyCurrency,
                         createdAt: now, updatedAt: now)
         p = setStatus(p, d.status, today: today)
-        if d.status == .done { p.completedOn = d.completedOn }
+        if d.status == .done {
+            p.completedOn = d.completedOn
+            p.completedYear = d.completedOn == nil ? d.completedYear : nil
+        }
         return p
     }
 
@@ -98,7 +103,7 @@ public enum ProjectLogic {
         p.status = status
         switch status {
         case .inProgress: if p.startedOn == nil { p.startedOn = today }; p.completedOn = nil; p.completedYear = nil
-        case .done: if p.completedOn == nil { p.completedOn = today }
+        case .done: if p.completedOn == nil && p.completedYear == nil { p.completedOn = today }
         default: p.completedOn = nil; p.completedYear = nil
         }
         return p

@@ -110,6 +110,8 @@ public protocol ThingRepository: Sendable {
 
 /// Inventory items and storage spots (LLD `InventoryServicing`, §11).
 public protocol InventoryRepository: Sendable {
+    /// Called only after the owner confirms buying the missing units on a to-do supply line.
+    func buySelectedSupply(_ line: ShoppingLine, propertyId: UUID) async throws
     func item(_ id: UUID) async throws -> InventoryItem?
     func items(_ query: InventoryQuery) async throws -> [InventoryItem]
     func observeItems(_ query: InventoryQuery) -> AsyncStream<[InventoryItem]>

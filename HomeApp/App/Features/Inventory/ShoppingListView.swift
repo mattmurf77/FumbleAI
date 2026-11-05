@@ -32,6 +32,12 @@ struct ShoppingListView: View {
                 }
                 .pickerStyle(.segmented)
             }
+            let supplies = visible.filter { $0.reason == .toDoSupply }
+            if !supplies.isEmpty {
+                Section("For your to-dos") {
+                    ForEach(supplies) { line in row(line, subtitle: "Buy " + TIK.quantityLabel(line.quantity, unit: line.unit), symbol: "checklist") }
+                }
+            }
             if !due.isEmpty {
                 Section("Filters & bulbs due") {
                     ForEach(due) { line in row(line, subtitle: "Replacement due · no spares left", symbol: "wrench.and.screwdriver") }
@@ -46,7 +52,7 @@ struct ShoppingListView: View {
                 Section {
                     EmptyView()
                 } footer: {
-                    Text("Low items come from the “running low” flag. Filters and bulbs come from appliances with a due to-do and no spares left.")
+                    Text("To-do supplies appear when you select missing items in a DIY plan. Low items come from the “running low” flag. Filters and bulbs come from appliances with a due to-do and no spares left.")
                 }
             }
         }
@@ -66,12 +72,14 @@ struct ShoppingListView: View {
             }
         }
         .alert(buyTitle, isPresented: Binding(get: { buying != nil }, set: { if !$0 { buying = nil } }), presenting: buying) { line in
-            TextField(line.reason == .low ? "New quantity" : "Spares", text: $quantityText)
-                .keyboardType(.decimalPad)
+            if line.reason != .toDoSupply {
+                TextField(line.reason == .low ? "New quantity" : "Spares", text: $quantityText).keyboardType(.decimalPad)
+            }
             Button("Cancel", role: .cancel) {}
-            Button("Save") { Task { await bought(line) } }
+            Button(line.reason == .toDoSupply ? "Record purchase" : "Save") { Task { await bought(line) } }
         } message: { line in
-            Text(line.reason == .low ? "How many do you have now?" : "Add spares so the next replacement is covered.")
+            if line.reason == .toDoSupply { Text("Add " + TIK.quantityLabel(line.quantity, unit: line.unit) + " to your inventory and clear the matching to-do requests.") }
+            else { Text(line.reason == .low ? "How many do you have now?" : "Add spares so the next replacement is covered.") }
         }
         .alert("Something went wrong", isPresented: Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })) {
             Button("OK", role: .cancel) {}
@@ -93,6 +101,7 @@ struct ShoppingListView: View {
 
     private var buyTitle: String {
         guard let b = buying else { return "" }
+        if b.reason == .toDoSupply { return "Bought \(b.label)?" }
         return b.reason == .low ? "Bought \(b.label)" : "Add spares for \(b.label)"
     }
 
@@ -143,6 +152,10 @@ struct ShoppingListView: View {
         let entered = Double(quantityText.replacingOccurrences(of: ",", with: "."))
         buying = nil
         do {
+            if line.reason == .toDoSupply, let property {
+                try await env.inventory.buySelectedSupply(line, propertyId: property.id)
+                return
+            }
             switch line.ref {
             case .inventory(let id):
                 guard var item = try await env.inventory.item(id) else { return }

@@ -23,11 +23,12 @@ public enum ProjectCSVBatch {
         }
     }
 
-    public static func review(_ items: [ProjectCSVItem], property: Property, existing: [Project],
+    public static func review(_ items: [ProjectCSVItem], property: Property, existing: [Project], lines: [CostLineItem] = [],
                               alreadyImported: (ProjectCSVItem) -> Bool) throws -> [ProjectCSVDecision] {
         guard items.count <= ProjectCSV.maxRows, Set(items.map(\.id)).count == items.count else {
             throw ProjectCSVError("The import contains too many rows or repeated row identifiers.")
         }
+        let effective = rowsWithLineTotals(items, property: property, projects: existing, lines: lines)
         var byID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
         var byKey = Dictionary(grouping: existing.filter { $0.propertyId == property.id && $0.status == .done }) {
             Key($0.title, day: $0.completedOn, year: $0.completedYear)
@@ -43,10 +44,12 @@ public enum ProjectCSVBatch {
                 let candidates: [Project]
                 if let id = row.sourceID, let project = byID[id] { candidates = [project] }
                 else { candidates = byKey[key, default: []] }
-                if candidates.contains(where: { matches(row, project: $0, property: property) }) {
+                if candidates.contains(where: { matches(row, project: $0, property: property, effective: effective[$0.id]) }) {
                     disposition = .duplicate
-                } else if !candidates.isEmpty {
-                    disposition = .conflict("A project with this ID or title and completion date already exists with different details. Existing work is preserved.")
+                } else if let other = candidates.first {
+                    if other.propertyId != property.id { disposition = .conflict("This exported ID belongs to another home.") }
+                    else if other.deletedAt != nil { disposition = .conflict("This project was deleted. Review Recently Deleted before importing it again.") }
+                    else { disposition = .conflict("The ID or title and completion date match existing work with different details. Review the spreadsheet before importing this row.") }
                 } else {
                     disposition = .ready
                     let p = row.makeProject(property: property, now: Date(timeIntervalSince1970: 0))
@@ -59,10 +62,16 @@ public enum ProjectCSVBatch {
         }
     }
 
-    private static func matches(_ row: ProjectCSVItem, project p: Project, property: Property) -> Bool {
+    private static func rowsWithLineTotals(_ rows: [ProjectCSVItem], property: Property, projects: [Project], lines: [CostLineItem]) -> [UUID: Money] {
+        guard rows.contains(where: \.usesExportedLineTotal) else { return [:] }
+        let history = HomeHistoryEntry.history(propertyId: property.id, projects: projects, lines: lines, attachments: [])
+        return Dictionary(uniqueKeysWithValues: history.compactMap { entry in entry.actual.map { (entry.id, $0) } })
+    }
+
+    private static func matches(_ row: ProjectCSVItem, project p: Project, property: Property, effective: Money?) -> Bool {
         guard p.propertyId == property.id, p.status == .done, p.deletedAt == nil else { return false }
         let prior = ProjectCSVItem(row: 0, title: p.title, day: p.completedOn, year: p.completedYear,
-                                   cost: p.actualCost, vendor: p.vendor, action: p.workAction, notes: p.notes)
+                                   cost: row.usesExportedLineTotal ? effective ?? p.actualCost : p.actualCost, vendor: p.vendor, action: p.workAction, notes: p.notes)
         return prior.signature == row.signature
     }
 }

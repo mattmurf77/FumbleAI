@@ -161,7 +161,7 @@ struct SharedInboxSheet: View {
                 if let id = libraryFileID { filedIDs.insert(id) }
             } } }
         }
-        .onDisappear { item.cleanUp() }
+        .onDisappear { if librarySource == nil { item.cleanUp() } }
     }
 
     @MainActor private func openDocument(_ incoming: SharedInboxItem.LocalFile) async {

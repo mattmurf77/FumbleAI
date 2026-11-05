@@ -18,8 +18,13 @@ struct ChoreForm: View {
     /// Called with the saved chore (after the calendar step).
     var onSaved: ((Chore) -> Void)?
 
-    init(spaceID: UUID?, levelID: UUID?, onSaved: ((Chore) -> Void)? = nil) {
+    init(spaceID: UUID?, levelID: UUID?, suggestion: MaintenanceIdea? = nil, suggestedMode: Chore.WorkMode? = nil, suggestedSupplies: [String] = [], suggestedPlan: [ChoreSupply]? = nil, onSaved: ((Chore) -> Void)? = nil) {
         mode = .create(spaceID: spaceID, levelID: levelID); self.onSaved = onSaved
+        _title = State(initialValue: (suggestedMode == .diy ? suggestion?.diyTitle : suggestion?.title) ?? "")
+        _guide = State(initialValue: suggestion)
+        _workMode = State(initialValue: suggestedMode)
+        _supplies = State(initialValue: suggestedPlan ?? (suggestedSupplies.isEmpty ? (suggestion?.suggestedSupplyPlan ?? []) : ChoreSupply.suggestions(suggestedSupplies)))
+        _rule = State(initialValue: suggestion?.suggestedRepeat)
     }
 
     init(choreID: UUID, onSaved: ((Chore) -> Void)? = nil) {
@@ -32,6 +37,11 @@ struct ChoreForm: View {
     @State private var original: Chore?
     @State private var title = ""
     @State private var notes = ""
+    @State private var guide: MaintenanceIdea?
+    @State private var country: String?
+    @State private var quoteRequest = false
+    @State private var workMode: Chore.WorkMode?
+    @State private var supplies: [ChoreSupply] = []
     @State private var scope: Scope = .property
     @State private var assigneeId: UUID?
     @State private var rule: RepeatRule?
@@ -79,6 +89,28 @@ struct ChoreForm: View {
                     }
                 }
 
+                Section {
+                    Picker("How will you do it?", selection: $workMode) {
+                        Text("Decide later").tag(Chore.WorkMode?.none)
+                        ForEach(Chore.WorkMode.allCases, id: \.self) { Text($0.label).tag(Optional($0)) }
+                    }.accessibilityIdentifier("todo.workMode")
+                    if let mode = workMode {
+                        if let guide {
+                            ChoreTaskGuide(idea: guide, mode: mode, country: country)
+                            if mode == .diy, !newSuggestions(for: guide).isEmpty { Button("Add suggested supplies") { supplies += newSuggestions(for: guide) } }
+                        } else if let match = MaintenanceIdea.allCases.first(where: { $0.matchesTask(trimmedTitle) }) {
+                            Button("Use task guide: " + (mode == .diy ? match.diyTitle : match.title)) { applyGuide(match) }
+                        }
+                        Menu(guide == nil ? "Choose a task guide" : "Change task guide") {
+                            ForEach(MaintenanceIdea.allCases) { idea in Button(idea.title) { applyGuide(idea) } }
+                            if guide != nil { Button("Remove guide") { guide = nil } }
+                        }
+                        if mode == .diy, let propertyId { DIYReadinessView(propertyId: propertyId, plan: $supplies) }
+                        if mode == .hirePro { Button("Prepare a written estimate request") { quoteRequest = true } }
+                    }
+                } header: { Text("Work plan") } footer: {
+                    if workMode == .diy { Text("Check supplies and select only what you need to buy. Saving updates your Shopping list. Preparation stays on this device.") }
+                }
                 Section("Schedule") {
                     RepeatRulePicker(rule: $rule, startOn: startOn)
                     DatePicker(rule == nil ? "Due" : "Starts", selection: $startOn.scheduleDate(env.clock.calendar),
@@ -130,6 +162,7 @@ struct ChoreForm: View {
             }
         }
         .feedbackPage("Chore form")
+        .sheet(isPresented: $quoteRequest) { ChoreQuoteRequestView(title: trimmedTitle) }
         .task { await load() }
     }
 
@@ -143,7 +176,7 @@ struct ChoreForm: View {
         let appSettings = await env.settings.load()
         remindOffset = appSettings.defaultRemindOffsetMin
         guard let property = try? await env.plan.currentProperty() else { loaded = true; return }
-        propertyId = property.id
+        propertyId = property.id; country = property.address?.countryCode
         people = ((try? await env.people.people(property: property.id)) ?? []).sorted { $0.sortOrder < $1.sortOrder }
         things = ((try? await env.things.things(ThingQuery(propertyId: property.id))) ?? [])
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -156,6 +189,8 @@ struct ChoreForm: View {
         case .edit(let id):
             guard let c = try? await env.chores.chore(id) else { saveError = "This to-do was deleted."; loaded = true; return }
             original = c
+            guide = c.guideID.flatMap(MaintenanceIdea.init(rawValue:))
+            workMode = c.workMode; supplies = c.supplyPlan ?? []
             title = c.title; notes = c.notes ?? ""; scope = c.scope; assigneeId = c.assigneeId; rule = c.repeatRule
             startOn = c.nextDueOn ?? c.startOn
             if c.repeatRule != nil { startOn = c.startOn }
@@ -170,6 +205,15 @@ struct ChoreForm: View {
         loaded = true
     }
 
+    private func newSuggestions(for idea: MaintenanceIdea) -> [ChoreSupply] {
+        let existing = Set(supplies.map(\.key))
+        return idea.suggestedSupplyPlan.filter { !existing.contains($0.key) }
+    }
+    private func applyGuide(_ idea: MaintenanceIdea) {
+        guide = idea
+        if workMode == .diy { supplies += newSuggestions(for: idea) }
+    }
+
     // MARK: Save
 
     @MainActor
@@ -179,11 +223,15 @@ struct ChoreForm: View {
         defer { saving = false }
         let notesValue = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
+            var prepared = supplies
+            if workMode != .diy { for i in prepared.indices { prepared[i].requested = false } }
+            try ChoreSupply.validate(prepared)
             let saved: Chore
             if var c = original {
                 let wasCalendarOn = c.calendarEnabled
                 c.title = trimmedTitle
                 c.notes = notesValue.isEmpty ? nil : notesValue
+                c.guideID = guide?.rawValue; c.workMode = workMode; c.supplyPlan = prepared.isEmpty ? nil : prepared
                 c.scope = scope
                 c.assigneeId = assigneeId
                 c.repeatRule = rule
@@ -210,10 +258,11 @@ struct ChoreForm: View {
                     }
                 }
             } else {
-                let draft = ChoreDraft(propertyId: propertyId, scope: scope, title: trimmedTitle,
+                var draft = ChoreDraft(propertyId: propertyId, scope: scope, title: trimmedTitle,
                                        notes: notesValue.isEmpty ? nil : notesValue, assigneeId: assigneeId, repeatRule: rule,
                                        startOn: startOn, dueMinutes: hasTime ? dueMinutes : nil, remindEnabled: remindEnabled,
                                        remindOffsetMin: remindOffset, calendarEnabled: false, linkedThingId: linkedThingId)
+                draft.guideID = guide?.rawValue; draft.workMode = workMode; draft.supplyPlan = prepared.isEmpty ? nil : prepared
                 saved = try await env.chores.create(draft)
                 if calendarOn, let calendarId {
                     do { try await env.calendar.enable(chore: saved.id, calendarId: calendarId) } catch {

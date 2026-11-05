@@ -25,6 +25,15 @@ final class HomeBriefPDFTests: XCTestCase {
         XCTAssertThrowsError(try HomeBriefPDF.make(from: data, selected: [], includeCosts: true, prepared: date))
     }
 
+    func testYearOnlyCompletionDoesNotInventMonthOrDay() throws {
+        let home = UUID(), date = LocalDate(2026, 8, 2)
+        var work = Project(propertyId: home, scope: .property, title: "Insulated attic", status: .done)
+        work.completedYear = 2022
+        let history = HomeHistoryEntry.history(propertyId: home, projects: [work], lines: [], attachments: [])
+        let pdf = try XCTUnwrap(PDFDocument(data: HomeBriefPDF.make(from: history, selected: [work.id], includeCosts: false, prepared: date))?.string)
+        XCTAssertTrue(pdf.contains("Completed 2022")); XCTAssertFalse(pdf.contains("2022-01-01"))
+    }
+
     func testLongBriefRetainsProjectsAcrossPages() throws {
         let owner = UUID(), date = LocalDate(2026, 2, 2)
         let projects = (1...90).map { Project(propertyId: owner, scope: .property, title: "Improvement-ref-\($0)-end", status: .done, completedOn: date) }

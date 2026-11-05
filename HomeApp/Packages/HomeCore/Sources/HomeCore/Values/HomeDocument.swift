@@ -44,9 +44,15 @@ public struct HomeDocument: Identifiable, Equatable, Sendable {
             self.details = .init(title: caption.flatMap { $0.isEmpty ? nil : String($0.prefix(240)) } ?? label, category: category)
         }
     }
-    public func matches(_ query: String) -> Bool {
+    public static let exportHeader = ["attachment_id", "project_id", "title", "original_filename", "type", "document_date", "quote_amount", "currency", "confirmed_details_json", "original_file", "status"]
+    public func exportRow(includedPath: String?) throws -> [String] {
+        [id.uuidString.lowercased(), linkedProjectId?.uuidString.lowercased() ?? "", details.title, details.originalFilename ?? "", details.category.rawValue,
+         details.documentDate?.description ?? "", details.quoteAmount?.plainString ?? "", details.quoteAmount?.currency ?? "",
+         try HomeJSON.encodeString(details.confirmedFields), includedPath ?? "", includedPath == nil ? "unavailable_on_device" : "included"]
+    }
+    public func matches(_ query: String, projectName: String? = nil) -> Bool {
         let tokens = query.split(whereSeparator: \.isWhitespace)
-        let text = ([details.title, details.category.label, details.originalFilename ?? "", details.documentDate?.description ?? ""] + Array(details.confirmedFields.values)).joined(separator: " ")
+        let text = ([details.title, details.category.label, projectName ?? "", details.originalFilename ?? "", details.documentDate?.description ?? ""] + Array(details.confirmedFields.values)).joined(separator: " ")
         return tokens.allSatisfy { text.localizedStandardContains(String($0)) }
     }
 }

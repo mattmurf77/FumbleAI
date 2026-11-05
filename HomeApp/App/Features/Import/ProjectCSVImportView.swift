@@ -66,7 +66,7 @@ struct ProjectCSVImportView: View {
     var body: some View {
         Form {
             if let summary {
-                Section { Label(summary, systemImage: "checkmark.circle.fill") }
+                Section { Label(summary, systemImage: "checkmark.circle.fill").accessibilityIdentifier("csv.outcome") }
                 Button("Done") { dismiss() }
             } else {
                 Section {
@@ -87,6 +87,7 @@ struct ProjectCSVImportView: View {
                     if !mappedRows.isEmpty && !reviewing {
                         Section {
                             LabeledContent("Ready to import", value: String(ready.count))
+                                .accessibilityElement(children: .ignore).accessibilityLabel("Ready to import").accessibilityValue(String(ready.count)).accessibilityIdentifier("csv.readyCount")
                             if duplicates > 0 { LabeledContent("Duplicates", value: String(duplicates)) }
                             let invalid = mappedRows.filter { $0.issue != nil }.count
                             if invalid + conflicts > 0 { LabeledContent("Need attention", value: String(invalid + conflicts)) }
@@ -142,7 +143,7 @@ struct ProjectCSVImportView: View {
                         ForEach(file.headers.indices, id: \.self) { i in
                             Text("\(i + 1). " + (file.headers[i].isEmpty ? "Unnamed column" : file.headers[i])).tag(i)
                         }
-                    }
+                    }.accessibilityIdentifier("csv.column." + field.rawValue)
                 }
                 if mapping?.columns[.date] != nil {
                     Picker("Slash dates", selection: Binding(get: { mapping?.dayFirst ?? false }, set: { mapping?.dayFirst = $0; invalidate() })) {
@@ -168,10 +169,12 @@ struct ProjectCSVImportView: View {
                         if disposition == .duplicate { Label("Duplicate · skipped", systemImage: "square.on.square") }
                         if case .conflict(let reason) = disposition { Label(reason, systemImage: "exclamationmark.circle") }
                     }
-                    Toggle("Include row", isOn: Binding(get: { !excluded.contains(row.id) }, set: { include in
-                        if include { excluded.remove(row.id) } else { excluded.insert(row.id) }
-                        invalidate(clearRows: false)
-                    })).disabled(busy)
+                    if results[row.id] == .ready || excluded.contains(row.id) {
+                        Toggle("Include row", isOn: Binding(get: { !excluded.contains(row.id) }, set: { include in
+                            if include { excluded.remove(row.id) } else { excluded.insert(row.id) }
+                            invalidate(clearRows: false)
+                        })).disabled(busy)
+                    }
                 } else {
                     if !row.title.isEmpty { Text(row.title).font(.headline) }
                     Label(row.issue ?? "Row is incomplete.", systemImage: "exclamationmark.circle")

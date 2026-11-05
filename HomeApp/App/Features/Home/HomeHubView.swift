@@ -3,8 +3,7 @@ import HomeCore
 import HomeCoreTesting
 import PlanCanvas
 
-/// The Home tab: "What would you like to do?" with the home's name/address, a live one-line summary, the house
-/// (floor plan, yard) and four task cards. Cards switch tabs (`onNavigate`); Search, Settings and yard setup open as
+/// The Home tab prioritizes one recommended action, the scheduled tasks, then the navigation cards. Cards switch tabs (`onNavigate`); Search, Settings and yard setup open as
 /// sheets. Counts come from the `HomeHubModel` that `MainTabView` shares across tabs.
 struct HomeHubView: View {
     @Environment(\.colorScheme) private var scheme
@@ -45,6 +44,15 @@ struct HomeHubView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     header
+                    if let property = model.property {
+                        HomeNextActionView(model: model, property: property) { onNavigate(.plan(lens: .plan)) }
+                            .id(property.id)
+                        HomePeriodTasks(propertyID: property.id)
+                    }
+                    Text("What do you want to do today?")
+                        .font(.title2.bold()).foregroundStyle(theme.ink)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("home.navigation")
                     ForEach(model.sections) { section in
                         sectionView(section)
                     }
@@ -74,25 +82,7 @@ struct HomeHubView: View {
                 HubCircleButton(symbol: "magnifyingglass", label: "Search", theme: theme) { sheet = .search }
                 HubCircleButton(symbol: "gearshape", label: "Settings", theme: theme) { sheet = .settings }
             }
-            Text("What would you like to do?")
-                .font(.title.bold())
-                .tracking(-0.6)
-                .foregroundStyle(theme.ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(model.summary)
-                    .font(.footnote.weight(.medium))
-                    .lineLimit(2)
-            }
-            .foregroundStyle(theme.accent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(theme.accentSoft))
-            .padding(.top, 2)
-            .accessibilityElement(children: .combine)
+
         }
     }
 
@@ -145,6 +135,8 @@ struct HomeHubView: View {
     @ViewBuilder
     private func sheetContent(_ s: HubSheet) -> some View {
         switch s {
+        case .maintenance:
+            MaintenanceSheet(property: model.property)
         case .homeHistory:
             HomeHistorySheet(property: model.property)
         case .search:
@@ -250,6 +242,7 @@ struct HubRowsScreen: View {
     private func sheetContent(_ s: HubSheet) -> some View {
         switch s {
         case .tellHome: TellHomeSheet()
+        case .maintenance: MaintenanceSheet(property: property)
         case .homeHistory: HomeHistorySheet(property: property)
         case .search: SearchView()
         case .settings: SettingsView()
@@ -621,6 +614,20 @@ private struct HomeHistorySheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
+        }
+    }
+}
+
+
+private struct MaintenanceSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let property: Property?
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let property { SuggestedMaintenanceView(property: property) }
+                else { ContentUnavailableView("Home unavailable", systemImage: "house") }
+            }.toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
     }
 }

@@ -227,6 +227,8 @@ extension Thing: DatabaseModel {
 }
 
 extension Chore: DatabaseModel {
+    // Device-local preparation joins the existing task without changing the shipped CloudKit record shape.
+    static var selectSQL: String { "SELECT chore.*, cp.work_mode AS _work_mode, cp.guide_id AS _guide, cp.supplies_json AS _supplies FROM chore LEFT JOIN chore_preparation cp ON cp.chore_id=chore.id" }
     init(row: Row) throws {
         self.init(id: try row.uuid("id"), propertyId: try row.uuid("property_id"), scope: try row.scope(), title: row["title"] ?? "",
                   notes: row["notes"], assigneeId: row.uuidOpt("assignee_id"), repeatRule: try row.json("repeat_rule_json", RepeatRule.self),
@@ -235,6 +237,9 @@ extension Chore: DatabaseModel {
                   calendarEnabled: row.bool("calendar_enabled"), linkedThingId: row.uuidOpt("linked_thing_id"),
                   isPaused: row.bool("is_paused"), closedAt: row["closed_at"],
                   createdAt: row.date("created_at"), updatedAt: row.date("updated_at"), deletedAt: row["deleted_at"])
+        guideID = row["_guide"]
+        workMode = (row["_work_mode"] as String?).flatMap(Chore.WorkMode.init(rawValue:))
+        supplyPlan = try row.json("_supplies", [ChoreSupply].self)
     }
     func columns() throws -> Columns {
         var c = Columns()

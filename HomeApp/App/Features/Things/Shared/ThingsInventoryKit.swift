@@ -621,14 +621,15 @@ extension TIK {
 
     /// Shopping list partition: replacements (filters & bulbs) first, then low items (FR-INV-50).
     enum ShoppingFilter: String, CaseIterable, Hashable, Identifiable {
-        case all, pantry, filtersAndBulbs
+        case all, pantry, filtersAndBulbs, supplies
         var id: String { rawValue }
         var title: String {
-            switch self { case .all: return "All"; case .pantry: return "Running low"; case .filtersAndBulbs: return "Filters & bulbs" }
+            switch self { case .all: return "All"; case .supplies: return "To-dos"; case .pantry: return "Running low"; case .filtersAndBulbs: return "Filters & bulbs" }
         }
         func includes(_ line: ShoppingLine) -> Bool {
             switch self {
             case .all: return true
+            case .supplies: return line.reason == .toDoSupply
             case .pantry: return line.reason == .low
             case .filtersAndBulbs: return line.reason == .replacementDue
             }
@@ -639,7 +640,11 @@ extension TIK {
     static func shoppingText(_ lines: [ShoppingLine]) -> String {
         let due = lines.filter { $0.reason == .replacementDue }
         let low = lines.filter { $0.reason == .low }
+        let supplies = lines.filter { $0.reason == .toDoSupply }
         var out = ["Shopping list"]
+        if !supplies.isEmpty {
+            out += ["", "For your to-dos"] + supplies.map { "• " + $0.label + " · " + quantityLabel($0.quantity, unit: $0.unit) }
+        }
         if !due.isEmpty {
             out.append("")
             out.append("Filters & bulbs")
@@ -653,7 +658,7 @@ extension TIK {
                 return "• " + l.label + (q.isEmpty ? "" : " (\(q) left)")
             }
         }
-        if due.isEmpty && low.isEmpty { out.append("You're stocked up.") }
+        if lines.isEmpty { out.append("You're stocked up.") }
         return out.joined(separator: "\n")
     }
 }

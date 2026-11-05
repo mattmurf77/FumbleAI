@@ -10,6 +10,10 @@ on:
         type: boolean
         required: false
         default: false
+      resume_home_brief_id:
+        description: "Optional Apple ID of a partially created Home Brief draft"
+        type: string
+        required: false
 
 concurrency:
   group: testflight
@@ -21,7 +25,7 @@ permissions:
 jobs:
   beta:
     name: Build and upload to TestFlight
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     env:
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -68,7 +72,17 @@ jobs:
 
       - name: Prepare Home Brief draft purchase
         if: inputs.prepare_home_brief
-        run: bundle exec fastlane ios prepare_home_brief
+        env:
+          RESUME_DRAFT_ID: ${{ inputs.resume_home_brief_id }}
+        run: |
+          if [[ -z "$RESUME_DRAFT_ID" ]]; then
+            bundle exec fastlane ios prepare_home_brief
+          elif [[ "$RESUME_DRAFT_ID" =~ ^[0-9]+$ ]]; then
+            bundle exec fastlane ios prepare_home_brief "resume_id:$RESUME_DRAFT_ID"
+          else
+            echo "Use the numeric Apple ID reported when the draft was created."
+            exit 1
+          fi
 
       - name: Build and upload (fastlane beta)
         run: bundle exec fastlane beta

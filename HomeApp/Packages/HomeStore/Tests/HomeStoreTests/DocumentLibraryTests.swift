@@ -26,6 +26,18 @@ final class DocumentLibraryTests: XCTestCase {
             let foreign = await all.next(); XCTAssertEqual(foreign?.count, 0)
             let enqueued = try await store.sync.perform { try $0.enqueueAll(property: home.id) }
             XCTAssertFalse(enqueued.contains(RecordRef(.attachment, docID)))
+            for include in [false, true] {
+                let output = try await store.export.exportCSV(property: home.id, options: ExportOptions(includeAttachments: include))
+                let folder = output.pathExtension == "zip" ? output.deletingPathExtension() : output
+                let manifest = folder.appendingPathComponent("documents.csv")
+                XCTAssertEqual(FileManager.default.fileExists(atPath: manifest.path), include)
+                if include {
+                    let csv = try String(contentsOf: manifest, encoding: .utf8)
+                    XCTAssertTrue(csv.contains("1240.50,CAD")); XCTAssertTrue(csv.contains("Proposal A.pdf")); XCTAssertTrue(csv.contains("E789"))
+                    let copies = try FileManager.default.contentsOfDirectory(at: folder.appendingPathComponent("attachments"), includingPropertiesForKeys: nil)
+                    XCTAssertEqual(copies.count, 1); XCTAssertEqual(try Data(contentsOf: XCTUnwrap(copies.first)), body)
+                }
+            }
             let pending = try await store.database.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM sync_outbox WHERE record_name = ?", arguments: [docID.uuidString.lowercased()]) }
             XCTAssertEqual(pending, 0)
             var edited = meta; edited.confirmedFields = [:]; edited.projectId = nil

@@ -72,6 +72,22 @@ final class HomeBlueprintUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Mark done"].waitForExistence(timeout: 5))
     }
 
+    func testHomeScheduledTasksCanBeCompletedAndReviewedByPeriod() {
+        let app = launch("home")
+        let picker = app.segmentedControls["home.period.picker"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 15))
+        let today = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                                                     "home.period.complete.", "Do the dishes")).firstMatch
+        open(today, in: app)
+        // The sample task repeats daily. Completing it advances the next occurrence out of Day.
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: today)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 8), .completed)
+        open(picker.buttons["Year"], in: app)
+        open(app.buttons["home.period.seeAll"], in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["todos.period.picker"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["todos.bucket.overdue"].waitForExistence(timeout: 8))
+    }
+
     func testHomeHistoryAndPrivateBriefAreReachable() {
         let app = launch("home")
         XCTAssertTrue(app.buttons["home.card.homeHistory"].waitForExistence(timeout: 15))

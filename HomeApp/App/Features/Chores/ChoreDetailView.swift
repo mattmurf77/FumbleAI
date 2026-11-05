@@ -20,6 +20,7 @@ struct ChoreDetailView: View {
     @State private var ownership: CalendarOwnership = .notEnabled
     @State private var notificationStatus: PermissionStatus = .notDetermined
 
+    @State private var quoteRequest = false
     @State private var editing = false
     @State private var rescheduling = false
     @State private var rescheduleDate = LocalDate(2026, 1, 1)
@@ -70,6 +71,7 @@ struct ChoreDetailView: View {
         } message: { Text(errorText ?? "") }
         .sensoryFeedback(.success, trigger: doneFeedback)
         .overlay(alignment: .bottom) { undoBar }
+        .sheet(isPresented: $quoteRequest) { ChoreQuoteRequestView(title: chore?.title ?? "") }
         .task { await observe() }
         .task(id: chore?.updatedAt) { await loadExtras() }
     }
@@ -116,6 +118,15 @@ struct ChoreDetailView: View {
             }
 
             Section { dueCard(c) }
+            Section("Work plan") {
+                LabeledContent("How", value: c.workMode?.label ?? "Decide later")
+                if c.workMode == .diy, let plan = c.supplyPlan, !plan.isEmpty {
+                    ForEach(plan) { item in LabeledContent(item.name, value: "\(item.quantity) \(item.unit)") }
+                    NavigationLink { ShoppingListView() } label: { Label("Shopping list", systemImage: "cart") }
+                }
+                if c.workMode == .hirePro { Button("Prepare a written estimate request") { quoteRequest = true } }
+                Button(c.workMode == .diy ? "Check readiness and edit supplies" : "Edit work plan") { editing = true }
+            }
 
             Section("Schedule") {
                 LabeledContent("Repeat", value: c.repeatRule?.humanText ?? "Doesn't repeat")

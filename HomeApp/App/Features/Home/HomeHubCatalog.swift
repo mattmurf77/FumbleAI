@@ -36,7 +36,7 @@ enum HubRoute: Hashable {
 /// Screens that manage their own `NavigationStack` and are therefore shown as sheets.
 enum HubSheet: String, Identifiable, Hashable {
     /// `tellHome`: say or type a to-do or project idea (`TellHomeSheet`).
-    case search, settings, addYard, tellHome, homeHistory
+    case search, settings, addYard, tellHome, homeHistory, maintenance
     var id: String { rawValue }
 }
 

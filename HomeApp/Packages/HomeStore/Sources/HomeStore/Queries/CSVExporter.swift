@@ -38,12 +38,8 @@ public struct CSVExporter: ExportService {
                 try FileManager.default.copyItem(at: files.url(for: a), to: dest)
                 exported[a.id] = "attachments/" + dest.lastPathComponent
             }
-            let header = ["attachment_id", "project_id", "title", "original_filename", "type", "document_date", "quote_amount", "currency", "confirmed_details_json", "original_file", "status"]
-            let rows = try documents.map { item -> [String] in
-                let d = item.details, path = exported[item.id]
-                return [item.id.db, item.linkedProjectId?.db ?? "", d.title, d.originalFilename ?? "", d.category.rawValue, d.documentDate?.description ?? "", d.quoteAmount?.plainString ?? "", d.quoteAmount?.currency ?? "", try HomeJSON.encodeString(d.confirmedFields), path ?? "", path == nil ? "unavailable_on_device" : "included"]
-            }
-            try CSV.file(header: header, rows: rows).write(to: folder.appendingPathComponent("documents.csv"))
+            let rows = try documents.map { try $0.exportRow(includedPath: exported[$0.id]) }
+            try CSV.file(header: HomeDocument.exportHeader, rows: rows).write(to: folder.appendingPathComponent("documents.csv"))
         }
         return try Self.zip(folder: folder, name: name, into: work)
     }
@@ -110,12 +106,12 @@ public struct CSVExporter: ExportService {
 
         let chores = ChoreStore.sort(try Chore.fetchAll(d, where: pw, pa))
         out["chores.csv"] = (["id", "title", "room", "floor", "scope", "assignee", "repeat", "next_due_on", "due_time", "reminder_on",
-                              "calendar_on", "linked_thing", "paused", "closed_at", "notes"],
-            chores.map { c in
+                              "calendar_on", "linked_thing", "paused", "closed_at", "notes", "work_mode", "task_guide", "supplies_json"],
+            try chores.map { c in
                 [c.id.db, c.title, room(c.scope), floor(c.scope), c.scope.kind.rawValue, L.personName(c.assigneeId) ?? "",
                  c.repeatRule?.humanText ?? "", c.nextDueOn?.description ?? "",
                  c.dueMinutes.map { String(format: "%02d:%02d", $0 / 60, $0 % 60) } ?? "", b(c.remindEnabled), b(c.calendarEnabled),
-                 L.thingName(c.linkedThingId) ?? "", b(c.isPaused), CSV.instant(c.closedAt), c.notes ?? ""]
+                 L.thingName(c.linkedThingId) ?? "", b(c.isPaused), CSV.instant(c.closedAt), c.notes ?? "", c.workMode?.rawValue ?? "", c.guideID ?? "", try HomeJSON.encodeString(c.supplyPlan ?? [])]
             })
 
         let titles = Dictionary(chores.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })

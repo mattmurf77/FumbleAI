@@ -6,8 +6,11 @@ extension InMemoryProjectRepository {
         guard let property = snapshot.properties[propertyID], property.deletedAt == nil else {
             throw ProjectCSVError("The selected home is no longer available.")
         }
-        let known = snapshot.csvImportSignatures[propertyID, default: []]
-        return try (property, ProjectCSVBatch.review(rows, property: property, existing: Array(snapshot.projects.values)) { known.contains($0.signature) })
+        let known = snapshot.csvImportSignatures[propertyID, default: [:]]
+        return try (property, ProjectCSVBatch.review(rows, property: property, existing: Array(snapshot.projects.values),
+                                                       lines: rows.contains(where: \.usesExportedLineTotal) ? Array(snapshot.lineItems.values) : []) { row in
+            known[row.signature].flatMap { snapshot.projects[$0] } != nil
+        })
     }
 
     public func reviewCSVImport(_ rows: [ProjectCSVItem], propertyID: UUID) async throws -> [ProjectCSVDecision] {
@@ -22,7 +25,7 @@ extension InMemoryProjectRepository {
             for result in decisions where result.disposition == .ready {
                 let project = result.item.makeProject(property: property, now: now)
                 snapshot.projects[project.id] = project
-                snapshot.csvImportSignatures[propertyID, default: []].insert(result.item.signature)
+                snapshot.csvImportSignatures[propertyID, default: [:]][result.item.signature] = project.id
                 ids.append(project.id)
             }
             return (decisions, ids)

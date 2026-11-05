@@ -190,7 +190,10 @@ struct ProjectDetailView: View {
     private func subtitle(_ p: Project) -> String {
         var parts = [names.path(p.scope)]
         if let v = p.vendor { parts.append(v) }
-        if p.status == .done, let c = p.completedOn { parts.append("done \(ScheduleFormat.longDay(c))") }
+        if p.status == .done {
+            if let c = p.completedOn { parts.append("done \(ScheduleFormat.longDay(c))") }
+            else if let year = p.completedYear { parts.append("done in \(year)") }
+        }
         else if let s = p.startedOn { parts.append("started \(ScheduleFormat.shortMonths[s.month - 1]) \(s.day)") }
         else if let t = p.targetOn { parts.append("target \(ScheduleFormat.longDay(t))") }
         return parts.joined(separator: " · ")

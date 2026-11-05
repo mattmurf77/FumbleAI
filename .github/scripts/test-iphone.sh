@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+suite="${1:?Select HomeTests or HomeUITests}"
+case "$suite" in
+  HomeTests|HomeUITests) ;;
+  *) echo "Unknown iPhone test target" >&2; exit 2 ;;
+esac
 # CI already generated Home.xcodeproj. Select an installed iPhone rather than a particular model.
 device="$(xcrun simctl list devices available -j | python3 -c '
 import json, re, sys
@@ -14,9 +19,11 @@ if not devices:
     sys.exit("No available iPhone simulator.")
 print(max(devices)[2])
 ')"
-echo "Using iPhone simulator $device"
+echo "Using iPhone simulator $device for $suite"
+xcrun simctl bootstatus "$device" -b
 xcodebuild -project Home.xcodeproj -scheme Home -configuration Debug \
   -destination "platform=iOS Simulator,id=$device" -parallel-testing-enabled NO \
+  -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 240 \
   -clonedSourcePackagesDirPath "$SPM_DIR" -skipPackagePluginValidation -skipMacroValidation \
-  -resultBundlePath "$RUNNER_TEMP/HomeBlueprint.xcresult" \
+  -only-testing:"$suite" -resultBundlePath "$RUNNER_TEMP/$suite.xcresult" \
   test HOME_CLOUD_SYNC=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM=""

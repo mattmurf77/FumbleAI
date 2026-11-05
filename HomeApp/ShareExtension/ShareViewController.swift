@@ -30,6 +30,25 @@ final class ShareViewController: UIViewController {
 
     private func loadShared() async {
         let items = (extensionContext?.inputItems as? [NSExtensionItem]) ?? []
+        // Detect a spreadsheet BEFORE considering attributed text, URLs, thumbnails or task-list alternatives.
+        var spreadsheet: SharedSpreadsheetProvider.SpreadsheetResult?
+        var otherFile = false
+        for provider in items.flatMap({ $0.attachments ?? [] }) {
+            if let found = await SharedSpreadsheetProvider.read(provider) {
+                if spreadsheet != nil {
+                    model.setSpreadsheet(.problem("Share one spreadsheet at a time. " + SharedInbox.Spreadsheet.openInFiles))
+                    return
+                }
+                spreadsheet = found
+            } else if provider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier)
+                        || provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                otherFile = true
+            }
+        }
+        if let spreadsheet {
+            model.setSpreadsheet(otherFile ? .problem("Share the spreadsheet separately from photos or PDFs.") : spreadsheet)
+            return
+        }
         var pieces: [String] = []
         var files: [ReceivedFile] = []
         var problems: [String] = []
@@ -82,7 +101,9 @@ final class ShareViewController: UIViewController {
 
     private func save() {
         let ok: Bool
-        if model.kind == .todos && model.files.isEmpty {
+        if let sheet = model.spreadsheet {
+            ok = SharedCaptureInbox.saveSpreadsheet(sheet)
+        } else if model.kind == .todos && model.files.isEmpty {
             ok = SharedCaptureInbox.append(model.text)
         } else {
             let payloads = model.files.map { SharedCaptureInbox.Payload(file: $0.file, data: $0.data) }
@@ -94,6 +115,8 @@ final class ShareViewController: UIViewController {
                 try? await Task.sleep(for: .seconds(1.6))
                 self.finish(cancelled: false)
             }
+        } else if model.spreadsheet != nil {
+            model.errorText = "Couldn’t hand off the original file. " + SharedInbox.Spreadsheet.openInFiles
         } else if model.files.isEmpty {
             model.errorText = "Couldn’t save it. Copy the text instead and use Paste a list in the To-Dos tab."
         } else {
@@ -113,6 +136,7 @@ final class ShareViewController: UIViewController {
 @MainActor
 @Observable
 final class ShareModel {
+    private(set) var spreadsheet: SharedInbox.Spreadsheet?
     private(set) var text = ""
     /// To-dos found in the text.
     private(set) var items: [String] = []
@@ -131,8 +155,17 @@ final class ShareModel {
 
     var canSave: Bool {
         guard loaded, !saved else { return false }
+        if spreadsheet != nil { return true }
         if kind == .todos { return files.isEmpty && !items.isEmpty }
         return !files.isEmpty || hasText
+    }
+
+    func setSpreadsheet(_ result: SharedSpreadsheetProvider.SpreadsheetResult) {
+        switch result {
+        case .file(let original): spreadsheet = original
+        case .problem(let message): problems = [message]
+        }
+        loaded = true
     }
 
     func setContent(text t: String, files f: [ReceivedFile], problems p: [String]) {
@@ -160,14 +193,21 @@ struct ShareView: View {
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill").font(.system(size: 44)).foregroundStyle(.green)
                         Text("Saved").font(.title2.bold())
-                        Text(model.kind == .todos ? "Open Home Blueprint to review and add them."
-                                                  : "Open Home Blueprint to file it.")
+                        Text(model.spreadsheet != nil ? "Open Home Blueprint to review the spreadsheet."
+                             : model.kind == .todos ? "Open Home Blueprint to review and add them." : "Open Home Blueprint to file it.")
                             .foregroundStyle(.secondary).multilineTextAlignment(.center)
                     }
                     .padding()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if !model.loaded {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let spreadsheet = model.spreadsheet {
+                    List {
+                        Section {
+                            Label(spreadsheet.name, systemImage: "tablecells")
+                            Text(SharedInbox.sizeText(spreadsheet.bytes.count)).foregroundStyle(.secondary)
+                        } footer: { Text("Open Home Blueprint to match columns and choose which projects to import.") }
+                    }
                 } else if model.files.isEmpty && !model.hasText {
                     ContentUnavailableView {
                         Label("Nothing to save", systemImage: "tray")
@@ -185,7 +225,7 @@ struct ShareView: View {
                 if !model.saved {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Save", action: onSave).disabled(!model.canSave)
+                        Button(model.spreadsheet == nil ? "Save" : "Send for review", action: onSave).disabled(!model.canSave)
                     }
                 }
             }
@@ -194,6 +234,7 @@ struct ShareView: View {
 
     private var title: String {
         if !model.loaded || model.saved { return "Home Blueprint" }
+        if model.spreadsheet != nil { return "Import projects" }
         return model.kind == .todos ? "Add to-dos" : "Save to Home Blueprint"
     }
 

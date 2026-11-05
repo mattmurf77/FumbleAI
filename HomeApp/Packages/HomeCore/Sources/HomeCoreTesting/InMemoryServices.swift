@@ -173,15 +173,30 @@ public struct InMemoryExportService: ExportService {
         let s = store.read { $0 }
         let people = s.livePeople.filter { $0.propertyId == property }.map { [$0.id.uuidString.lowercased(), $0.name] }
         try CSV.file(header: ["id", "name"], rows: people).write(to: dir.appendingPathComponent("people.csv"))
-        let chores = s.liveChores.filter { $0.propertyId == property }.map { c in
-            [c.id.uuidString.lowercased(), c.title, s.locationText(c.scope), c.repeatRule?.humanText ?? "", c.nextDueOn?.description ?? "", c.notes ?? ""]
+        let chores = try s.liveChores.filter { $0.propertyId == property }.map { c in
+            [c.id.uuidString.lowercased(), c.title, s.locationText(c.scope), c.repeatRule?.humanText ?? "", c.nextDueOn?.description ?? "", c.notes ?? "", c.workMode?.rawValue ?? "", c.guideID ?? "", try HomeJSON.encodeString(c.supplyPlan ?? [])]
         }
-        try CSV.file(header: ["id", "title", "location", "repeat", "next_due_on", "notes"], rows: chores).write(to: dir.appendingPathComponent("chores.csv"))
+        try CSV.file(header: ["id", "title", "location", "repeat", "next_due_on", "notes", "work_mode", "task_guide", "supplies_json"], rows: chores).write(to: dir.appendingPathComponent("chores.csv"))
         let projects = s.liveProjects.filter { $0.propertyId == property }.map { p in
             [p.id.uuidString.lowercased(), p.title, p.status.rawValue, p.estCost?.plainString ?? "",
              Money(cents: RollupMath.spentCents(p, lineItems: s.liveLineItems), currency: p.currencyCode).plainString, p.currencyCode, p.workAction?.rawValue ?? ""]
         }
         try CSV.file(header: ["id", "title", "status", "est_cost", "spent_effective", "currency", "work_action"], rows: projects).write(to: dir.appendingPathComponent("projects.csv"))
+        if options.includeAttachments {
+            let target = dir.appendingPathComponent("attachments", isDirectory: true)
+            try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+            let owners = Dictionary(uniqueKeysWithValues: s.liveLineItems.map { ($0.id, $0.projectId) })
+            let docs = s.liveAttachments.filter { $0.propertyId == property && $0.kind != .underlay }
+            let rows = try docs.map { a -> [String] in
+                var path: String?
+                if let local = InMemoryAttachmentRepository.files.get(a.id), FileManager.default.fileExists(atPath: local.path) {
+                    try FileManager.default.copyItem(at: local, to: target.appendingPathComponent(a.fileName))
+                    path = "attachments/" + a.fileName
+                }
+                return try HomeDocument(attachment: a, details: s.documentDetails[a.id], lineOwners: owners).exportRow(includedPath: path)
+            }
+            try CSV.file(header: HomeDocument.exportHeader, rows: rows).write(to: dir.appendingPathComponent("documents.csv"))
+        }
         try Data("Home export (in-memory preview). Lengths in inches; money in major units.\r\n".utf8).write(to: dir.appendingPathComponent("README.txt"))
         return dir
     }

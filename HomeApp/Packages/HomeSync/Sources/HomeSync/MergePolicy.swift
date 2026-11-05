@@ -31,8 +31,9 @@ public enum MergePolicy {
         var overlay = changed.filter { !$0.contains(".") }
         // Groups.
         for g in groups(type) where !overlay.isDisjoint(with: g) { overlay.formUnion(g) }
-        // Project: status + completed_on are paired.
-        if type == .project, !overlay.isDisjoint(with: ["status", "completed_on"]) { overlay.formUnion(["status", "completed_on"]) }
+        // Keep exact, year-only and unknown completion dates consistent with project status.
+        let completionFields: Set<String> = ["status", "completed_on", "completed_year"]
+        if type == .project, !overlay.isDisjoint(with: completionFields) { overlay.formUnion(completionFields) }
         // Thing attributes: key-level overlay.
         var attributeKeys: Set<String> = []
         if type == .thing {
@@ -41,6 +42,10 @@ public enum MergePolicy {
         }
         for c in overlay where c != "updated_at" && c != "created_at" {
             if let v = local[c] { merged[c] = v }
+        }
+        if type == .project, merged["completed_year"] != nil,
+           merged["status"]?.stringValue != "done" || merged["completed_on"]?.stringValue != nil {
+            merged["completed_year"] = .null
         }
         if !attributeKeys.isEmpty {
             merged["attributes_json"] = mergeAttributes(server: server["attributes_json"], local: local["attributes_json"], keys: attributeKeys)

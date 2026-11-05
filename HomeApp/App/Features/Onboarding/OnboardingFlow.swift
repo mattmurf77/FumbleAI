@@ -53,6 +53,13 @@ struct OnboardingFlow: View {
                             welcome
                         }
                     }
+                        .toolbar {
+                            if addingPlan {
+                                ToolbarItem(placement: .cancellationAction) { Button("Close") { onFinished() } }
+                            } else if showingPlanSetup && model.routes.isEmpty {
+                                ToolbarItem(placement: .cancellationAction) { Button("Back") { showingPlanSetup = false } }
+                            }
+                        }
                         .navigationDestination(for: OnboardingModel.Route.self) { route in
                             destination(route)
                         }

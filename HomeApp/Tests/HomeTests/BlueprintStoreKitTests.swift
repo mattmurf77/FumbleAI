@@ -24,7 +24,7 @@ final class HomeBriefBillingTests: XCTestCase {
     }
 
     @MainActor
-    func testPurchaseRestoreOnFreshInstanceAndRefund() async throws {
+    func testPurchaseFreshInstanceEntitlementAndRefund() async throws {
         let session = try makeSession()
         defer { session.clearTransactions() }
         let store = BlueprintBilling()
@@ -38,8 +38,8 @@ final class HomeBriefBillingTests: XCTestCase {
         let restored = BlueprintBilling()
         await restored.refreshEntitlements()
         XCTAssertTrue(restored.unlocked)
-        await restored.restore()
-        XCTAssertTrue(restored.unlocked)
+        // Fresh-instance entitlement restoration exercises StoreKit without opening an Apple Account login.
+        // The user-triggered AppStore.sync path has a separate injected commerce test.
         let transaction = try XCTUnwrap(session.allTransactions().first { $0.productIdentifier == BlueprintBilling.productID })
         try session.refundTransaction(identifier: transaction.identifier)
         try await waitFor(false, in: restored)

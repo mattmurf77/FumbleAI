@@ -40,13 +40,14 @@ final class DocumentReadingTests: XCTestCase {
         let result = DocumentFieldParser.candidates(in: [
             .init(number: 1, lines: ["Contractor Estimate", "Quoted Price: $1,250.00"]),
             .init(number: 2, lines: ["Invoice", "Grand Total: $1,100.00"]),
-            .init(number: 3, lines: ["Sales Receipt", "Total: $500.00"]),
+            .init(number: 3, lines: ["Sales Receipt", "Total: $500.00", "Quoted Price: $750.00"]),
             .init(number: 4, lines: ["Inspection Report", "Total: $400.00"])
         ])
         XCTAssertTrue(result.contains { $0.page == 1 && $0.field == .category && $0.value == "estimate" })
         XCTAssertTrue(result.contains { $0.page == 1 && $0.field == .estimateTotal && $0.value == "$1,250.00" })
         XCTAssertTrue(result.contains { $0.page == 2 && $0.field == .invoiceTotal && $0.value == "$1,100.00" })
         XCTAssertTrue(result.contains { $0.page == 3 && $0.field == .receiptTotal && $0.value == "$500.00" })
+        XCTAssertFalse(result.contains { $0.value == "$750.00" })
         XCTAssertFalse(result.contains { $0.page == 4 && [.receiptTotal, .invoiceTotal, .estimateTotal].contains($0.field) })
     }
 

@@ -15,7 +15,7 @@ public struct InMemorySnapshot: Sendable, Equatable {
     public var chores: [UUID: Chore] = [:]
     public var completions: [UUID: ChoreCompletion] = [:]
     public var calendarLinks: [UUID: ChoreCalendarLink] = [:]
-    public var csvImportSignatures: [UUID: Set<String>] = [:]
+    public var csvImportSignatures: [UUID: [String: UUID]] = [:]
     public var projects: [UUID: Project] = [:]
     public var lineItems: [UUID: CostLineItem] = [:]
     public var inventory: [UUID: InventoryItem] = [:]

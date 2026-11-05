@@ -7,6 +7,9 @@ public struct ChoreDraft: Hashable, Codable, Sendable {
     public var scope: Scope
     public var title: String
     public var notes: String?
+    public var guideID: String?
+    public var workMode: Chore.WorkMode?
+    public var supplyPlan: [ChoreSupply]?
     public var assigneeId: UUID?
     public var repeatRule: RepeatRule?
     public var startOn: LocalDate
@@ -42,17 +45,18 @@ public struct ProjectDraft: Hashable, Codable, Sendable {
     public var estHours: Double?
     public var actualHours: Double?
     public var targetOn: LocalDate?
-    /// Leave nil for historical work whose completion date is unknown.
+    /// Leave nil for historical work whose exact day is unknown.
     public var completedOn: LocalDate?
+    public var completedYear: Int?
     public var vendor: String?
     public var spawnedFromChoreId: UUID?
     public init(propertyId: UUID, scope: Scope, title: String, notes: String? = nil, status: Project.Status = .idea, workAction: Project.WorkAction? = nil,
                 priority: Int? = nil, estCost: Money? = nil, actualCost: Money? = nil, estHours: Double? = nil,
-                actualHours: Double? = nil, targetOn: LocalDate? = nil, completedOn: LocalDate? = nil,
+                actualHours: Double? = nil, targetOn: LocalDate? = nil, completedOn: LocalDate? = nil, completedYear: Int? = nil,
                 vendor: String? = nil, spawnedFromChoreId: UUID? = nil) {
         self.propertyId = propertyId; self.scope = scope; self.title = title; self.notes = notes; self.status = status; self.workAction = workAction
         self.priority = priority; self.estCost = estCost; self.actualCost = actualCost; self.estHours = estHours
-        self.actualHours = actualHours; self.targetOn = targetOn; self.completedOn = completedOn; self.vendor = vendor
+        self.actualHours = actualHours; self.targetOn = targetOn; self.completedOn = completedOn; self.completedYear = completedOn == nil ? completedYear : nil; self.vendor = vendor
         self.spawnedFromChoreId = spawnedFromChoreId
     }
 }

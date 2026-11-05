@@ -214,6 +214,7 @@ public struct RecentlyDeletedStore: RecentlyDeletedRepository {
 
     static func ownerType(_ t: RecordType) -> Attachment.OwnerType? {
         switch t {
+        case .property: return .property
         case .chore: return .chore; case .choreCompletion: return .choreCompletion; case .project: return .project
         case .costLineItem: return .costLineItem; case .thing: return .thing; case .inventoryItem: return .inventoryItem
         case .measurement: return .measurement; case .space: return .space; case .level: return .level

@@ -30,7 +30,6 @@ struct HomeApp: App {
                     #endif
                     await env.start()
                 }
-                .onOpenURL { url in if !url.isFileURL { env.handle(url: url) } }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

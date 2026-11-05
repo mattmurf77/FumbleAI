@@ -38,6 +38,16 @@ enum Migrations {
                 """)
         }
         m.registerMigration("v7_device_document_library") { db in try db.execute(sql: documentLibrarySQL) }
+        m.registerMigration("v8_local_chore_preparation") { db in
+            try db.execute(sql: """
+                CREATE TABLE chore_preparation (
+                    chore_id TEXT PRIMARY KEY NOT NULL REFERENCES chore(id) ON DELETE CASCADE,
+                    work_mode TEXT CHECK(work_mode IN ('diy','hirePro')),
+                    guide_id TEXT,
+                    supplies_json TEXT
+                );
+                """)
+        }
         return m
     }
 

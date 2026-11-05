@@ -11,6 +11,9 @@ public struct Chore: SyncedModel {
     public var scope: Scope
     public var title: String
     public var notes: String?
+    public var guideID: String?
+    public var workMode: Chore.WorkMode?
+    public var supplyPlan: [ChoreSupply]?
     public var assigneeId: UUID?
     /// nil = one-off task (§9.1).
     public var repeatRule: RepeatRule?

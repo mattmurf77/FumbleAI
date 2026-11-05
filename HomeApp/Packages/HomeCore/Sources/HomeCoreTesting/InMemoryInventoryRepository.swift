@@ -171,7 +171,7 @@ public struct InMemoryInventoryRepository: InventoryRepository {
                 let detail = t.attributes["filterSize"]?.displayText ?? t.attributes["bulbBase"]?.displayText
                 lines.append(ShoppingLine(reason: .replacementDue, ref: .thing(tid), label: t.name + (detail.map { " – \($0)" } ?? "")))
             }
-            return lines
+            return ChoreShopping.merged(existing: lines, supplies: ChoreShopping.lines(property: property, chores: s.liveChores, inventory: s.liveInventory, things: s.liveThings))
         }
     }
 }
@@ -275,5 +275,15 @@ public struct InMemoryRecentlyDeletedRepository: RecentlyDeletedRepository {
         }
         for r in refs { try await purge(r) }
         return refs.count
+    }
+}
+
+extension InMemoryInventoryRepository {
+    public func buySelectedSupply(_ line: ShoppingLine, propertyId: UUID) async throws {
+        try store.write { s in
+            var (item, chores) = try ChoreShopping.purchase(line, property: propertyId, chores: s.liveChores, inventory: s.liveInventory, things: s.liveThings)
+            item.updatedAt = store.now; s.inventory[item.id] = item
+            for c in chores { s.chores[c.id] = c }
+        }
     }
 }

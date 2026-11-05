@@ -1,5 +1,6 @@
 import SwiftUI
 import QuickLook
+import PDFKit
 import HomeCore
 import HomeCapture
 
@@ -15,6 +16,7 @@ struct DocumentEditor: View {
     @State private var selectedDate: Date
     @State private var hasDate: Bool
     @State private var preview: URL?
+    @State private var pagePreview: SuggestedPage?
     @State private var file: URL?
     @State private var reading = false
     @State private var report: DocumentReading?
@@ -75,7 +77,7 @@ struct DocumentEditor: View {
             if let file {
                 Section {
                     if reading { ProgressView("Reading on this device…") }
-                    else { Button { Task { await read(file) } } label: { Label(report == nil ? "Look for details on this device" : "Read again", systemImage: "text.viewfinder") } }
+                    else { Button { Task { await read(file) } } label: { Label(report == nil ? "Look for details on this device" : "Read again", systemImage: "text.viewfinder") }.accessibilityIdentifier("documents.read") }
                     if let readMessage { Text(readMessage).font(.footnote).foregroundStyle(.secondary) }
                     if let report {
                         ForEach(report.candidates) { candidate in
@@ -83,7 +85,13 @@ struct DocumentEditor: View {
                                 Text("\(candidate.field.displayName) · Page \(candidate.page)").font(.caption).foregroundStyle(.secondary)
                                 Text(candidate.value).font(.headline)
                                 Text(candidate.excerpt).font(.footnote).foregroundStyle(.secondary).lineLimit(4)
-                                Button("Use this detail") { use(candidate) }.buttonStyle(.bordered).accessibilityLabel("Use \(candidate.field.displayName), \(candidate.value)")
+                                HStack {
+                                    Button("Use this detail") { use(candidate) }.buttonStyle(.bordered).accessibilityLabel("Use \(candidate.field.displayName), \(candidate.value)").accessibilityIdentifier("documents.use." + candidate.field.rawValue)
+                                    Button("View original") {
+                                        if file.pathExtension.lowercased() == "pdf" { pagePreview = SuggestedPage(file: file, page: candidate.page) }
+                                        else { preview = file }
+                                    }.buttonStyle(.borderless).accessibilityLabel("View original page \(candidate.page)").accessibilityIdentifier("documents.page." + candidate.field.rawValue)
+                                }
                             }.padding(.vertical, 3)
                         }
                     }
@@ -97,6 +105,13 @@ struct DocumentEditor: View {
             ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(saving || metadata.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("documents.save") }
         }
         .quickLookPreview($preview)
+        .sheet(item: $pagePreview) { request in
+            NavigationStack {
+                SuggestedPageView(request: request)
+                    .navigationTitle("Original · Page \(request.page)").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { pagePreview = nil } } }
+            }
+        }
         .alert("Document", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } })) { Button("OK") {} } message: { Text(problem ?? "") }
         .task(id: propertyId) { for await values in env.projects.observeProjects(.init(propertyId: propertyId)) { projects = values } }
         .task { if let original { file = await env.attachments.fileURL(for: original.attachment); if original.details.quoteAmount == nil, let home = try? await env.plan.currentProperty(), home.id == propertyId { quoteCurrency = home.currencyCode } } }
@@ -151,4 +166,24 @@ struct DocumentEditor: View {
             onSaved(); dismiss()
         } catch { problem = error.localizedDescription }
     }
+}
+
+private struct SuggestedPage: Identifiable {
+    let id = UUID()
+    let file: URL
+    let page: Int
+}
+
+private struct SuggestedPageView: UIViewRepresentable {
+    let request: SuggestedPage
+    func makeUIView(context: Context) -> PDFView {
+        let view = PDFView()
+        view.autoScales = true; view.displayDirection = .vertical
+        if let document = PDFDocument(url: request.file) {
+            view.document = document
+            if request.page > 0, request.page <= document.pageCount, let target = document.page(at: request.page - 1) { view.go(to: target) }
+        }
+        return view
+    }
+    func updateUIView(_ view: PDFView, context: Context) {}
 }

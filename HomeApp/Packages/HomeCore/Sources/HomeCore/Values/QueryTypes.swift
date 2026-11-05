@@ -148,14 +148,15 @@ public struct SeasonalSwap: Hashable, Codable, Sendable {
 
 /// Shopping list line (§11.5).
 public struct ShoppingLine: Hashable, Codable, Sendable, Identifiable {
-    public enum Reason: String, Codable, Hashable, Sendable { case low, replacementDue = "replacement_due" }
+    public enum Reason: String, Codable, Hashable, Sendable { case low, replacementDue = "replacement_due", toDoSupply = "todo_supply" }
     public var reason: Reason
     /// `.inventory(id)` for low items, `.thing(id)` for replacements due.
     public var ref: ItemRef
     public var label: String
     public var quantity: Double?
     public var unit: String?
-    public var id: String { "\(reason.rawValue):\(ref.id)" }
+    public var supplyKey: String?
+    public var id: String { reason.rawValue + ":" + (supplyKey ?? ref.id.uuidString) }
     public init(reason: Reason, ref: ItemRef, label: String, quantity: Double? = nil, unit: String? = nil) {
         self.reason = reason; self.ref = ref; self.label = label; self.quantity = quantity; self.unit = unit
     }

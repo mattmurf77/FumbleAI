@@ -137,6 +137,7 @@ public struct ProjectCSVItem: Hashable, Sendable, Identifiable {
     public var day: LocalDate?
     public var year: Int?
     public var cost: Money?
+    public var usesExportedLineTotal = false
     public var vendor: String?
     public var action: Project.WorkAction?
     public var notes: String?
@@ -209,13 +210,16 @@ public extension ProjectCSV {
                 if let code = statedCurrency, code.uppercased() != currency.uppercased() { throw ProjectCSVError("Currency \(code) differs from this home’s \(currency).") }
                 let (day, year) = try Self.date(mapped(.date), dayFirst: mapping.dayFirst)
                 var money = try Self.amount(mapped(.cost), currency: currency, decimalComma: mapping.decimalComma)
+                var usesLineTotal = false
                 if native, money == nil, mapping.columns[.cost] == normalized.firstIndex(of: "actualcost"),
                    let fallback = try Self.amount(cell(normalized.firstIndex(of: "spenteffective")), currency: currency, decimalComma: false), fallback.cents > 0 {
                     money = fallback
+                    usesLineTotal = true
                 }
                 let action = try Self.action(mapped(.action))
-                let item = ProjectCSVItem(row: row.id, sourceID: source, title: title, day: day, year: year, cost: money,
+                var item = ProjectCSVItem(row: row.id, sourceID: source, title: title, day: day, year: year, cost: money,
                                           vendor: mapped(.vendor), action: action, notes: mapped(.notes))
+                item.usesExportedLineTotal = usesLineTotal
                 try item.validate(currency: currency)
                 return .init(id: row.id, title: title, item: item, issue: nil)
             } catch { return .init(id: row.id, title: title, item: nil, issue: error.localizedDescription) }

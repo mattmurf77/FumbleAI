@@ -11,7 +11,8 @@ extension ProjectStore {
             if let other = try Project.fetchOne(database, id: id) { projects.append(other) }
         }
         let receipts = Set(try String.fetchAll(database, sql: "SELECT fingerprint FROM project_csv_import WHERE property_id = ?", arguments: [property.id.db]))
-        return try ProjectCSVBatch.review(rows, property: property, existing: projects) { receipts.contains(SHA256.hex(Data($0.signature.utf8))) }
+        let lines = rows.contains(where: \.usesExportedLineTotal) ? try CostLineItem.fetchAll(database, where: "property_id = ?", [property.id.db]) : []
+        return try ProjectCSVBatch.review(rows, property: property, existing: projects, lines: lines) { receipts.contains(SHA256.hex(Data($0.signature.utf8))) }
     }
 
     public func reviewCSVImport(_ rows: [ProjectCSVItem], propertyID: UUID) async throws -> [ProjectCSVDecision] {

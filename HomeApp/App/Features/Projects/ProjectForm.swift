@@ -18,10 +18,14 @@ struct ProjectForm: View {
     private let mode: Mode
     var onSaved: ((Project) -> Void)?
 
-    init(spaceID: UUID?, levelID: UUID?, initialStatus: Project.Status, onSaved: ((Project) -> Void)? = nil) {
+    init(spaceID: UUID?, levelID: UUID?, initialStatus: Project.Status, suggestion: MaintenanceIdea? = nil, onSaved: ((Project) -> Void)? = nil) {
         mode = .create(spaceID: spaceID, levelID: levelID, status: initialStatus)
         self.onSaved = onSaved
         _status = State(initialValue: initialStatus == .unknown ? .idea : initialStatus)
+        _title = State(initialValue: suggestion?.title ?? "")
+        if let idea = suggestion, let range = idea.costLabel, let source = idea.priceSource {
+            _notes = State(initialValue: "US professional planning range: " + range + ". " + idea.sourceLabel + ". " + source.absoluteString)
+        }
     }
 
     init(projectID: UUID, onSaved: ((Project) -> Void)? = nil) {
@@ -45,7 +49,13 @@ struct ProjectForm: View {
     @State private var actualHoursText = ""
     @State private var hasTarget = false
     @State private var targetOn = LocalDate(2026, 1, 1)
-    @State private var hasCompletionDate = false
+    private enum CompletionPrecision: Hashable { case unknown, year, day }
+    @State private var completionPrecision: CompletionPrecision = .unknown
+    @State private var completionYearText = ""
+    private var completionYear: Int? {
+        guard completionYearText.count == 4, let value = Int(completionYearText), (1...9999).contains(value) else { return nil }
+        return value
+    }
     @State private var completedOn = LocalDate(2026, 1, 1)
     @State private var vendor = ""
     @State private var saving = false
@@ -62,6 +72,7 @@ struct ProjectForm: View {
     private var actual: ProjectInput.MoneyResult { ProjectInput.money(actualText, currency: currency) }
 
     private var inputsValid: Bool {
+        if status == .done, completionPrecision == .year, completionYear == nil { return false }
         if case .invalid = est { return false }
         if case .invalid = actual { return false }
         return ProjectInput.hours(estHoursText) != nil && ProjectInput.hours(actualHoursText) != nil
@@ -107,8 +118,15 @@ struct ProjectForm: View {
                 if status == .done || status == .inProgress || !actualText.isEmpty {
                     Section {
                         if status == .done {
-                            Toggle("Include completion date", isOn: $hasCompletionDate)
-                            if hasCompletionDate {
+                            Picker("Completion date", selection: $completionPrecision) {
+                                Text("Unknown").tag(CompletionPrecision.unknown)
+                                Text("Year only").tag(CompletionPrecision.year)
+                                Text("Exact date").tag(CompletionPrecision.day)
+                            }
+                            if completionPrecision == .year {
+                                TextField("Four-digit completion year", text: $completionYearText)
+                                    .keyboardType(.numberPad).accessibilityIdentifier("project.completionYear")
+                            } else if completionPrecision == .day {
                                 DatePicker("Completed", selection: $completedOn.scheduleDate(env.clock.calendar),
                                            in: ...env.clock.now, displayedComponents: .date)
                             }
@@ -180,7 +198,8 @@ struct ProjectForm: View {
             workAction = p.workAction
             priority = p.priority; estText = ProjectInput.text(p.estCost); estHoursText = ProjectInput.text(p.estHours)
             actualText = ProjectInput.text(p.actualCost); actualHoursText = ProjectInput.text(p.actualHours)
-            hasCompletionDate = p.completedOn != nil
+            completionPrecision = p.completedOn != nil ? .day : (p.completedYear != nil ? .year : .unknown)
+            completionYearText = p.completedYear.map(String.init) ?? ""
             hasTarget = p.targetOn != nil; targetOn = p.targetOn ?? targetOn; completedOn = p.completedOn ?? today
             vendor = p.vendor ?? ""; currency = p.currencyCode
             statusTouched = true
@@ -215,14 +234,18 @@ struct ProjectForm: View {
                 p.targetOn = hasTarget ? targetOn : nil
                 p.vendor = vendorValue.isEmpty ? nil : vendorValue
                 if p.status != status { p = ProjectLogic.setStatus(p, status, today: today) }
-                if status == .done { p.completedOn = hasCompletionDate ? completedOn : nil }
+                if status == .done {
+                    p.completedOn = completionPrecision == .day ? completedOn : nil
+                    p.completedYear = completionPrecision == .year ? completionYear : nil
+                }
                 try await env.projects.update(p)
                 saved = p
             } else {
                 let draft = ProjectDraft(propertyId: propertyId, scope: scope, title: trimmedTitle,
                                          notes: notesValue.isEmpty ? nil : notesValue, status: status, workAction: workAction, priority: priority,
                                          estCost: estMoney, actualCost: actualMoney, estHours: estHours, actualHours: actualHours,
-                                         targetOn: hasTarget ? targetOn : nil, completedOn: status == .done && hasCompletionDate ? completedOn : nil,
+                                         targetOn: hasTarget ? targetOn : nil, completedOn: status == .done && completionPrecision == .day ? completedOn : nil,
+                                         completedYear: status == .done && completionPrecision == .year ? completionYear : nil,
                                          vendor: vendorValue.isEmpty ? nil : vendorValue)
                 saved = try await env.projects.create(draft)
             }

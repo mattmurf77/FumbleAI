@@ -15,6 +15,7 @@ struct HomeDocumentsView: View {
     }
     @State private var documents: [HomeDocument]?
     @State private var query = ""
+    @State private var projectNames: [UUID: String] = [:]
     @State private var category: HomeDocumentCategory?
     @State private var importing = false
     @State private var scanning = false
@@ -31,20 +32,24 @@ struct HomeDocumentsView: View {
                 if documents.isEmpty {
                     ContentUnavailableView { Label("Keep your home documents", systemImage: "folder") } description: { Text("File permits, insurance policies, appliance warranties and invoices here. Link them to a project whenever it helps.") } actions: { importButton }
                 } else {
-                    let filtered = documents.filter { (projectId == nil || $0.linkedProjectId == projectId) && $0.matches(query) && (category == nil || $0.details.category == category) }
-                    if filtered.isEmpty { ContentUnavailableView("No matching documents", systemImage: "magnifyingglass", description: Text("Try another search or choose All types.")) }
+                    let filtered = documents.filter { (projectId == nil || $0.linkedProjectId == projectId) && $0.matches(query, projectName: $0.linkedProjectId.flatMap { projectNames[$0] }) && (category == nil || $0.details.category == category) }
+                    if filtered.isEmpty {
+                        ContentUnavailableView { Label(projectId == nil ? "No matching documents" : "No matching files for this project", systemImage: "doc.text.magnifyingglass") } description: {
+                            Text("Import a file or change your search.")
+                        } actions: { importButton }
+                    }
                     ForEach(filtered) { doc in
                         NavigationLink { HomeDocumentDetail(id: doc.id, propertyId: property.id) } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(doc.details.title).font(.headline)
-                                Text([doc.details.category.label, doc.details.documentDate.map(ScheduleFormat.longDay) ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(.secondary).font(.subheadline)
+                                Text([doc.details.category.label, doc.details.documentDate.map(ScheduleFormat.longDay) ?? "", doc.linkedProjectId.flatMap { projectNames[$0] } ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(.secondary).font(.subheadline)
                             }
                         }.accessibilityIdentifier("documents.item.\(doc.id)")
                     }
                 }
             } else if failed { Button("Reload documents") { retry += 1 } } else { ProgressView("Loading documents…") }
         }
-        .navigationTitle("Documents").navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(projectId == nil ? "Documents" : "Project documents").navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "Title, type or confirmed detail")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -64,6 +69,9 @@ struct HomeDocumentsView: View {
         }, onCancel: { scanning = false }) }
         .sheet(item: $source) { file in NavigationStack { DocumentEditor(propertyId: property.id, source: file, defaultCategory: initialCategory ?? .other, defaultProject: projectId, currency: property.currencyCode) } }
         .alert("Documents", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } })) { Button("OK") {} } message: { Text(problem ?? "") }
+        .task(id: property.id) {
+            for await values in env.projects.observeProjects(.init(propertyId: property.id)) { projectNames = Dictionary(uniqueKeysWithValues: values.map { ($0.id, $0.title) }) }
+        }
         .task(id: "\(property.id)-\(retry)") {
             failed = false
             for await next in env.attachments.observeDocuments(propertyId: property.id) { documents = next }
@@ -95,6 +103,7 @@ struct HomeDocumentDetail: View {
                 Section {
                     Button { Task { if let url = await env.attachments.fileURL(for: doc.attachment) { preview = url } else { problem = "The original is unavailable on this iPhone. Check iCloud sync for earlier attachments." } } } label: { Label("Open original", systemImage: "doc.text.magnifyingglass") }.accessibilityIdentifier("documents.preview")
                     LabeledContent("File", value: doc.details.originalFilename ?? "Original filename unrecorded")
+                    LabeledContent("Date filed", value: doc.attachment.createdAt.formatted(date: .abbreviated, time: .omitted))
                     LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: Int64(doc.attachment.byteSize), countStyle: .file))
                 }
                 Section("Details") {
@@ -102,7 +111,10 @@ struct HomeDocumentDetail: View {
                     if let date = doc.details.documentDate { LabeledContent("Document date", value: ScheduleFormat.longDay(date)) }
                     if let amount = doc.details.quoteAmount { LabeledContent("Quoted price", value: amount.formatted() + " " + amount.currency) }
                     if let projectName { LabeledContent("Linked project", value: projectName) }
-                    ForEach(doc.details.confirmedFields.keys.sorted(), id: \.self) { key in LabeledContent(DocumentField(rawValue: key)?.displayName ?? key, value: doc.details.confirmedFields[key] ?? "") }
+                    ForEach(doc.details.confirmedFields.keys.sorted(), id: \.self) { key in
+                        let label = DocumentField(rawValue: key)?.displayName ?? key, value = doc.details.confirmedFields[key] ?? ""
+                        LabeledContent(label, value: value).accessibilityElement(children: .ignore).accessibilityLabel(label).accessibilityValue(value).accessibilityIdentifier("documents.confirmed." + key)
+                    }
                 }
                 Button("Edit details") { editing = doc }.accessibilityIdentifier("documents.edit")
                 Button("Delete document", role: .destructive) { removing = true }

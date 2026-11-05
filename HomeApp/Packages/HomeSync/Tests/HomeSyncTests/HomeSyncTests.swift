@@ -112,6 +112,11 @@ final class MapperAndMergeTests: XCTestCase {
         server = ["status": .string("planned"), "completed_on": .null]
         m = MergePolicy.merge(.project, server: server, local: local, changed: ["status"], today: today)
         XCTAssertEqual(m["completed_on"], .null)
+        // A locally entered year replaces an older exact date as a single completion group.
+        local = ["status": .string("done"), "completed_on": .null, "completed_year": .int(2021)]
+        server = ["status": .string("done"), "completed_on": .string("2020-08-15"), "completed_year": .null]
+        m = MergePolicy.merge(.project, server: server, local: local, changed: ["completed_year"], today: today)
+        XCTAssertEqual(m["completed_year"], .int(2021)); XCTAssertEqual(m["completed_on"], .null)
         // Thing attributes: key-level overlay.
         server = ["attributes_json": .string(#"{"filterSize":"16x25x1","merv":8}"#)]
         local = ["attributes_json": .string(#"{"filterSize":"20x25x1","merv":11}"#)]

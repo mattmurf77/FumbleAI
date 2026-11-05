@@ -53,6 +53,7 @@ struct RootView: View {
             }
         }
         .onOpenURL { url in
+            if !url.isFileURL { env.handle(url: url); return }
             guard OpenSpreadsheet.accepts(url) else { return }
             Task {
                 do {

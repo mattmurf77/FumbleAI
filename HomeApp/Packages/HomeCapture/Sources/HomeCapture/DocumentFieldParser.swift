@@ -45,15 +45,9 @@ struct DocumentFieldParser {
                     default: add(rule.field, capture, line: line, page: page.number)
                     }
                 }
-                let totalField: DocumentField?
-                switch category {
-                case "receipt": totalField = .receiptTotal
-                case "invoice": totalField = .invoiceTotal
-                case "estimate": totalField = .estimateTotal
-                default: totalField = nil
-                }
-                if let field = totalField, let total = totalRule.match(line), total.firstMatch(of: amountRegex) != nil {
-                    add(field, total, line: line, page: page.number)
+                if let category, let rule = totals[category], let total = rule.match(line),
+                   total.firstMatch(of: amountRegex) != nil {
+                    add(rule.field, total, line: line, page: page.number)
                 }
                 if category == "receipt" || category == "invoice",
                    let label = dateRule.match(line), let date = unambiguousDate(label) {
@@ -110,7 +104,11 @@ struct DocumentFieldParser {
         Rule(.invoiceDate, #"invoice date|date invoiced"#)
     ]
     private static let dateRule = Rule(.receiptDate, "date")
-    private static let totalRule = Rule(.receiptTotal, #"grand total|invoice total|receipt total|estimate total|quoted total|total estimate|quoted price|proposal price|bid total|total(?: paid| due| amount)?"#)
+    private static let totals = [
+        "receipt": Rule(.receiptTotal, #"grand total|receipt total|total paid|total amount|total"#),
+        "invoice": Rule(.invoiceTotal, #"grand total|invoice total|total amount|total"#),
+        "estimate": Rule(.estimateTotal, #"grand total|estimate total|quoted total|total estimate|quoted price|proposal price|bid total|total"#)
+    ]
     private static let amountRegex = try! Regex(#"^(?:(?:USD|CAD|AUD|EUR|GBP)\s*|[$€£]\s*)?[0-9]{1,12}(?:[,. ][0-9]{3})*(?:[.,][0-9]{2})?(?:\s*(?:USD|CAD|AUD|EUR|GBP))?$"#)
 
     private static func unambiguousDate(_ value: String) -> String? {

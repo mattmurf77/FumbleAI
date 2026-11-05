@@ -19,6 +19,8 @@ struct MainTabView: View {
     @State private var model = HomeHubModel()
     @State private var sharedText: SharedText?
     @State private var sharedItem: SharedInboxItem?
+    @State private var sharedSpreadsheet: SharedCaptureInbox.PendingSpreadsheet?
+    @State private var spreadsheetKey: UUID?
     @State private var sharedQueue: [SharedInboxItem] = []
     @State private var demoSheet: DemoSheet?
 
@@ -70,6 +72,26 @@ struct MainTabView: View {
         .onAppear { applyDemo() }
         .sheet(item: $demoSheet) { $0.view }
         .onChange(of: scenePhase, initial: true) { _, phase in if phase == .active { collectShared() } }
+        .onChange(of: model.property?.id) { _, property in
+            if property != nil && scenePhase == .active { collectShared() }
+        }
+        .sheet(item: $sharedSpreadsheet, onDismiss: {
+            if let spreadsheetKey { SharedCaptureInbox.finishSpreadsheet(spreadsheetKey) }
+            spreadsheetKey = nil
+            showNextShared()
+        }) { pending in
+            NavigationStack {
+                Group {
+                    if let sheet = pending.file, let property = model.property {
+                        ProjectCSVImportView(property: property, initialFile: .init(name: sheet.name, data: sheet.bytes))
+                    } else {
+                        ContentUnavailableView("Couldn’t open the shared spreadsheet", systemImage: "tablecells",
+                                               description: Text(SharedInbox.Spreadsheet.openInFiles))
+                    }
+                }
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { sharedSpreadsheet = nil } } }
+            }
+        }
         .sheet(item: $sharedText, onDismiss: showNextShared) { shared in
             QuickCaptureSheet(initialText: shared.text)
         }
@@ -94,9 +116,9 @@ struct MainTabView: View {
     /// Shares waiting from the share extension: to-do text → Quick add (review step) on the To-Dos tab; receipts,
     /// documents and notes → "File it" on the Projects tab (after Quick add, one at a time).
     private func collectShared() {
-        guard sharedText == nil, sharedItem == nil, demoSheet == nil else { return }
+        guard DemoLaunch.current == nil, model.property != nil, sharedText == nil,
+              sharedItem == nil, sharedSpreadsheet == nil, demoSheet == nil else { return }
         let taken = SharedCaptureInbox.takeAll()
-        guard !taken.isEmpty else { return }
         let todoText = taken.filter(\.entry.isTodoList).map(\.entry.text).filter { !$0.isEmpty }
         sharedQueue += taken.filter { !$0.entry.isTodoList }.compactMap(SharedInboxItem.make(from:))
         if !todoText.isEmpty {
@@ -109,9 +131,16 @@ struct MainTabView: View {
 
     /// The next receipt / document / note waiting to be filed, if any.
     private func showNextShared() {
-        guard sharedText == nil, sharedItem == nil, !sharedQueue.isEmpty else { return }
-        tab = .projects
-        sharedItem = sharedQueue.removeFirst()
+        guard DemoLaunch.current == nil, model.property != nil, sharedText == nil,
+              sharedItem == nil, sharedSpreadsheet == nil, demoSheet == nil else { return }
+        if !sharedQueue.isEmpty {
+            tab = .projects
+            sharedItem = sharedQueue.removeFirst()
+        } else if let next = SharedCaptureInbox.nextSpreadsheet() {
+            tab = .projects
+            spreadsheetKey = next.id
+            sharedSpreadsheet = next
+        }
     }
 
         private func tabLabel(_ t: AppTab) -> some View {

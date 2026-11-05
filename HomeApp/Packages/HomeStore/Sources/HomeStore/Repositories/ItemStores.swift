@@ -52,6 +52,7 @@ public struct ChoreStore: ChoreRepository {
         let c = ChoreLogic.make(from: draft, now: db.clock.now, engine: db.engine)
         return try await db.write { tx in
             let saved = try tx.save(c)
+            try Self.putPreparation(c, in: tx)
             tx.emit(.created(.chore(c.id)))
             return saved
         }
@@ -65,6 +66,7 @@ public struct ChoreStore: ChoreRepository {
                 c = ChoreLogic.recomputeNextDue(c, completions: try Self.completions(tx.db, chore: c.id), engine: tx.engine)
             }
             try tx.save(c)
+            try Self.putPreparation(c, in: tx)
             tx.emit(.updated(.chore(c.id)))
         }
     }

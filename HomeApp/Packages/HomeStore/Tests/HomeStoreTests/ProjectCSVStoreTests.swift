@@ -51,12 +51,44 @@ struct ProjectCSVStoreTests {
         } catch is DatabaseError {}
         let count = try await db.read { d in
             try [Int.fetchOne(d, sql: "SELECT COUNT(*) FROM project"),
-                 Int.fetchOne(d, sql: "SELECT COUNT(*) FROM project_csv_import")]
+                 Int.fetchOne(d, sql: "SELECT COUNT(*) FROM project_csv_import"),
+                 Int.fetchOne(d, sql: "SELECT COUNT(*) FROM sync_outbox WHERE record_type = 'Project'")]
         }
-        #expect(count == [0, 0])
+        #expect(count == [0, 0, 0])
         try await db.write { try $0.db.execute(sql: "DROP TRIGGER csv_rollback_probe") }
         let retry = try await repository.importCompletedCSV([first, second], propertyID: home.id)
         #expect(retry.allSatisfy { $0.disposition == .ready })
+    }
+
+    @Test func recognizesAnExistingExportWithOnlyUnderlyingExpenses() async throws {
+        let db = try AppDatabase.inMemory()
+        let home = Property()
+        let project = Project(propertyId: home.id, scope: .property, title: "Roof", status: .done)
+        let line = CostLineItem(propertyId: home.id, projectId: project.id, label: "Repair", amount: .init(cents: 2595), kind: .labor)
+        try await db.write { tx in _ = try tx.save(home); _ = try tx.save(project); _ = try tx.save(line) }
+        let repo = ProjectStore(db, files: .init(directory: FileManager.default.temporaryDirectory))
+        let text = "id,title,status,actual_cost,spent_effective,currency\n\(project.id),Roof,done,,25.95,USD"
+        let file = try ProjectCSV(data: Data(text.utf8))
+        let rows = try file.review(mapping: .init(file), currency: "USD").compactMap(\.item)
+        #expect(rows.first?.usesExportedLineTotal == true)
+        let outcome = try await repo.importCompletedCSV(rows, propertyID: home.id)
+        #expect(outcome.first?.disposition == .duplicate)
+        #expect(try await repo.project(project.id)?.actualCost == nil)
+    }
+
+    @Test func simultaneousImportsCreateOneProject() async throws {
+        let db = try AppDatabase.inMemory()
+        let owner = Property()
+        let repository = ProjectStore(db, files: .init(directory: FileManager.default.temporaryDirectory))
+        _ = try await db.write { try $0.save(owner) }
+        let rows = [ProjectCSVItem(row: 2, title: "Insulation", year: 2021, cost: .init(cents: 18325))]
+        async let a = repository.importCompletedCSV(rows, propertyID: owner.id)
+        async let b = repository.importCompletedCSV(rows, propertyID: owner.id)
+        let (left, right) = try await (a, b)
+        let outcomes = (left + right).map(\.disposition)
+        #expect(outcomes.filter { $0 == .ready }.count == 1)
+        #expect(outcomes.filter { $0 == .duplicate }.count == 1)
+        #expect(try await repository.projects(.past(owner.id)).count == 1)
     }
 
     @Test func foreignSourceIDsAndChangedDataDoNotOverwriteProjects() async throws {
@@ -88,9 +120,12 @@ struct ProjectCSVStoreTests {
         }
         try Migrations.migrator.migrate(q)
         try q.read { d in
-            #expect(try String.fetchOne(d, sql: "SELECT completed_on FROM project WHERE id='p'") == "2020-07-04")
-            #expect(try Int.fetchOne(d, sql: "SELECT COUNT(*) FROM project WHERE completed_year IS NOT NULL") == 0)
-            #expect(try Int.fetchOne(d, sql: "SELECT COUNT(*) FROM project_csv_import") == 0)
+            let originalDay = try String.fetchOne(d, sql: "SELECT completed_on FROM project WHERE id='p'")
+            let partialYears = try Int.fetchOne(d, sql: "SELECT COUNT(*) FROM project WHERE completed_year IS NOT NULL")
+            let receipts = try Int.fetchOne(d, sql: "SELECT COUNT(*) FROM project_csv_import")
+            #expect(originalDay == "2020-07-04")
+            #expect(partialYears == 0)
+            #expect(receipts == 0)
         }
     }
 }

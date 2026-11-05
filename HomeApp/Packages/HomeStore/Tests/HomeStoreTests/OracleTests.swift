@@ -12,14 +12,16 @@ final class OracleTests: XCTestCase {
         let names = try await store.database.read { d in try String.fetchAll(d, sql: "SELECT name FROM sqlite_master WHERE type IN ('table')") }
         for t in RecordType.allCases { XCTAssertTrue(names.contains(t.tableName), t.tableName) }
         for t in ["sync_state", "sync_record_meta", "sync_outbox", "sync_orphan", "calendar_event_cache", "attachment_local",
-                  "map_snapshot_cache", "notification_snooze", "app_meta", "search_fts"] {
+                  "map_snapshot_cache", "notification_snooze", "app_meta", "search_fts",
+                  "project_csv_import", "home_document_local", "chore_preparation"] {
             XCTAssertTrue(names.contains(t), t)
         }
         let applied = try await store.database.read { d in try String.fetchAll(d, sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid") }
-        XCTAssertEqual(Array(applied.prefix(4)), ["v1_core", "v1_local", "v1_search", "v2_outdoor_things"])
-        XCTAssertEqual(Set(applied).count, applied.count)
-        XCTAssertTrue(applied.contains("v4_undated_past_work"))
-        XCTAssertTrue(applied.contains("v5_project_work_action"))
+        XCTAssertEqual(applied, [
+            "v1_core", "v1_local", "v1_search", "v2_outdoor_things",
+            "v4_undated_past_work", "v5_project_work_action", "v6_project_csv_history",
+            "v7_device_document_library", "v8_local_chore_preparation"
+        ])
     }
 
     func testEveryModelRoundTrips() async throws {

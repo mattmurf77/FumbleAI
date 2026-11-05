@@ -46,31 +46,7 @@ enum OpenSpreadsheet {
 
     static func read(_ url: URL) throws -> ProjectCSVFile {
         guard accepts(url) else { throw CocoaError(.fileReadUnsupportedScheme) }
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        let coordinator = NSFileCoordinator()
-        var coordinationError: NSError?
-        var result: Result<Data, Error>?
-        coordinator.coordinate(readingItemAt: url, options: .withoutChanges, error: &coordinationError) { coordinated in
-            result = Result {
-                let values = try coordinated.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-                guard values.isRegularFile == true, let size = values.fileSize, size > 0, size <= ProjectCSVFile.maxBytes else {
-                    throw SourceError()
-                }
-                let handle = try FileHandle(forReadingFrom: coordinated)
-                defer { try? handle.close() }
-                let limit = ProjectCSVFile.maxBytes
-                let bytes = try handle.read(upToCount: limit + 1) ?? Data()
-                guard !bytes.isEmpty, bytes.count <= limit else { throw SourceError() }
-                return bytes
-            }
-        }
-        if let coordinationError { throw coordinationError }
-        guard let result else { throw CocoaError(.fileReadUnknown) }
-        return try ProjectCSVFile(name: url.lastPathComponent, data: result.get())
+        return try ProjectCSVFile.read(url)
     }
 
-    struct SourceError: LocalizedError {
-        var errorDescription: String? { "Choose a CSV or tab-separated file between one byte and 4 MB." }
-    }
 }

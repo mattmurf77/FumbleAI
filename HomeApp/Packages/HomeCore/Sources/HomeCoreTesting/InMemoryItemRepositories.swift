@@ -23,12 +23,14 @@ public struct InMemoryChoreRepository: ChoreRepository {
     public func completions(chore: UUID) async throws -> [ChoreCompletion] { store.read { $0.liveCompletions.filter { $0.choreId == chore } } }
 
     public func create(_ draft: ChoreDraft) async throws -> Chore {
+        try ChoreSupply.validate(draft.supplyPlan ?? [])
         let c = ChoreLogic.make(from: draft, now: store.now, engine: store.engine)
         store.write(events: [.created(.chore(c.id))]) { $0.chores[c.id] = c }
         return c
     }
 
     public func update(_ chore: Chore) async throws {
+        try ChoreSupply.validate(chore.supplyPlan ?? [])
         var c = chore
         c.updatedAt = store.now
         try store.write(events: [.updated(.chore(c.id))]) { s in

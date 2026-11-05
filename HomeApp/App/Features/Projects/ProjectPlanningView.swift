@@ -9,6 +9,7 @@ struct ProjectPlanningView: View {
     @State private var quotes: [HomeDocument] = []
     @State private var budgetText: String
     @State private var showingRequest = false
+    @State private var costGuide: ProjectCostGuide?
     @State private var benchmark: RecoveryBenchmark?
     @State private var recoveryText = ""
     @State private var rateText = ""
@@ -23,6 +24,16 @@ struct ProjectPlanningView: View {
         Form {
             Section {
                 ProjectMoneyField(title: "Project cost", text: $budgetText, currency: project.currencyCode)
+                if project.currencyCode == "USD" {
+                    Picker("Compare with a cost guide", selection: $costGuide) {
+                        Text("Choose a project").tag(Optional<ProjectCostGuide>.none)
+                        ForEach(ProjectCostGuide.allCases, id: \.self) { Text($0.rawValue).tag(Optional($0)) }
+                    }
+                    if let costGuide {
+                        LabeledContent("US project range", value: costGuide.range)
+                        Link(costGuide.source, destination: costGuide.url)
+                    }
+                }
                 if !budgetText.isEmpty && budget == nil {
                     Text("Enter a positive amount in \(project.currencyCode).").font(.footnote)
                 }
@@ -115,6 +126,16 @@ struct ProjectPlanningView: View {
             Link("Understand home-equity borrowing", destination: Self.borrowingURL)
         } header: { Text("Paying for the work") } footer: {
             Text("Use terms from your lender. The illustration assumes you finance the full project cost at a fixed rate, with no fees.")
+        }
+    }
+
+    private enum ProjectCostGuide: String, CaseIterable {
+        case kitchen = "Kitchen remodel", bathroom = "Bathroom remodel"
+        var range: String { self == .kitchen ? "$14,592–$41,617 USD" : "$6,651–$17,662 USD" }
+        var source: String { self == .kitchen ? "Angi project data · September 2026" : "Angi project data · October 2026" }
+        var url: URL {
+            self == .kitchen ? URL(string: "https://www.angi.com/articles/how-much-should-kitchen-remodel-cost.htm")!
+                : URL(string: "https://www.angi.com/articles/how-much-does-bathroom-remodel-cost.htm")!
         }
     }
 

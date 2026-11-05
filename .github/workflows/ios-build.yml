@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   build:
-    name: Build app and test packages
+    name: Test the iPhone app and archive Release
     runs-on: macos-26
     timeout-minutes: 60
     env:
@@ -42,7 +42,6 @@ jobs:
         with:
           path: |
             .spm
-            HomeApp/Packages/*/.build
           key: spm-${{ runner.os }}-${{ hashFiles('HomeApp/project.yml', 'HomeApp/**/Package.swift', 'HomeApp/**/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
@@ -50,17 +49,18 @@ jobs:
         working-directory: HomeApp
         run: xcodegen generate
 
-      - name: Build and test on iPhone Simulator
+      - name: Build and run homeowner journeys on iPhone
+        timeout-minutes: 30
         working-directory: HomeApp
         run: |
           set -o pipefail
-          ../.github/scripts/test-iphone.sh | if command -v xcbeautify >/dev/null; then xcbeautify --renderer github-actions; else cat; fi
+          ../.github/scripts/test-iphone.sh HomeUITests | if command -v xcbeautify >/dev/null; then xcbeautify --renderer github-actions; else cat; fi
 
       - name: Export iPhone screenshots
         if: always()
         run: |
-          if [[ -d "$RUNNER_TEMP/HomeBlueprint.xcresult" ]]; then
-            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/HomeBlueprint.xcresult" \
+          if [[ -d "$RUNNER_TEMP/HomeUITests.xcresult" ]]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/HomeUITests.xcresult" \
               --output-path "$RUNNER_TEMP/HomeBlueprintScreens" || echo "The xcresult contains no exportable screenshots."
           fi
 
@@ -73,23 +73,57 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Test Apple billing, PDF and app services on iPhone
+        if: ${{ !cancelled() }}
+        timeout-minutes: 15
+        working-directory: HomeApp
+        run: |
+          set -o pipefail
+          ../.github/scripts/test-iphone.sh HomeTests | if command -v xcbeautify >/dev/null; then xcbeautify --renderer github-actions; else cat; fi
+
       - name: Save iPhone test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: iphone-test-results
-          path: ${{ runner.temp }}/HomeBlueprint.xcresult
+          path: |
+            ${{ runner.temp }}/HomeUITests.xcresult
+            ${{ runner.temp }}/HomeTests.xcresult
           if-no-files-found: ignore
           retention-days: 7
 
-      # Pure packages first (fast, no Apple frameworks), then the platform packages, whose macOS builds also
-      # compile the CloudKit / EventKit / UserNotifications / MapKit / SwiftUI code paths.
+      - name: Validate an unsigned Release archive
+        if: success()
+        working-directory: HomeApp
+        run: |
+          xcodebuild -project Home.xcodeproj -scheme Home -configuration Release -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath "$SPM_DIR" -skipPackagePluginValidation -skipMacroValidation \
+            -archivePath "$RUNNER_TEMP/HomeBlueprint.xcarchive" archive CODE_SIGNING_ALLOWED=NO HOME_CLOUD_SYNC=NO -quiet
+          app="$RUNNER_TEMP/HomeBlueprint.xcarchive/Products/Applications/Home.app"
+          test -f "$app/Home" && test -f "$app/PrivacyInfo.xcprivacy" && test -d "$app/PlugIns/HomeShare.appex"
+          test -z "$(find "$app" -name '*.storekit' -print -quit)"
+
+  packages:
+    name: Test all eight Swift packages
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - uses: actions/cache@v4
+        with:
+          path: HomeApp/Packages/*/.build
+          key: package-tests-${{ runner.os }}-${{ hashFiles('HomeApp/**/Package.swift', 'HomeApp/**/Package.resolved') }}
       - name: Test Swift packages (macOS)
-        if: always()
         run: |
           set -euo pipefail
+          failed=0
           for pkg in PlanKit HomeCore HomeStore HomeSync HomeSchedule HomeCapture HomeExterior PlanCanvas; do
             echo "::group::swift test $pkg"
-            swift test --package-path "HomeApp/Packages/$pkg"
+            swift test --package-path "HomeApp/Packages/$pkg" || failed=1
             echo "::endgroup::"
           done
+          exit "$failed"
