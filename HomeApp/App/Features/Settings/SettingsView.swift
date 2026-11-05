@@ -321,6 +321,8 @@ struct SettingsView: View {
         Section("About") {
             LabeledContent("Version", value: Self.versionText)
             NavigationLink("Diagnostics") { DiagnosticsView() }
+            NavigationLink("Privacy policy") { ProductInfoView(page: .privacy) }
+            NavigationLink("Support") { ProductInfoView(page: .support) }
             NavigationLink("Acknowledgments") { AcknowledgmentsView() }
         }
     }

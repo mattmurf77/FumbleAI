@@ -19,4 +19,4 @@ xcodebuild -project Home.xcodeproj -scheme Home -configuration Debug \
   -destination "platform=iOS Simulator,id=$device" -parallel-testing-enabled NO \
   -clonedSourcePackagesDirPath "$SPM_DIR" -skipPackagePluginValidation -skipMacroValidation \
   -resultBundlePath "$RUNNER_TEMP/HomeBlueprint.xcresult" \
-  test CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM=""
+  test HOME_CLOUD_SYNC=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM=""

@@ -8,6 +8,18 @@ Use the existing **Home Blueprint** app record, Apple ID **6817578211**. In App 
 
 Create a **non-consumable** called **Home Brief**. The proposed US storefront price is **$14.99**, which is also the local fixture price. Configure availability, the production price, localizations and the review screenshot in App Store Connect. The publisher’s Paid Apps Agreement, tax and banking details must be active. Submit the first purchase with the app version.
 
+## Read the catalog or create a draft
+
+From the repository root, the existing `bundle exec fastlane ios status` lane also checks Home Brief. It derives the SKU from the bundle returned by Apple for app 6817578211. It reports absence or product type, state, locales, US price periods and availability, subject to the key’s permissions. The status client accepts GET requests only. A permission error is reported as an incomplete check.
+
+The separate, manual `bundle exec fastlane ios prepare_home_brief` lane uses the same Fastlane authentication and `HOME_BUNDLE_ID`. Use it only for intentional draft setup. For an absent SKU, it creates the non-consumable and en-US localization, selects the exact $14.99 US price point Apple returns for that IAP, and requests availability in the USA only, with automatic availability in future territories turned off. The catalog read at the end reports Apple’s resulting configuration. The English description is “Export selected home projects as a PDF.”
+
+An existing SKU is read back and preserved. If Apple interrupts setup after creating the new product, keep its logged Apple product resource ID. Read the status, then use `bundle exec fastlane ios prepare_home_brief resume_id:APPLE_RESOURCE_ID` to fill missing configuration for that exact MISSING_METADATA draft. Any existing localization, price schedule or availability is preserved. If an existing setting needs a change, review it directly in App Store Connect. Coordinate with other App Store Connect editors during manual setup.
+
+The helper can post only to Apple’s product, localization, price-schedule and availability endpoints. Review screenshots, submission, agreements, tax/banking and release remain separate publisher steps. No automatic workflow triggers the draft helper.
+
+[Apple product API and pricing examples](https://developer.apple.com/documentation/appstoreconnectapi/managing-in-app-purchases) · [Apple availability request](https://developer.apple.com/documentation/appstoreconnectapi/post-v1-inapppurchaseavailabilities) · [Apple product metadata limits](https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-information/)
+
 ## Verification
 
 - The Home scheme uses the local StoreKit configuration when run from Xcode. The fixture is included in HomeTests and excluded from the app archive. Keep the default bundle ID when running these simulator tests. Demo screenshots and SwiftUI purchase previews do not contact the App Store.

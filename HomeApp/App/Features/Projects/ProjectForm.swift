@@ -37,6 +37,7 @@ struct ProjectForm: View {
     @State private var scope: Scope = .property
     @State private var status: Project.Status = .idea
     @State private var statusTouched = false
+    @State private var workAction: Project.WorkAction?
     @State private var priority: Int?
     @State private var estText = ""
     @State private var estHoursText = ""
@@ -51,6 +52,10 @@ struct ProjectForm: View {
     @State private var errorText: String?
 
     private var isEditing: Bool { if case .edit = mode { return true }; return false }
+    private var loggingHistory: Bool {
+        if case .create(_, _, .done) = mode { return true }
+        return false
+    }
     private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private var est: ProjectInput.MoneyResult { ProjectInput.money(estText, currency: currency) }
@@ -62,32 +67,40 @@ struct ProjectForm: View {
         return ProjectInput.hours(estHoursText) != nil && ProjectInput.hours(actualHoursText) != nil
     }
 
-    private var canSave: Bool { loaded && !saving && propertyId != nil && !trimmedTitle.isEmpty && inputsValid }
+    private var canSave: Bool { loaded && !saving && propertyId != nil && (!isEditing || original != nil) && !trimmedTitle.isEmpty && inputsValid }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Title, e.g. LVP flooring", text: $title)
+                    TextField(loggingHistory ? "e.g. Replaced the kitchen windows" : "Title, e.g. LVP flooring", text: $title)
+                        .accessibilityLabel(loggingHistory ? "What changed?" : "Project title")
+                        .accessibilityIdentifier("project.title")
                     SchedulePlacePicker(propertyId: propertyId, scope: $scope)
-                    Picker("Status", selection: Binding(get: { status }, set: { status = $0; statusTouched = true })) {
-                        ForEach(Project.Status.lifecycleSteps, id: \.self) { Text($0.displayName).tag($0) }
+                    if !loggingHistory {
+                        Picker("Status", selection: Binding(get: { status }, set: { status = $0; statusTouched = true })) {
+                            ForEach(Project.Status.lifecycleSteps, id: \.self) { status in Text(status.displayName).tag(status) }
+                        }
+                        Picker("Priority", selection: $priority) {
+                            Text("None").tag(Int?.none)
+                            Text("High").tag(Int?.some(1))
+                            Text("Medium").tag(Int?.some(2))
+                            Text("Low").tag(Int?.some(3))
+                        }
                     }
-                    Picker("Priority", selection: $priority) {
-                        Text("None").tag(Int?.none)
-                        Text("High").tag(Int?.some(1))
-                        Text("Medium").tag(Int?.some(2))
-                        Text("Low").tag(Int?.some(3))
-                    }
+                } header: {
+                    if loggingHistory { Text("What changed?") }
                 }
 
-                Section("Estimate") {
-                    ProjectMoneyField(title: "Cost", text: $estText, currency: currency)
-                        .onChange(of: estText) { _, _ in autoPlan() }
-                    ProjectHoursField(title: "Hours", text: $estHoursText)
-                    Toggle("Target date", isOn: $hasTarget)
-                    if hasTarget {
-                        DatePicker("Target", selection: $targetOn.scheduleDate(env.clock.calendar), displayedComponents: .date)
+                if !loggingHistory {
+                    Section("Estimate") {
+                        ProjectMoneyField(title: "Cost", text: $estText, currency: currency)
+                            .onChange(of: estText) { _, _ in autoPlan() }
+                        ProjectHoursField(title: "Hours", text: $estHoursText)
+                        Toggle("Target date", isOn: $hasTarget)
+                        if hasTarget {
+                            DatePicker("Target", selection: $targetOn.scheduleDate(env.clock.calendar), displayedComponents: .date)
+                        }
                     }
                 }
 
@@ -101,17 +114,27 @@ struct ProjectForm: View {
                             }
                         }
                         ProjectMoneyField(title: "Actual cost", text: $actualText, currency: currency)
-                        ProjectHoursField(title: "Actual hours", text: $actualHoursText)
+                        if !loggingHistory { ProjectHoursField(title: "Actual hours", text: $actualHoursText) }
                     } header: {
-                        Text("Actual")
+                        Text(loggingHistory ? "Details you remember" : "Actual")
                     } footer: {
-                        Text("Leave the actual cost empty to use the sum of the line items.")
+                        Text(loggingHistory ? "You can leave the date and cost blank. Add a receipt to the saved project whenever you have one." : "Leave the actual cost empty to use the sum of the line items.")
                     }
                 }
 
                 Section {
-                    TextField("Vendor", text: $vendor)
-                    TextField("Notes", text: $notes, axis: .vertical).lineLimit(2...6)
+                    if loggingHistory {
+                        DisclosureGroup("More details") {
+                            ProjectWorkActionPicker(selection: $workAction)
+                            TextField("Notes", text: $notes, axis: .vertical).lineLimit(2...6)
+                            TextField("Contractor or company", text: $vendor)
+                            ProjectHoursField(title: "Actual hours", text: $actualHoursText)
+                        }
+                    } else {
+                        if status == .done { ProjectWorkActionPicker(selection: $workAction) }
+                        TextField("Vendor", text: $vendor)
+                        TextField("Notes", text: $notes, axis: .vertical).lineLimit(2...6)
+                    }
                 }
             }
             .navigationTitle(isEditing ? "Edit Project" : (status == .done ? "Past Work" : "New Project"))
@@ -154,6 +177,7 @@ struct ProjectForm: View {
             guard let p = try? await env.projects.project(id) else { errorText = "This project was deleted."; loaded = true; return }
             original = p
             title = p.title; notes = p.notes ?? ""; scope = p.scope; status = p.status == .unknown ? .idea : p.status
+            workAction = p.workAction
             priority = p.priority; estText = ProjectInput.text(p.estCost); estHoursText = ProjectInput.text(p.estHours)
             actualText = ProjectInput.text(p.actualCost); actualHoursText = ProjectInput.text(p.actualHours)
             hasCompletionDate = p.completedOn != nil
@@ -182,6 +206,7 @@ struct ProjectForm: View {
                 p.title = trimmedTitle
                 p.notes = notesValue.isEmpty ? nil : notesValue
                 p.scope = scope
+                p.workAction = workAction
                 p.priority = priority
                 p.estCost = estMoney
                 p.estHours = estHours
@@ -195,7 +220,7 @@ struct ProjectForm: View {
                 saved = p
             } else {
                 let draft = ProjectDraft(propertyId: propertyId, scope: scope, title: trimmedTitle,
-                                         notes: notesValue.isEmpty ? nil : notesValue, status: status, priority: priority,
+                                         notes: notesValue.isEmpty ? nil : notesValue, status: status, workAction: workAction, priority: priority,
                                          estCost: estMoney, actualCost: actualMoney, estHours: estHours, actualHours: actualHours,
                                          targetOn: hasTarget ? targetOn : nil, completedOn: status == .done && hasCompletionDate ? completedOn : nil,
                                          vendor: vendorValue.isEmpty ? nil : vendorValue)

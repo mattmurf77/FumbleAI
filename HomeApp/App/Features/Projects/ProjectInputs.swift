@@ -11,18 +11,40 @@ enum ProjectInput {
     static func money(_ text: String, currency: String, locale: Locale = .current) -> MoneyResult {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return .empty }
-        let decimalSep = locale.decimalSeparator ?? "."
-        var s = trimmed
-        let negative = s.hasPrefix("-") || s.hasPrefix("−") || (s.hasPrefix("(") && s.hasSuffix(")"))
-        s = s.filter { $0.isNumber || String($0) == decimalSep || String($0) == "." }
-        if decimalSep != "." { s = s.replacingOccurrences(of: decimalSep, with: ".") }
-        // More than one "." (e.g. "1.234.56") → treat all but the last as grouping.
-        let parts = s.split(separator: ".", omittingEmptySubsequences: false)
-        if parts.count > 2 { s = parts.dropLast().joined() + "." + parts.last! }
-        guard !s.isEmpty, let d = Decimal(string: s, locale: Locale(identifier: "en_US_POSIX")) else {
-            return .invalid("Enter an amount like 1,250.00")
+        if trimmed.contains("-") || trimmed.contains("−") || trimmed.first == "(" { return .invalid(negativeMessage) }
+        let invalid = MoneyResult.invalid("Enter a positive amount with up to two decimal places")
+        let formatter = NumberFormatter()
+        formatter.locale = locale
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currency
+        var number = trimmed
+        for symbol in [currency, formatter.currencySymbol ?? ""] where !symbol.isEmpty {
+            if number.hasPrefix(symbol) { number.removeFirst(symbol.count) }
+            else if number.hasSuffix(symbol) { number.removeLast(symbol.count) }
+            number = number.trimmingCharacters(in: .whitespaces)
         }
-        if negative { return .invalid(negativeMessage) }
+        let decimal = locale.decimalSeparator ?? "."
+        let grouping = locale.groupingSeparator ?? ","
+        if grouping.trimmingCharacters(in: .whitespaces).isEmpty {
+            for space in [" ", "\u{a0}", "\u{202f}"] { number = number.replacingOccurrences(of: space, with: grouping) }
+        }
+        if number.hasPrefix(decimal) { number = "0" + number }
+        let parts = number.components(separatedBy: decimal)
+        guard parts.count <= 2 else { return invalid }
+        let groups = parts[0].components(separatedBy: grouping)
+        let digits = CharacterSet(charactersIn: "0123456789")
+        func isDigits(_ value: String) -> Bool { !value.isEmpty && value.unicodeScalars.allSatisfy(digits.contains) }
+        guard groups.allSatisfy(isDigits) else { return invalid }
+        if groups.count > 1 {
+            let size = max(formatter.groupingSize, 1)
+            let secondary = formatter.secondaryGroupingSize > 0 ? formatter.secondaryGroupingSize : size
+            guard groups[0].count <= secondary, groups.last?.count == size,
+                  groups.dropFirst().dropLast().allSatisfy({ $0.count == secondary }) else { return invalid }
+        }
+        if parts.count == 2, !isDigits(parts[1]) || parts[1].count > 2 { return invalid }
+        let canonical = groups.joined() + (parts.count == 2 ? "." + parts[1] : "")
+        guard canonical.count <= 20, let d = Decimal(string: canonical, locale: Locale(identifier: "en_US_POSIX")),
+              d <= Decimal(Int64.max) / 100 else { return invalid }
         return .value(Money(major: d, currency: currency))
     }
 
@@ -30,18 +52,19 @@ enum ProjectInput {
     static func hours(_ text: String) -> Double?? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
         if t.isEmpty { return .some(nil) }
-        guard let v = Double(t), v >= 0, v.isFinite else { return nil }
+        guard let v = Double(t), v >= 0, v.isFinite, v <= 10_000_000 else { return nil }
         return .some(v)
     }
 
     static func text(_ m: Money?) -> String {
         guard let m else { return "" }
-        return m.cents % 100 == 0 ? String(m.cents / 100) : m.plainString
+        return m.decimal.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
     }
 
     static func text(_ h: Double?) -> String {
         guard let h else { return "" }
-        return h == h.rounded() ? String(Int(h)) : String(h)
+        if h == h.rounded(), let integer = Int(exactly: h) { return String(integer) }
+        return String(h)
     }
 }
 
@@ -102,7 +125,7 @@ struct ProjectHoursField: View {
                 }
             }
             if ProjectInput.hours(text) == nil {
-                Text("Enter hours of 0 or more").font(.footnote).foregroundStyle(.red)
+                Text("Enter between 0 and 10,000,000 hours").font(.footnote).foregroundStyle(.red)
             }
         }
     }
@@ -111,4 +134,19 @@ struct ProjectHoursField: View {
 extension Project.Status {
     /// The four steps of the lifecycle stepper.
     static let lifecycleSteps: [Project.Status] = [.idea, .planned, .inProgress, .done]
+}
+
+
+struct ProjectWorkActionPicker: View {
+    @Binding var selection: Project.WorkAction?
+
+    var body: some View {
+        Picker("Type of work", selection: $selection) {
+            Text("Unspecified").tag(Project.WorkAction?.none)
+            ForEach(Project.WorkAction.knownCases, id: \.self) { action in
+                Text(action.displayName).tag(Optional(action))
+            }
+        }
+        .accessibilityIdentifier("project.workAction")
+    }
 }

@@ -4,6 +4,12 @@ name: TestFlight
 # Setup guide: docs/setup/TESTFLIGHT.md
 on:
   workflow_dispatch:
+    inputs:
+      prepare_home_brief:
+        description: "Prepare Home Brief’s US draft purchase and price before upload"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: testflight
@@ -59,6 +65,10 @@ jobs:
       - name: Generate Xcode project
         working-directory: HomeApp
         run: xcodegen generate
+
+      - name: Prepare Home Brief draft purchase
+        if: inputs.prepare_home_brief
+        run: bundle exec fastlane ios prepare_home_brief
 
       - name: Build and upload (fastlane beta)
         run: bundle exec fastlane beta

@@ -15,12 +15,34 @@ public struct Project: SyncedModel {
             }
         }
     }
+    public enum WorkAction: String, ForwardCompatibleEnum {
+        case serviced, repaired, replaced, installed, remodeled, unknown
+        public static var unknownCase: Self { .unknown }
+        public var displayName: String {
+            switch self {
+            case .serviced: return "Serviced"
+            case .repaired: return "Repaired"
+            case .replaced: return "Replaced"
+            case .installed: return "Newly installed"
+            case .remodeled: return "Remodeled"
+            case .unknown: return "Unspecified"
+            }
+        }
+    }
+
+    /// A caller completing an existing project may leave its stored answer alone or deliberately clear it.
+    public enum WorkActionEdit: Sendable {
+        case keep
+        case set(WorkAction?)
+    }
+
     public var id: UUID
     public var propertyId: UUID
     public var scope: Scope
     public var title: String
     public var notes: String?
     public var status: Status
+    public var workAction: WorkAction?
     /// 1…3.
     public var priority: Int?
     public var estCost: Money?
@@ -32,6 +54,8 @@ public struct Project: SyncedModel {
     public var startedOn: LocalDate?
     /// Owner-reported completion date. Nil when the date of past work is unknown.
     public var completedOn: LocalDate?
+    /// Recorded when only the year of completion is known; an exact date takes precedence.
+    public var completedYear: Int?
     public var vendor: String?
     public var spawnedFromChoreId: UUID?
     public var currencyCode: String
@@ -40,15 +64,15 @@ public struct Project: SyncedModel {
     public var deletedAt: Date?
 
     public init(id: UUID = UUID(), propertyId: UUID, scope: Scope, title: String, notes: String? = nil,
-                status: Status = .idea, priority: Int? = nil, estCost: Money? = nil, actualCost: Money? = nil,
+                status: Status = .idea, workAction: WorkAction? = nil, priority: Int? = nil, estCost: Money? = nil, actualCost: Money? = nil,
                 estHours: Double? = nil, actualHours: Double? = nil, targetOn: LocalDate? = nil,
-                startedOn: LocalDate? = nil, completedOn: LocalDate? = nil, vendor: String? = nil,
+                startedOn: LocalDate? = nil, completedOn: LocalDate? = nil, completedYear: Int? = nil, vendor: String? = nil,
                 spawnedFromChoreId: UUID? = nil, currencyCode: String = "USD",
                 createdAt: Date = Date(), updatedAt: Date = Date(), deletedAt: Date? = nil) {
         self.id = id; self.propertyId = propertyId; self.scope = scope; self.title = title; self.notes = notes
-        self.status = status; self.priority = priority; self.estCost = estCost; self.actualCost = actualCost
+        self.status = status; self.workAction = workAction; self.priority = priority; self.estCost = estCost; self.actualCost = actualCost
         self.estHours = estHours; self.actualHours = actualHours; self.targetOn = targetOn; self.startedOn = startedOn
-        self.completedOn = completedOn; self.vendor = vendor; self.spawnedFromChoreId = spawnedFromChoreId
+        self.completedOn = completedOn; self.completedYear = completedOn == nil ? completedYear : nil; self.vendor = vendor; self.spawnedFromChoreId = spawnedFromChoreId
         self.currencyCode = currencyCode; self.createdAt = createdAt; self.updatedAt = updatedAt; self.deletedAt = deletedAt
     }
 }

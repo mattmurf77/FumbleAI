@@ -51,7 +51,8 @@ enum ScheduleFormat {
 
     static func hours(_ h: Double?) -> String? {
         guard let h, h > 0 else { return nil }
-        return h == h.rounded() ? "\(Int(h)) h" : String(format: "%.1f h", h)
+        if let integer = Int(exactly: h) { return "\(integer) h" }
+        return h.formatted(.number.precision(.fractionLength(0...1))) + " h"
     }
 
     static func money(_ m: Money?) -> String { (m ?? .zero()).formatted(showCents: false) }

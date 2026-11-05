@@ -106,6 +106,14 @@ struct ProjectDetailView: View {
 
             Section { ProjectStatusStepper(status: p.status) { select($0, for: p) } }
 
+            if let action = p.workAction, action != .unknown {
+                LabeledContent("Type of work", value: action.displayName)
+            }
+            if p.status.isFuture {
+                NavigationLink { ProjectPlanningView(project: p) } label: {
+                    Label("Plan costs, quotes and financing", systemImage: "list.clipboard")
+                }
+            }
             Section("Estimate vs actual") { estimateCard(p) }
 
             Section {
@@ -136,16 +144,18 @@ struct ProjectDetailView: View {
                 ForEach(receipts) { r in
                     Button {
                         Task { await preview(r) }
-                    } label: { HStack(spacing: 12) {
-                        Image(systemName: r.kind == .document ? "doc.fill" : "doc.text.fill").font(.title2).foregroundStyle(.secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(r.caption ?? (r.kind == .document ? "Document" : "Receipt")).fontWeight(.semibold)
-                            Text(receiptSubtitle(r)).font(.footnote).foregroundStyle(.secondary)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: r.kind == .document ? "doc.fill" : "doc.text.fill").font(.title2).foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(r.caption ?? (r.kind == .document ? "Document" : "Receipt")).fontWeight(.semibold)
+                                Text(receiptSubtitle(r)).font(.footnote).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if r.ocrText != nil { Text("Scanned").font(.caption).padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.15), in: Capsule()).foregroundStyle(.orange) }
                         }
-                        Spacer()
-                        if r.ocrText != nil { Text("Scanned").font(.caption).padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.15), in: Capsule()).foregroundStyle(.orange) }
-                    } }.foregroundStyle(.primary)
+                    }.foregroundStyle(.primary)
                 }
                 ReceiptScanButton { scanned = $0 }
                 Button { importingReceipt = true } label: { Label("Import receipt from Files", systemImage: "doc.badge.plus") }
@@ -225,7 +235,7 @@ struct ProjectDetailView: View {
 
     private func progressText(_ p: Project, spent: Int64, est: Int64) -> String {
         if p.status == .done { return ScheduleFormat.variance(spent - est, currency: p.currencyCode) }
-        let pct = Int((Double(spent) / Double(est) * 100).rounded())
+        let pct = (Double(spent) / Double(est) * 100).formatted(.number.precision(.fractionLength(0)))
         let left = Money(cents: max(est - spent, 0), currency: p.currencyCode).formatted(showCents: false)
         return spent > est ? "\(pct)% of estimate used · over by \(Money(cents: spent - est, currency: p.currencyCode).formatted(showCents: false))"
                            : "\(pct)% of estimate used · \(left) left"

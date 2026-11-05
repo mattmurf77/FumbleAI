@@ -22,6 +22,7 @@ struct ToDosListView: View {
     @State private var adding = false
     @State private var capture: CaptureRequest?
     @State private var addedCount: Int?
+    @State private var actingIDs: Set<UUID> = []
     @State private var doneFeedback = 0
     @State private var errorText: String?
 
@@ -72,6 +73,7 @@ struct ToDosListView: View {
                                      assignee: c.assigneeId.flatMap { id in people.first { $0.id == id }?.name },
                                      onComplete: completeAction(c))
                         }
+                        .accessibilityIdentifier("todo.open." + c.id.uuidString)
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
                             if c.isOpen {
                                 Button { Task { await complete(c) } } label: { Label("Done", systemImage: "checkmark") }
@@ -202,6 +204,8 @@ struct ToDosListView: View {
 
     @MainActor
     private func complete(_ c: Chore) async {
+        guard actingIDs.insert(c.id).inserted else { return }
+        defer { actingIDs.remove(c.id) }
         do {
             _ = try await env.chores.complete(c.id, by: c.assigneeId, at: env.clock.now)
             doneFeedback += 1
@@ -210,6 +214,8 @@ struct ToDosListView: View {
 
     @MainActor
     private func skip(_ c: Chore) async {
+        guard actingIDs.insert(c.id).inserted else { return }
+        defer { actingIDs.remove(c.id) }
         do { try await env.chores.skip(c.id, at: env.clock.now) } catch { errorText = error.localizedDescription }
     }
 }

@@ -14,10 +14,10 @@ struct OnboardingFlow: View {
     let onFinished: () -> Void
     @State private var showingPlanSetup = false
     private var addingPlan = false
-    private var recordPastWork: (() -> Void)?
+    private var bringRecords: (() -> Void)?
 
-    init(recordPastWork: (() -> Void)? = nil, onFinished: @escaping () -> Void) {
-        self.recordPastWork = recordPastWork
+    init(bringRecords: (() -> Void)? = nil, onFinished: @escaping () -> Void) {
+        self.bringRecords = bringRecords
         self.onFinished = onFinished
         _model = State(initialValue: OnboardingModel())
     }
@@ -77,14 +77,14 @@ struct OnboardingFlow: View {
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .accessibilityIdentifier("onboarding.startRecords")
-                if let recordPastWork {
+                if let bringRecords {
                     Button {
-                        Task { await model.startWithRecords(env, onFinished: recordPastWork) }
+                        Task { await model.startWithRecords(env, onFinished: bringRecords) }
                     } label: {
-                        Label("Record a past improvement", systemImage: "hammer").frame(maxWidth: .infinity)
+                        Label("Bring in existing records", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered).controlSize(.large)
-                    .accessibilityIdentifier("onboarding.pastWork")
+                    .accessibilityIdentifier("onboarding.bringRecords")
                 }
                 Button {
                     showingPlanSetup = true

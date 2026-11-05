@@ -27,13 +27,23 @@ public struct CSVExporter: ExportService {
         for (file, (header, rows)) in tables { try CSV.file(header: header, rows: rows).write(to: folder.appendingPathComponent(file)) }
         try Data(Self.readme.utf8).write(to: folder.appendingPathComponent("README.txt"))
         if options.includeAttachments {
-            let atts = try await db.read { d in try Attachment.fetchAll(d, where: "property_id = ?", [property.db]) }
+            let (atts, documents) = try await db.read { d in
+                (try Attachment.fetchAll(d, where: "property_id = ?", [property.db]), try AttachmentStore.documents(d, propertyId: property))
+            }
             let dir = folder.appendingPathComponent("attachments", isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            var exported: [UUID: String] = [:]
             for a in atts where files.exists(a) {
                 let dest = dir.appendingPathComponent("\(a.ownerType.rawValue)-\(a.ownerId.db)-\(a.id.db).\(a.fileExt)")
-                try? FileManager.default.copyItem(at: files.url(for: a), to: dest)
+                try FileManager.default.copyItem(at: files.url(for: a), to: dest)
+                exported[a.id] = "attachments/" + dest.lastPathComponent
             }
+            let header = ["attachment_id", "project_id", "title", "original_filename", "type", "document_date", "quote_amount", "currency", "confirmed_details_json", "original_file", "status"]
+            let rows = try documents.map { item -> [String] in
+                let d = item.details, path = exported[item.id]
+                return [item.id.db, item.linkedProjectId?.db ?? "", d.title, d.originalFilename ?? "", d.category.rawValue, d.documentDate?.description ?? "", d.quoteAmount?.plainString ?? "", d.quoteAmount?.currency ?? "", try HomeJSON.encodeString(d.confirmedFields), path ?? "", path == nil ? "unavailable_on_device" : "included"]
+            }
+            try CSV.file(header: header, rows: rows).write(to: folder.appendingPathComponent("documents.csv"))
         }
         return try Self.zip(folder: folder, name: name, into: work)
     }
@@ -69,7 +79,7 @@ public struct CSVExporter: ExportService {
         Lengths: inches with 2 decimals; *_display columns use your chosen units.\r
         IDs are included so a later version can re-import the data. Deleted items are not exported.\r
         Files: spaces, chores, chore_completions, projects, cost_line_items, things, inventory, measurements,\r
-        storage_spots, people, budget_summary (+ attachments/ when "Include photos and receipts" is on).\r
+        storage_spots, people, budget_summary (+ documents.csv and attachments/ when "Include documents, photos and receipts" is on).\r
 
         """
 
@@ -119,12 +129,12 @@ public struct CSVExporter: ExportService {
         let projects = try Project.fetchAll(d, where: pw, pa).sorted { $0.title < $1.title }
         let lines = try CostLineItem.fetchAll(d, where: pw, pa).sorted { ($0.createdAt, $0.id.db) < ($1.createdAt, $1.id.db) }
         out["projects.csv"] = (["id", "title", "room", "floor", "scope", "status", "est_cost", "actual_cost", "spent_effective", "currency",
-                                "est_hours", "actual_hours", "target_on", "started_on", "completed_on", "vendor", "spawned_from_chore", "notes"],
+                                "est_hours", "actual_hours", "target_on", "started_on", "completed_on", "vendor", "spawned_from_chore", "notes", "work_action"],
             projects.map { p in
                 [p.id.db, p.title, room(p.scope), floor(p.scope), p.scope.kind.rawValue, p.status.rawValue, p.estCost?.plainString ?? "",
                  p.actualCost?.plainString ?? "", Money(cents: RollupMath.spentCents(p, lineItems: lines), currency: p.currencyCode).plainString,
                  p.currencyCode, num(p.estHours), num(p.actualHours), p.targetOn?.description ?? "", p.startedOn?.description ?? "",
-                 p.completedOn?.description ?? "", p.vendor ?? "", id(p.spawnedFromChoreId), p.notes ?? ""]
+                 p.completedOn?.description ?? p.completedYear.map(String.init) ?? "", p.vendor ?? "", id(p.spawnedFromChoreId), p.notes ?? "", p.workAction?.rawValue ?? ""]
             })
 
         let ptitles = Dictionary(projects.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })

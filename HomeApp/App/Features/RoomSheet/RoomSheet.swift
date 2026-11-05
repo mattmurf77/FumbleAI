@@ -526,7 +526,7 @@ struct RoomSheet: View {
         }
     }
 
-    private func hours(_ h: Double) -> String { h.rounded() == h ? String(Int(h)) : String(format: "%.1f", h) }
+    private func hours(_ h: Double) -> String { h.formatted(.number.precision(.fractionLength(0...1))) }
 }
 
 /// One storage spot with its children (expandable) and counts.

@@ -15,6 +15,7 @@ struct DoneSheet: View {
 
     @State private var actualText = ""
     @State private var hoursText = ""
+    @State private var workAction: Project.WorkAction?
     @State private var completedOn = LocalDate(2026, 1, 1)
     @State private var receipt: ScannedReceipt?
     @State private var saving = false
@@ -62,6 +63,12 @@ struct DoneSheet: View {
                     ProjectHoursField(title: "Hours", text: $hoursText)
                 }
 
+                Section {
+                    DisclosureGroup("Work details") {
+                        ProjectWorkActionPicker(selection: $workAction)
+                    }
+                }
+
                 Section("Receipt") {
                     if let receipt {
                         HStack {
@@ -103,6 +110,7 @@ struct DoneSheet: View {
     private func prefill() {
         guard !didLoad else { return }
         didLoad = true
+        workAction = project.workAction
         completedOn = env.clock.today
         if let a = project.actualCost { actualText = ProjectInput.text(a) }
         else if !liveItems.isEmpty { actualText = ProjectInput.text(lineSum) }
@@ -122,7 +130,8 @@ struct DoneSheet: View {
         let entered: Money? = (money != nil && !liveItems.isEmpty && money == lineSum && project.actualCost == nil) ? nil : money
         do {
             try await env.projects.markDone(project.id, actual: entered, completedOn: completedOn,
-                                            hours: ProjectInput.hours(hoursText) ?? nil, receipt: receipt?.attachmentDraft)
+                                            hours: ProjectInput.hours(hoursText) ?? nil, receipt: receipt?.attachmentDraft,
+                                            workAction: .set(workAction))
             onDone?()
             dismiss()
         } catch {

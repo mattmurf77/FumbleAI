@@ -75,7 +75,7 @@ public struct InventoryItem: SyncedModel {
 public struct Attachment: SyncedModel {
     public static let recordType = RecordType.attachment
     public enum OwnerType: String, ForwardCompatibleEnum {
-        case chore, choreCompletion = "chore_completion", project, costLineItem = "cost_line_item", thing
+        case property, chore, choreCompletion = "chore_completion", project, costLineItem = "cost_line_item", thing
         case inventoryItem = "inventory_item", measurement, space, level, storageSpot = "storage_spot", unknown
         public static var unknownCase: OwnerType { .unknown }
     }

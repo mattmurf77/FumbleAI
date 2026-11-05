@@ -37,20 +37,7 @@ public struct ReceiptReader: ReceiptReading {
             let page = try await Task.detached(priority: .userInitiated) { () throws -> [OCRLine] in
                 guard let src = CGImageSourceCreateWithData(data as CFData, nil),
                       let image = CGImageSourceCreateImageAtIndex(src, 0, nil) else { throw ReaderError.unreadableImage(index: i) }
-                let request = VNRecognizeTextRequest()
-                request.recognitionLevel = .accurate
-                request.usesLanguageCorrection = true
-                var langs = ["en-US"]
-                let local = Locale.current.identifier.replacingOccurrences(of: "_", with: "-")
-                if local != "en-US" { langs.append(local) }
-                request.recognitionLanguages = langs
-                try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
-                let observations = request.results ?? []
-                return observations.compactMap { obs -> OCRLine? in
-                    guard let text = obs.topCandidates(1).first?.string else { return nil }
-                    // Vision boxes are normalized with the origin at the bottom-left.
-                    return OCRLine(text: text, y: 1 - Double(obs.boundingBox.midY))
-                }
+                return try recognizePage(image)
             }.value
             all += page.map { OCRLine(text: $0.text, y: (Double(i) + $0.y) / n) }
         }
@@ -59,4 +46,25 @@ public struct ReceiptReader: ReceiptReading {
         throw ReaderError.unavailable
         #endif
     }
+
+    #if canImport(Vision) && canImport(ImageIO) && canImport(CoreGraphics)
+    /// Shared on-device Vision pass. Document imports pass a bounded raster, preserving page provenance.
+    static func recognizePage(_ image: CGImage) throws -> [OCRLine] {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        var langs = ["en-US"]
+        let local = Locale.current.identifier.replacingOccurrences(of: "_", with: "-")
+        if local != "en-US" { langs.append(local) }
+        request.recognitionLanguages = langs
+        try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+        let observations = request.results ?? []
+        return observations.compactMap { obs -> OCRLine? in
+            guard let text = obs.topCandidates(1).first?.string else { return nil }
+            // Vision boxes are normalized with the origin at the bottom-left.
+            return OCRLine(text: text, y: 1 - Double(obs.boundingBox.midY))
+        }
+    }
+    #endif
+
 }

@@ -179,9 +179,9 @@ public struct InMemoryExportService: ExportService {
         try CSV.file(header: ["id", "title", "location", "repeat", "next_due_on", "notes"], rows: chores).write(to: dir.appendingPathComponent("chores.csv"))
         let projects = s.liveProjects.filter { $0.propertyId == property }.map { p in
             [p.id.uuidString.lowercased(), p.title, p.status.rawValue, p.estCost?.plainString ?? "",
-             Money(cents: RollupMath.spentCents(p, lineItems: s.liveLineItems), currency: p.currencyCode).plainString, p.currencyCode]
+             Money(cents: RollupMath.spentCents(p, lineItems: s.liveLineItems), currency: p.currencyCode).plainString, p.currencyCode, p.workAction?.rawValue ?? ""]
         }
-        try CSV.file(header: ["id", "title", "status", "est_cost", "spent_effective", "currency"], rows: projects).write(to: dir.appendingPathComponent("projects.csv"))
+        try CSV.file(header: ["id", "title", "status", "est_cost", "spent_effective", "currency", "work_action"], rows: projects).write(to: dir.appendingPathComponent("projects.csv"))
         try Data("Home export (in-memory preview). Lengths in inches; money in major units.\r\n".utf8).write(to: dir.appendingPathComponent("README.txt"))
         return dir
     }

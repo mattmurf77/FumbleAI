@@ -145,8 +145,8 @@ struct HomeHubView: View {
     @ViewBuilder
     private func sheetContent(_ s: HubSheet) -> some View {
         switch s {
-        case .homeValue:
-            HomeValueSheet(property: model.property)
+        case .homeHistory:
+            HomeHistorySheet(property: model.property)
         case .search:
             SearchView()
         case .settings:
@@ -250,7 +250,7 @@ struct HubRowsScreen: View {
     private func sheetContent(_ s: HubSheet) -> some View {
         switch s {
         case .tellHome: TellHomeSheet()
-        case .homeValue: HomeValueSheet(property: property)
+        case .homeHistory: HomeHistorySheet(property: property)
         case .search: SearchView()
         case .settings: SettingsView()
         case .addYard: EmptyView()     // Only offered on the Home tab, which owns the property.
@@ -591,7 +591,7 @@ struct YardSetupSheet: View {
             }
             GridRow {
                 HubCardView(card: HomeHubCatalog.stuff(counts), theme: .light, onTap: { _ in })
-                HubCardView(card: HomeHubCatalog.homeValue, theme: .light, onTap: { _ in })
+                HubCardView(card: HomeHubCatalog.homeHistory, theme: .light, onTap: { _ in })
             }
         }
         HubWideCardView(card: HomeHubCatalog.yard(counts), theme: .light, onTap: { _ in })
@@ -608,14 +608,14 @@ struct YardSetupSheet: View {
 }
 
 
-private struct HomeValueSheet: View {
+private struct HomeHistorySheet: View {
     @Environment(\.dismiss) private var dismiss
     let property: Property?
 
     var body: some View {
         NavigationStack {
             Group {
-                if let property { HomeValueView(property: property) }
+                if let property { HomeHistoryView(property: property) }
                 else { ContentUnavailableView("Home unavailable", systemImage: "house") }
             }
             .toolbar {

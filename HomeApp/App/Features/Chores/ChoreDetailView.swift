@@ -26,11 +26,12 @@ struct ChoreDetailView: View {
     @State private var confirmDelete = false
     @State private var spawnedProject: ProjectRoute?
     @State private var undo: UndoState?
+    @State private var acting = false
     @State private var doneFeedback = 0
     @State private var errorText: String?
     @State private var texting = false
 
-    private struct UndoState: Equatable { var message: String; var previousDue: LocalDate?; var token = UUID() }
+    private struct UndoState: Equatable { var message: String; var completionID: UUID; var token = UUID() }
     struct ProjectRoute: Identifiable, Hashable { let id: UUID }
 
     private var today: LocalDate { env.clock.today }
@@ -344,30 +345,29 @@ struct ChoreDetailView: View {
 
     @MainActor
     private func act(_ outcome: ChoreCompletion.Outcome) async {
-        guard let c = chore else { return }
-        let previous = c.nextDueOn
+        guard let c = chore, !acting else { return }
+        acting = true
+        defer { acting = false }
         do {
+            let completion: ChoreCompletion
             if outcome == .done {
                 // Done in-app defaults to the assignee (FR-CHR-21).
-                _ = try await env.chores.complete(c.id, by: c.assigneeId, at: env.clock.now)
+                completion = try await env.chores.complete(c.id, by: c.assigneeId, at: env.clock.now)
                 doneFeedback += 1
             } else {
-                try await env.chores.skip(c.id, at: env.clock.now)
+                completion = try await env.chores.skip(c.id, at: env.clock.now)
             }
-            withAnimation { undo = UndoState(message: outcome == .done ? "Marked done" : "Skipped", previousDue: previous) }
+            withAnimation { undo = UndoState(message: outcome == .done ? "Marked done" : "Skipped", completionID: completion.id) }
             await loadExtras()
         } catch {
             errorText = error.localizedDescription
         }
     }
 
-    /// Restores the previous due date. NOTE: `ChoreRepository` has no "delete completion" call yet, so the
-    /// completion row stays in history (see INTEGRATION_NOTES/schedule.md).
     @MainActor
     private func performUndo(_ state: UndoState) async {
         withAnimation { undo = nil }
-        guard let due = state.previousDue else { return }
-        do { try await env.chores.reschedule(choreID, to: due) } catch { errorText = error.localizedDescription }
+        do { try await env.chores.undoCompletion(state.completionID); await loadExtras() } catch { errorText = error.localizedDescription }
     }
 
     @MainActor

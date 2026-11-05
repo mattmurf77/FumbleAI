@@ -26,7 +26,7 @@ private struct HomeBriefPurchaseSection: View {
                 Label("Home Brief unlocked", systemImage: "checkmark.seal.fill")
                     .accessibilityIdentifier("billing.unlocked")
             } else {
-                Text("Create a PDF of the home improvements you choose to share with an agent or buyer.")
+                Text("Keep a PDF of selected projects for your records, or share it with a contractor, insurer or future owner.")
                 if let price = store.price {
                     Button {
                         Task { await store.purchase() }

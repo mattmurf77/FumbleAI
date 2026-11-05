@@ -56,6 +56,23 @@ jobs:
           set -o pipefail
           ../.github/scripts/test-iphone.sh | if command -v xcbeautify >/dev/null; then xcbeautify --renderer github-actions; else cat; fi
 
+      - name: Export iPhone screenshots
+        if: always()
+        run: |
+          if [[ -d "$RUNNER_TEMP/HomeBlueprint.xcresult" ]]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/HomeBlueprint.xcresult" \
+              --output-path "$RUNNER_TEMP/HomeBlueprintScreens" || echo "The xcresult contains no exportable screenshots."
+          fi
+
+      - name: Save iPhone screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iphone-screenshots
+          path: ${{ runner.temp }}/HomeBlueprintScreens
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Save iPhone test results
         if: always()
         uses: actions/upload-artifact@v4

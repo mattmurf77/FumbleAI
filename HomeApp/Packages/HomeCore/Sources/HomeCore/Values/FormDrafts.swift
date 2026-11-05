@@ -35,21 +35,22 @@ public struct ProjectDraft: Hashable, Codable, Sendable {
     public var title: String
     public var notes: String?
     public var status: Project.Status
+    public var workAction: Project.WorkAction?
     public var priority: Int?
     public var estCost: Money?
     public var actualCost: Money?
     public var estHours: Double?
     public var actualHours: Double?
     public var targetOn: LocalDate?
-    /// Required when status == .done.
+    /// Leave nil for historical work whose completion date is unknown.
     public var completedOn: LocalDate?
     public var vendor: String?
     public var spawnedFromChoreId: UUID?
-    public init(propertyId: UUID, scope: Scope, title: String, notes: String? = nil, status: Project.Status = .idea,
+    public init(propertyId: UUID, scope: Scope, title: String, notes: String? = nil, status: Project.Status = .idea, workAction: Project.WorkAction? = nil,
                 priority: Int? = nil, estCost: Money? = nil, actualCost: Money? = nil, estHours: Double? = nil,
                 actualHours: Double? = nil, targetOn: LocalDate? = nil, completedOn: LocalDate? = nil,
                 vendor: String? = nil, spawnedFromChoreId: UUID? = nil) {
-        self.propertyId = propertyId; self.scope = scope; self.title = title; self.notes = notes; self.status = status
+        self.propertyId = propertyId; self.scope = scope; self.title = title; self.notes = notes; self.status = status; self.workAction = workAction
         self.priority = priority; self.estCost = estCost; self.actualCost = actualCost; self.estHours = estHours
         self.actualHours = actualHours; self.targetOn = targetOn; self.completedOn = completedOn; self.vendor = vendor
         self.spawnedFromChoreId = spawnedFromChoreId

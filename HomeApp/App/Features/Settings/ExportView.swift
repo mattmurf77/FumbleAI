@@ -15,9 +15,9 @@ struct ExportView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Include photos and receipts", isOn: $includeAttachments)
+                Toggle("Include documents, photos and receipts", isOn: $includeAttachments)
             } footer: {
-                Text("One CSV per kind of record (rooms, to-dos, projects, appliances, inventory, measurements, storage spots, housemates, budget summary) plus a README. Opens in Excel and Numbers. Deleted items aren’t included.")
+                Text("One CSV per kind of record (rooms, to-dos, projects, appliances, inventory, measurements, storage spots, housemates, budget summary) plus a README. Opens in Excel and Numbers. Turn on documents to include private originals, their names and confirmed details. Missing originals are marked in documents.csv. Deleted items aren’t included.")
             }
             Section {
                 if exporting {

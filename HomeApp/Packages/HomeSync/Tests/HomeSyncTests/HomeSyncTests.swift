@@ -50,6 +50,23 @@ func seedSample(_ d: Device) async throws {
 }
 
 final class MapperAndMergeTests: XCTestCase {
+    func testOptionalProjectWorkActionRemainsCompatibleWithOlderRecords() async throws {
+        let device = try Device.make(FakeCloud())
+        let mapper = try XCTUnwrap(device.sync.processor.mappers[.project])
+        let id = UUID()
+        let zone = Property.zoneName(for: UUID())
+        let old = mapper.record(id: id, row: ["title": .string("Roof")], zoneName: zone, systemFields: nil, assetURL: nil)
+        XCTAssertNil(mapper.row(from: old)["work_action"], "An older record omits the column")
+        let named = mapper.record(id: id, row: ["work_action": .string("repaired")], zoneName: zone, systemFields: nil, assetURL: nil)
+        XCTAssertEqual(named.fields["workAction"], .string("repaired"))
+        XCTAssertEqual(mapper.row(from: named)["work_action"], .string("repaired"))
+        XCTAssertFalse(RecordMapper.plainKeys.contains("workAction"))
+        let cleared = mapper.record(id: id, row: ["work_action": .null], zoneName: zone, systemFields: nil, assetURL: nil)
+        XCTAssertEqual(mapper.row(from: cleared)["work_action"], .null)
+        let future = mapper.record(id: id, row: ["work_action": .string("future-action")], zoneName: zone, systemFields: nil, assetURL: nil)
+        XCTAssertNil(future.fields["workAction"], "A client must not rewrite an unknown enum value")
+    }
+
     func testMapperRoundTripsEveryTableAndUsesCamelCase() async throws {
         let d = try Device.make(FakeCloud())
         try await seedSample(d)

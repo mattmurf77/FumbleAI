@@ -9,7 +9,10 @@ struct RootView: View {
     @State private var property: Property?
     @State private var loaded = false
     @State private var showOnboarding = false
-    @State private var recordPastWork = false
+    @State private var bringRecords = false
+    @State private var incomingFiles: [ProjectCSVFile] = []
+    @State private var reviewingCSV: ProjectCSVFile?
+    @State private var importError: String?
     @State private var accountError: String?
     @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = true
 
@@ -31,17 +34,57 @@ struct RootView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if showOnboarding {
-                OnboardingFlow(recordPastWork: {
+                OnboardingFlow(bringRecords: {
                     showOnboarding = false
-                    recordPastWork = true
+                    bringRecords = true
                 }, onFinished: { showOnboarding = false })
             } else {
                 MainTabView()
             }
         }
-        .sheet(isPresented: $recordPastWork) {
-            ProjectForm(spaceID: nil, levelID: nil, initialStatus: .done)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let file = incomingFiles.first, !showOnboarding, property != nil, reviewingCSV == nil {
+                Button {
+                    reviewingCSV = file
+                } label: {
+                    Label("Review spreadsheet: " + file.name, systemImage: "tablecells")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }.background(.regularMaterial)
+            }
         }
+        .onOpenURL { url in
+            guard OpenSpreadsheet.accepts(url) else { return }
+            Task {
+                do {
+                    let incoming = try await Task.detached(priority: .userInitiated) { try OpenSpreadsheet.read(url) }.value
+                    guard incomingFiles.count < 5 else {
+                        importError = "Finish reviewing open spreadsheets, then open this file again."; return
+                    }
+                    incomingFiles.append(incoming)
+                } catch { importError = error.localizedDescription }
+            }
+        }
+        .sheet(isPresented: $bringRecords) {
+            if let property {
+                NavigationStack {
+                    BringRecordsView(property: property)
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { bringRecords = false } } }
+                }
+            } else { ProgressView("Opening your home…") }
+        }
+        .sheet(item: $reviewingCSV, onDismiss: {
+            if !incomingFiles.isEmpty { incomingFiles.removeFirst() }
+        }) { file in
+            if let property {
+                NavigationStack {
+                    ProjectCSVImportView(property: property, initialFile: file)
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { reviewingCSV = nil } } }
+                }
+            }
+        }
+        .alert("Couldn’t open spreadsheet", isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(importError ?? "") }
         .onChange(of: rootFeedbackPage, initial: true) { _, page in FeedbackPageTracker.shared.rootPage = page }
         #if canImport(UIKit)
         // Floating feedback button on every screen (own window, above sheets) + shake to send feedback.

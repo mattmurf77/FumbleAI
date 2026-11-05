@@ -19,19 +19,58 @@ enum Migrations {
         m.registerMigration(v1Search) { db in try db.execute(sql: searchSQL) }
         // Rebuilds `thing` (chore / inventory_item reference it); GRDB defers FK checks to the end of the migration.
         m.registerMigration(v2OutdoorThings) { db in try db.execute(sql: outdoorThingsSQL) }
-        m.registerMigration("v3_local_home_value") { db in
+        m.registerMigration("v4_undated_past_work") { db in try db.execute(sql: undatedPastWorkSQL) }
+        m.registerMigration("v5_project_work_action") { db in
             try db.execute(sql: """
-                CREATE TABLE home_value_reference (
-                    id TEXT PRIMARY KEY NOT NULL,
-                    property_id TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
-                    payload TEXT NOT NULL
-                );
-                CREATE INDEX home_value_reference_property ON home_value_reference(property_id);
+                ALTER TABLE project ADD COLUMN work_action TEXT
+                CHECK (work_action IN ('serviced','repaired','replaced','installed','remodeled'))
                 """)
         }
-        m.registerMigration("v4_undated_past_work") { db in try db.execute(sql: undatedPastWorkSQL) }
+        m.registerMigration("v6_project_csv_history") { db in
+            try db.execute(sql: """
+                ALTER TABLE project ADD COLUMN completed_year INTEGER CHECK (completed_year BETWEEN 1 AND 9999);
+                CREATE TABLE project_csv_import (
+                    property_id TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+                    fingerprint TEXT NOT NULL,
+                    project_id TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+                    PRIMARY KEY (property_id, fingerprint)
+                );
+                """)
+        }
+        m.registerMigration("v7_device_document_library") { db in try db.execute(sql: documentLibrarySQL) }
         return m
     }
+
+    // Rebuild the original attachment table to add whole-property ownership while preserving all existing attachment IDs.
+    static let documentLibrarySQL = #"""
+CREATE TABLE attachment_v7 (
+  id            TEXT PRIMARY KEY NOT NULL,
+  property_id   TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+  owner_type    TEXT NOT NULL CHECK (owner_type IN ('property','chore','chore_completion','project','cost_line_item',
+                   'thing','inventory_item','measurement','space','level','storage_spot')),
+  owner_id      TEXT NOT NULL,                         -- polymorphic: no FK; app-level cascade on purge
+  kind          TEXT NOT NULL CHECK (kind IN ('photo','receipt','manual','document','underlay')),
+  file_ext      TEXT NOT NULL,                         -- 'heic','jpg','pdf','png'
+  uti           TEXT NOT NULL,
+  byte_size     INTEGER NOT NULL,
+  width_px      INTEGER, height_px INTEGER,
+  sha256        TEXT NOT NULL,                         -- dedupe + integrity
+  caption       TEXT,
+  ocr_text      TEXT,                                  -- Vision output (receipts, manuals)
+  captured_at   DATETIME,
+  created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, deleted_at DATETIME
+);
+INSERT INTO attachment_v7 SELECT * FROM attachment;
+DROP TABLE attachment;
+ALTER TABLE attachment_v7 RENAME TO attachment;
+CREATE INDEX attachment_owner ON attachment(owner_type, owner_id) WHERE deleted_at IS NULL;
+CREATE TABLE home_document_local (
+  attachment_id TEXT PRIMARY KEY NOT NULL REFERENCES attachment(id) ON DELETE CASCADE,
+  project_id TEXT REFERENCES project(id) ON DELETE SET NULL,
+  details_json TEXT NOT NULL
+);
+CREATE INDEX home_document_project ON home_document_local(project_id);
+"""#
 
     // Historical improvements can have an unknown completion date. Existing IDs, receipts, foreign keys,
     // indexes, outbox entries and recorded dates are preserved by GRDB's deferred FK-checked transaction.

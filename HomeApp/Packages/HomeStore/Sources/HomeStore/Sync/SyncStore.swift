@@ -62,7 +62,7 @@ public enum SyncSchema {
         "thing.scope": set(Scope.Kind.self), "thing.category": set(Thing.Category.self), "thing.ownership": set(Thing.Ownership.self),
         "chore.scope": set(Scope.Kind.self), "chore_completion.outcome": set(ChoreCompletion.Outcome.self),
         "chore_calendar_link.event_mode": set(ChoreCalendarLink.Mode.self),
-        "project.scope": set(Scope.Kind.self), "project.status": set(Project.Status.self),
+        "project.scope": set(Scope.Kind.self), "project.status": set(Project.Status.self), "project.work_action": set(Project.WorkAction.self),
         "cost_line_item.kind": set(CostLineItem.Kind.self),
         "inventory_item.kind": set(InventoryItem.Kind.self), "inventory_item.scope": set(Scope.Kind.self),
         "inventory_item.season": set(Season.self),
@@ -388,6 +388,7 @@ public final class SyncTransaction {
 
     /// Re-enqueues a row with the given changed fields (e.g. after a conflict merge, or "mark all pending").
     public func enqueue(_ ref: RecordRef, zone: String, changedFields: Set<String>, op: OutboxEntry.Op = .save) throws {
+        guard try !AttachmentStore.isDeviceDocument(ref, in: db) else { return }
         try Outbox.upsert(db, type: ref.type, id: ref.id, zone: zone, op: op, changedFields: changedFields, now: tx.now)
     }
 
@@ -407,7 +408,8 @@ public final class SyncTransaction {
             } else {
                 sql = "SELECT id, \(t == .property ? "id" : "property_id") AS pid FROM \(t.tableName)"
             }
-            for r in try Row.fetchAll(db, sql: sql, arguments: args) {
+            let eligible = t == .attachment ? sql + (property == nil ? " WHERE" : " AND") + " owner_type <> 'property'" : sql
+            for r in try Row.fetchAll(db, sql: eligible, arguments: args) {
                 guard let id = r.uuidOpt("id"), let pid = r.uuidOpt("pid") else { continue }
                 try Outbox.upsert(db, type: t, id: id, zone: Property.zoneName(for: pid), op: .save, changedFields: fields, now: tx.now)
                 out.append(RecordRef(t, id))

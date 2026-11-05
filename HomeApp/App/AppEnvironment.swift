@@ -50,7 +50,6 @@ struct AppDependencies {
     var plan: any PlanRepository
     var planCommitter: any PlanCommitting
     var chores: any ChoreRepository
-    var homeValue: any HomeValueRepository
     var projects: any ProjectRepository
     var things: any ThingRepository
     var inventory: any InventoryRepository
@@ -104,7 +103,7 @@ struct AppDependencies {
         let device = StaticDeviceIdentity(deviceId: "in-memory-device", nickname: "This iPhone")
         return AppDependencies(
             config: config, clock: clock, device: device, events: home.store.bus,
-            plan: home.plan, planCommitter: home.plan, chores: home.chores, homeValue: InMemoryHomeValueRepository(home.store), projects: home.projects, things: home.things,
+            plan: home.plan, planCommitter: home.plan, chores: home.chores, projects: home.projects, things: home.things,
             inventory: home.inventory, measurements: home.measurements, people: home.people, attachments: home.attachments,
             settings: home.settings, recentlyDeleted: home.recentlyDeleted,
             search: home.search, rollups: home.rollups, lensStats: home.lensStats, export: home.export, diagnostics: home.diagnostics,
@@ -135,7 +134,6 @@ struct AppDependencies {
         }
         d.events = store.database.bus
         d.plan = store.plan;                 d.planCommitter = store.planCommitter
-        d.homeValue = HomeValueStore(store.database)
         d.chores = store.chores;             d.projects = store.projects
         d.things = store.things;             d.inventory = store.inventory
         d.measurements = store.measurements; d.people = store.people
@@ -214,7 +212,6 @@ final class AppEnvironment {
     let plan: any PlanRepository
     let planCommitter: any PlanCommitting
     let chores: any ChoreRepository
-    let homeValue: any HomeValueRepository
     let projects: any ProjectRepository
     let things: any ThingRepository
     let inventory: any InventoryRepository
@@ -279,7 +276,6 @@ final class AppEnvironment {
 
     init(_ d: AppDependencies) {
         config = d.config; clock = d.clock; device = d.device; events = d.events
-        homeValue = d.homeValue
         plan = d.plan; planCommitter = d.planCommitter; chores = d.chores; projects = d.projects; things = d.things
         inventory = d.inventory; measurements = d.measurements; people = d.people; attachments = d.attachments
         settings = d.settings; recentlyDeleted = d.recentlyDeleted

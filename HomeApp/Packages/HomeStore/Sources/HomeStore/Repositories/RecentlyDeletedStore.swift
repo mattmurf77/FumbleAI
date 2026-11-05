@@ -12,7 +12,7 @@ public struct RecentlyDeletedStore: RecentlyDeletedRepository {
     /// Record types listed in Recently Deleted, with their user-facing kind label.
     static let listed: [(RecordType, String)] = [
         (.level, "Floor"), (.space, "Room"), (.storageSpot, "Storage spot"), (.chore, "To-Do"), (.project, "Project"),
-        (.thing, "Thing"), (.inventoryItem, "Item"), (.measurement, "Measurement"), (.person, "Person")]
+        (.thing, "Thing"), (.inventoryItem, "Item"), (.measurement, "Measurement"), (.person, "Person"), (.attachment, "Document")]
 
     static func entries(_ d: Database, property: UUID) throws -> [DeletedEntry] {
         let L = Lookup(d)
@@ -32,6 +32,10 @@ public struct RecentlyDeletedStore: RecentlyDeletedRepository {
         for x in try InventoryItem.fetchAll(d, where: w, a, includeDeleted: true) { add(.inventoryItem, x.id, x.name, "Item", L.locationText(x.scope), x.deletedAt) }
         for x in try HomeMeasurement.fetchAll(d, where: w, a, includeDeleted: true) { add(.measurement, x.id, x.label, "Measurement", L.spaceName(x.spaceId), x.deletedAt) }
         for x in try Person.fetchAll(d, where: w, a, includeDeleted: true) { add(.person, x.id, x.name, "Person", nil, x.deletedAt) }
+        for a in try Attachment.fetchAll(d, where: w, a, includeDeleted: true) where a.kind != .underlay {
+            let entry = try AttachmentStore.libraryItem(a, in: d)
+            add(.attachment, a.id, entry.details.title, "Document", nil, a.deletedAt)
+        }
         return out.sorted { ($0.deletedAt, $0.ref.id.db) > ($1.deletedAt, $1.ref.id.db) }
     }
 
@@ -185,7 +189,7 @@ public struct RecentlyDeletedStore: RecentlyDeletedRepository {
             let owned = try Attachment.fetchAll(d, where: "owner_type = ? AND owner_id = ?", [ot.rawValue, v.id.db], includeDeleted: true)
             attachments += owned
         }
-        if ref.type == .attachment, let a = try Attachment.fetchOne(d, id: ref.id) { attachments.append(a) }
+        if ref.type == .attachment, let a = try Attachment.fetchOne(d, id: ref.id, includeDeleted: true) { attachments.append(a) }
         for a in attachments where a.id != ref.id || ref.type != .attachment {
             try d.execute(sql: "DELETE FROM attachment_local WHERE attachment_id = ?", arguments: [a.id.db])
             try tx.hardDelete(RecordRef(.attachment, a.id), zone: zone)

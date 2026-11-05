@@ -20,18 +20,31 @@ final class HomeBlueprintUITests: XCTestCase {
         button.tap()
     }
 
+    private func capture(_ name: String, app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     func testFirstHomeCanStartWithWorkBeforeAddingAnyRooms() {
         let app = launch("onboarding")
-        open(app.buttons["onboarding.pastWork"], in: app)
-        let field = app.textFields["Title, e.g. LVP flooring"]
+        XCTAssertTrue(app.buttons["onboarding.bringRecords"].waitForExistence(timeout: 15))
+        capture("Welcome", app: app)
+        open(app.buttons["onboarding.bringRecords"], in: app)
+        XCTAssertTrue(app.buttons["intake.csv"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["intake.documents"].exists)
+        open(app.buttons["intake.manual"], in: app)
+        let field = app.textFields["project.title"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
         field.typeText("Replaced the roof")
         open(app.buttons["Save"], in: app)
-        open(app.buttons["home.card.homeValue"], in: app)
-        XCTAssertTrue(app.buttons["value.add"].waitForExistence(timeout: 10))
+        open(app.buttons["Done"], in: app)
+        open(app.buttons["home.card.homeHistory"], in: app)
+        XCTAssertTrue(app.buttons["history.log"].waitForExistence(timeout: 10))
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "Home value after recording past work"
+        screenshot.name = "Home history after recording past work"
         screenshot.lifetime = .keepAlways
         add(screenshot)
         open(app.buttons["Done"], in: app)
@@ -48,25 +61,26 @@ final class HomeBlueprintUITests: XCTestCase {
         field.tap()
         field.typeText("Test air filter")
         open(app.buttons["Save"], in: app)
-        let task = app.buttons.containing(.staticText, identifier: "Test air filter").firstMatch
+        let task = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "todo.open.", "Test air filter")
+        ).firstMatch
         open(task, in: app)
         open(app.buttons["Mark done"], in: app)
+        XCTAssertTrue(app.staticTexts["Marked done"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Mark done"].isHittable)
+        open(app.buttons["Undo"], in: app)
+        XCTAssertTrue(app.buttons["Mark done"].waitForExistence(timeout: 5))
     }
 
-    func testOwnerEstimateAndHomeBriefNavigation() {
+    func testHomeHistoryAndPrivateBriefAreReachable() {
         let app = launch("home")
-        open(app.buttons["home.card.homeValue"], in: app)
-        open(app.buttons["value.add"], in: app)
-        let source = app.textFields["value.source"]
-        source.tap()
-        source.typeText("Agent review")
-        let amount = app.textFields["value.amount"]
-        amount.tap()
-        amount.typeText("450000")
-        open(app.buttons["value.save"], in: app)
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Agent review")).firstMatch.waitForExistence(timeout: 10))
-        open(app.buttons["value.homeBrief"], in: app)
+        XCTAssertTrue(app.buttons["home.card.homeHistory"].waitForExistence(timeout: 15))
+        capture("Home", app: app)
+        open(app.buttons["home.card.homeHistory"], in: app)
+        XCTAssertTrue(app.buttons["history.log"].waitForExistence(timeout: 10))
+        capture("Home History", app: app)
+        open(app.buttons["history.homeBrief"], in: app)
         XCTAssertTrue(app.buttons["billing.restore"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["brief.preview"].exists)
     }
 }
