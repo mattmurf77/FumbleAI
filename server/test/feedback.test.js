@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { createApp } from '../src/app.js';
-import { validateFeedback, ValidationError, RateLimiter, renderAdminPage, FeedbackStore } from '../src/feedback.js';
+import { validateFeedback, validateRequestId, ValidationError, IdempotencyConflict, RateLimiter, renderAdminPage, FeedbackStore } from '../src/feedback.js';
 
 const servers = [];
 after(() => Promise.all(servers.map((s) => new Promise((r) => s.close(r)))));
@@ -22,12 +22,21 @@ function fakeDb({ failWith } = {}) {
       const sql = text.trim();
       if (sql.startsWith('CREATE TABLE')) return { rows: [] };
       if (sql.startsWith('INSERT INTO feedback')) {
-        const [category, message, page, ctx, appVersion, buildNumber, osVersion, deviceModel, installId] = params;
+        const [category, message, page, ctx, appVersion, buildNumber, osVersion, deviceModel, installId, requestId] = params;
+        const existing = requestId && rows.find((r) => r.request_id === requestId);
+        if (existing) {
+          const proposed = [category, message, page, ctx === null ? null : JSON.parse(ctx), appVersion, buildNumber, osVersion, deviceModel, installId];
+          const saved = [existing.category, existing.message, existing.page, existing.screen_context, existing.app_version, existing.build_number,
+            existing.os_version, existing.device_model, existing.install_id];
+          try { assert.deepEqual(proposed, saved); }
+          catch { return { rows: [] }; }
+          return { rows: [{ id: existing.id, created_at: existing.created_at }] };
+        }
         clock += 1000;
         const row = {
           id: randomUUID(), created_at: new Date(clock), category, message, page,
           screen_context: ctx === null ? null : JSON.parse(ctx), app_version: appVersion, build_number: buildNumber,
-          os_version: osVersion, device_model: deviceModel, install_id: installId, status: 'new',
+          os_version: osVersion, device_model: deviceModel, install_id: installId, request_id: requestId, status: 'new',
         };
         rows.push(row);
         return { rows: [{ id: row.id, created_at: row.created_at }] };
@@ -117,11 +126,12 @@ test('POST /v1/feedback is 503 when no database is configured', async () => {
 });
 
 test('POST /v1/feedback is 503 database_unavailable when the database errors', async () => {
-  const { post, logs } = await start({ db: fakeDb({ failWith: 'connection refused' }) });
+  const { post, logs } = await start({ db: fakeDb({ failWith: 'private submitted text from a database error' }) });
   const res = await post(good);
   assert.equal(res.status, 503);
   assert.equal((await res.json()).error, 'database_unavailable');
-  assert.ok(logs.some((l) => l.includes('connection refused')));
+  assert.ok(logs.some((l) => l.includes('feedback database error: unavailable')));
+  assert.ok(logs.every((l) => !l.includes('private submitted text')));
 });
 
 test('POST /v1/feedback rate-limits per install id', async () => {
@@ -143,6 +153,96 @@ test('RateLimiter resets after the window', () => {
   assert.equal(rl.hit('b').ok, true);
   t = 1000;
   assert.equal(rl.hit('a').ok, true);
+});
+
+test('RateLimiter bounds active identities without evicting their counters', () => {
+  let t = 0;
+  const rl = new RateLimiter({ limit: 1, windowMs: 1000, maxKeys: 2, now: () => t });
+  assert.equal(rl.hit('a').ok, true);
+  t = 250;
+  assert.equal(rl.hit('b').ok, true);
+  for (let i = 0; i < 100; i++) assert.equal(rl.hit(`new-${i}`).ok, false);
+  assert.equal(rl.windows.size, 2);
+  assert.equal(rl.hit('a').ok, false);
+  t = 1000;
+  assert.equal(rl.hit('c').ok, true);
+  assert.equal(rl.hit('b').ok, false);
+  t = 1250;
+  assert.equal(rl.hit('b').ok, true);
+  assert.equal(rl.windows.size, 2);
+});
+
+test('RateLimiter preserves expiry ordering after a wall-clock rollback and rejects invalid limits', () => {
+  let t = 500;
+  const rl = new RateLimiter({ limit: 1, windowMs: 1000, maxKeys: 2, now: () => t });
+  rl.hit('a');
+  t = 0;
+  rl.hit('b');
+  t = 1500;
+  assert.equal(rl.hit('c').ok, true);
+  assert.equal(rl.windows.size, 1);
+  for (const settings of [{ limit: -1 }, { limit: Infinity }, { limit: 0.5 }, { windowMs: 0 }, { maxKeys: 0 }]) {
+    assert.throws(() => new RateLimiter(settings), RangeError);
+  }
+});
+
+test('request identifiers are optional UUIDs, normalized and validated without including the supplied value', () => {
+  assert.equal(validateRequestId(undefined), null);
+  assert.equal(validateRequestId(null), null);
+  const id = randomUUID();
+  assert.equal(validateRequestId(id.toUpperCase()), id);
+  for (const invalid of ['', 'private-text', [id], 123]) {
+    assert.throws(() => validateRequestId(invalid), { name: 'Error', message: 'X-Home-Request-ID must be a UUID.' });
+  }
+});
+
+test('FeedbackStore replays a receipt after a lost response and preserves triaged status', async () => {
+  const db = fakeDb();
+  const store = new FeedbackStore(db);
+  const requestId = randomUUID();
+  const feedback = validateFeedback(good);
+  const first = await store.insert(feedback, { requestId });
+  await store.setStatus(first.id, 'triaged');
+  const retry = await store.insert(validateFeedback({ ...good, screenContext: { level: 'Ground floor', lens: 'plan' } }), { requestId });
+  assert.deepEqual(retry, first);
+  assert.equal(db.rows.length, 1);
+  assert.equal(db.rows[0].status, 'triaged');
+  await assert.rejects(store.insert({ ...feedback, message: 'Different message' }, { requestId }), IdempotencyConflict);
+  await assert.rejects(store.insert({ ...feedback, installId: 'another-install' }, { requestId }), IdempotencyConflict);
+  assert.equal(db.rows[0].message, feedback.message);
+  assert.equal(db.rows.length, 1);
+});
+
+test('FeedbackStore keeps old-client submissions independent and does not persist invalid identifiers', async () => {
+  const db = fakeDb();
+  const store = new FeedbackStore(db);
+  const feedback = validateFeedback(good);
+  const a = await store.insert(feedback);
+  const b = await store.insert(feedback);
+  assert.notEqual(a.id, b.id);
+  await assert.rejects(store.insert(feedback, { requestId: 'invalid' }), ValidationError);
+  assert.equal(db.rows.length, 2);
+});
+
+test('POST feedback replays a stable request ID, rejects conflicting reuse and accepts older clients', async () => {
+  const { post, db } = await start();
+  const headers = { 'X-Home-Request-ID': randomUUID() };
+  const first = await post(good, headers);
+  assert.equal(first.status, 201);
+  const firstReceipt = await first.json();
+  const retry = await post(good, headers);
+  assert.equal(retry.status, 201);
+  assert.deepEqual(await retry.json(), firstReceipt);
+  assert.equal(db.rows.length, 1);
+  const conflict = await post({ ...good, message: 'Different report' }, headers);
+  assert.equal(conflict.status, 409);
+  const conflictBody = await conflict.json();
+  assert.equal(conflictBody.error, 'idempotency_conflict');
+  assert.equal(conflictBody.id, undefined);
+  assert.equal(db.rows.length, 1);
+  assert.equal((await post(good, { 'X-Home-Request-ID': 'not-a-uuid' })).status, 400);
+  assert.equal((await post(good)).status, 201);
+  assert.equal(db.rows.length, 2);
 });
 
 test('admin routes are 404 when HOME_ADMIN_KEY is unset', async () => {

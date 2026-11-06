@@ -11,12 +11,16 @@
         "text": "If you search for an address, Apple Maps receives your search text to find the property. Looking up its exterior sends coordinates for the selected property to the configured Home Blueprint helper service or directly to an OpenStreetMap Overpass service. The helper uses Overpass and can cache the map result by rounded coordinates in memory for up to 24 hours. These requests can reveal the home’s location to the service receiving them. Network and hosting providers process connection information such as the request address and IP address. You can enter and maintain home records without using an exterior lookup."
       },
       {
+        "heading": "Planning guides",
+        "text": "Home Blueprint can download updated public task suggestions, supply lists, cost guides and provider directories from its configured helper service. These requests include the app’s service key but no home address, task text, document contents, account details or purchase information. Hosting providers still process connection information such as the network address. Recommendations are selected using records on your device. Downloaded guides are cached on your device with their original source and review dates for offline use."
+      },
+      {
         "heading": "Camera, dictation and reminders",
         "text": "Room scans, selected images and scanned documents help you build your plan or add records. The microphone is used when you start dictation. Home Blueprint requests Apple’s on-device speech recognition where supported. Otherwise Apple may process audio on its servers. You can type instead. The app requests calendar or notification access when those features need it. Manage access in iPhone Settings."
       },
       {
         "heading": "Feedback you send",
-        "text": "Sending feedback submits your category, message, screen name and available screen context, app and build versions, iOS version, device model and a random installation identifier to the configured helper service. Screen context may identify the page or room you were viewing. The service uses the installation identifier and network address to limit repeated submissions. A message that cannot be sent is queued on this device and retried. Sent messages are stored in the service’s feedback database for the publisher to review. They have no automatic deletion date. Please keep private home details out of your message."
+        "text": "Sending feedback submits your category, message, screen name and available screen context, app and build versions, iOS version, device model, a random installation identifier and a random submission identifier to the configured helper service. Screen context may identify the page or room you were viewing. The service uses the installation identifier and network address to limit repeated submissions. The submission identifier prevents a network retry from saving the same report twice. A message that cannot be sent is queued on this device and retried. Sent messages are stored in the service’s feedback database for the publisher to review. They have no automatic deletion date. Please keep private home details out of your message."
       },
       {
         "heading": "Purchases and sharing",
