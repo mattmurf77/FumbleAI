@@ -20,6 +20,7 @@ struct SuggestedMaintenanceView: View {
 }
 
 struct MaintenanceRecommendationCatalog: View {
+    @Environment(AppEnvironment.self) private var env
     let property: Property
     let ideas: [MaintenanceIdea]
     @State private var mode = Chore.WorkMode.hirePro
@@ -34,7 +35,7 @@ struct MaintenanceRecommendationCatalog: View {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(mode == .diy ? idea.diyTitle : idea.title).font(.headline)
                                 Text(costLabel(idea)).font(.subheadline).foregroundStyle(.secondary)
-                                if let band = idea.resaleScenario(isDIY: mode == .diy), property.currencyCode == "USD" {
+                                if let band = env.catalog.resale(idea, mode: mode), property.currencyCode == "USD" {
                                     Text("Resale scenario: " + dollarRange(band)).font(.caption)
                                 } else {
                                     Text(idea == .closet ? "Resale impact needs a scope-matched estimate" : "Value impact: upkeep").font(.caption)
@@ -49,7 +50,8 @@ struct MaintenanceRecommendationCatalog: View {
 
     private func costLabel(_ idea: MaintenanceIdea) -> String {
         guard property.currencyCode == "USD" else { return "Get a local price in " + property.currencyCode }
-        return mode == .diy ? idea.diyBudget : idea.costLabel.map { $0 + " · US pro guide" } ?? "Ask for a written service quote"
+        return env.catalog.price(idea, mode: mode).map { $0 + (mode == .diy ? " · DIY guide" : " · US pro guide") }
+            ?? "Ask for a written service quote"
     }
 }
 
@@ -76,6 +78,7 @@ struct MaintenanceRecommendationDetail: View {
     @AppStorage private var hidden: String
     @State private var mode: Chore.WorkMode
     @State private var supplies: [ChoreSupply]
+    @State private var suppliesInitialized = false
     private struct TaskProposal: Identifiable {
         let id = UUID()
         let mode: Chore.WorkMode
@@ -98,11 +101,18 @@ struct MaintenanceRecommendationDetail: View {
         let proposedSupplies = mode == .diy ? supplies : []
         List {
             Section {
-                Text(idea.detail)
+                Text(env.catalog.snapshot?.recommendation(idea)?.detail ?? idea.detail)
                 WorkApproachPicker(mode: $mode)
             }
             Section("Estimated cost") {
-                if mode == .diy {
+                if let guide = env.catalog.guide(idea, mode: mode) {
+                    if property.currencyCode == guide.currency { Text(guide.priceLabel).font(.headline) }
+                    else { Text("Request a local quote in " + property.currencyCode + ".") }
+                    Text(guide.scope)
+                    ForEach(guide.sources, id: \.url) { source in
+                        Link(source.label + " · checked " + source.reviewedOn, destination: source.url)
+                    }
+                } else if mode == .diy {
                     if property.currencyCode == "USD" { Text(idea.diyBudget).font(.headline) }
                     Text(idea.diyScope)
                     Link(idea.diySourceLabel, destination: idea.diySource)
@@ -113,10 +123,15 @@ struct MaintenanceRecommendationDetail: View {
                 } else { Text("Request a local quote for your equipment and scope.") }
             }
             Section("Possible resale impact") {
-                if let band = idea.resaleScenario(isDIY: mode == .diy), property.currencyCode == "USD" {
+                if let band = env.catalog.resale(idea, mode: mode), property.currencyCode == "USD" {
                     Text(dollarRange(band)).font(.headline)
-                    Text("Illustration using the US installed-cost guide and the 83% cost recovery surveyed for a typical closet renovation. The project scope, finish and local market determine whether that assumption fits.")
-                    Link("NAR/NARI · 2025 Remodeling Impact Report", destination: URL(string: "https://www.nar.realtor/research-and-statistics/research-reports/remodeling-impact")!)
+                    if let assumption = env.catalog.snapshot?.resaleAssumption(for: idea) {
+                        Text(assumption.scope)
+                        Link(assumption.source.label, destination: assumption.source.url)
+                    } else {
+                        Text("Illustration using the US installed-cost guide and the 83% cost recovery surveyed for a typical closet renovation. The project scope, finish and local market determine whether that assumption fits.")
+                        Link("NAR/NARI · 2025 Remodeling Impact Report", destination: URL(string: "https://www.nar.realtor/research-and-statistics/research-reports/remodeling-impact")!)
+                    }
                 } else {
                     Text(idea == .closet ? "A kit-only change needs a scope-matched local estimate." : "Routine maintenance helps preserve condition. A reliable increase in sale price has not been established for this task.")
                 }
@@ -128,7 +143,12 @@ struct MaintenanceRecommendationDetail: View {
             } else {
                 Section("Get a quote") {
                     if let partner = ProjectReferral(kind: "Contractor") { ProjectReferralLink(partner: partner) }
-                    Link(idea == .closet ? "Find a remodeler in the NARI directory" : "Find local pros on Thumbtack", destination: idea.providerDirectory)
+                    if let directory = env.catalog.snapshot?.directory(for: idea) {
+                        Link("Find local pros · " + directory.name, destination: directory.url)
+                        Text(directory.disclosure).font(.footnote).foregroundStyle(.secondary)
+                    } else {
+                        Link(idea == .closet ? "Find a remodeler in the NARI directory" : "Find local pros on Thumbtack", destination: idea.providerDirectory)
+                    }
                     ShareLink(item: "Please send a written estimate for \(idea.title). Include labor, materials, exclusions and availability.") {
                         Label("Share a quote request", systemImage: "square.and.arrow.up")
                     }
@@ -159,6 +179,10 @@ struct MaintenanceRecommendationDetail: View {
         }
         .navigationTitle(mode == .diy ? idea.diyTitle : idea.title).navigationBarTitleDisplayMode(.inline)
         .task(id: property.id) {
+            if !suppliesInitialized {
+                supplies = env.catalog.supplies(idea)
+                suppliesInitialized = true
+            }
             for await all in env.chores.observeChores(.init(propertyId: property.id)) {
                 scheduled = all.first {
                     $0.deletedAt == nil && $0.closedAt == nil &&
@@ -173,7 +197,8 @@ struct MaintenanceRecommendationDetail: View {
             .id(proposal.id)
         }
         .sheet(isPresented: $addProject) {
-            ProjectForm(spaceID: nil, levelID: nil, initialStatus: .planned, suggestion: idea) { _ in confirmation = "Saved to your planned projects." }
+            ProjectForm(spaceID: nil, levelID: nil, initialStatus: .planned, suggestion: idea,
+                        suggestedGuide: env.catalog.guide(idea, mode: .hirePro)) { _ in confirmation = "Saved to your planned projects." }
         }
     }
 }

@@ -18,12 +18,16 @@ struct ProjectForm: View {
     private let mode: Mode
     var onSaved: ((Project) -> Void)?
 
-    init(spaceID: UUID?, levelID: UUID?, initialStatus: Project.Status, suggestion: MaintenanceIdea? = nil, onSaved: ((Project) -> Void)? = nil) {
+    init(spaceID: UUID?, levelID: UUID?, initialStatus: Project.Status, suggestion: MaintenanceIdea? = nil,
+         suggestedGuide: HomeContentCatalog.Guide? = nil, onSaved: ((Project) -> Void)? = nil) {
         mode = .create(spaceID: spaceID, levelID: levelID, status: initialStatus)
         self.onSaved = onSaved
         _status = State(initialValue: initialStatus == .unknown ? .idea : initialStatus)
         _title = State(initialValue: suggestion?.title ?? "")
-        if let idea = suggestion, let range = idea.costLabel, let source = idea.priceSource {
+        if let guide = suggestedGuide {
+            _notes = State(initialValue: "US professional planning range: " + guide.priceLabel + ". " + guide.scope + " " +
+                guide.sources.map { $0.label + " (checked " + $0.reviewedOn + "): " + $0.url.absoluteString }.joined(separator: " "))
+        } else if let idea = suggestion, let range = idea.costLabel, let source = idea.priceSource {
             _notes = State(initialValue: "US professional planning range: " + range + ". " + idea.sourceLabel + ". " + source.absoluteString)
         }
     }

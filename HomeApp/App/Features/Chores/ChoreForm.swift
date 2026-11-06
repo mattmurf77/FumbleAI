@@ -230,7 +230,7 @@ struct ChoreForm: View {
 
     private func newSuggestions(for idea: MaintenanceIdea) -> [ChoreSupply] {
         let existing = Set(supplies.map(\.key))
-        return idea.suggestedSupplyPlan.filter { !existing.contains($0.key) }
+        return env.catalog.supplies(idea).filter { !existing.contains($0.key) }
     }
     private func applyGuide(_ idea: MaintenanceIdea) {
         guide = idea

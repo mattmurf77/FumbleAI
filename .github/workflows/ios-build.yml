@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - "HomeApp/**"
+      - "server/data/home-catalog.json"
       - ".github/workflows/ios-build.yml"
       - ".github/scripts/test-iphone.sh"
   push:
     branches: [main]
     paths:
       - "HomeApp/**"
+      - "server/data/home-catalog.json"
       - ".github/workflows/ios-build.yml"
       - ".github/scripts/test-iphone.sh"
   workflow_dispatch:

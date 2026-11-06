@@ -85,6 +85,8 @@ targets:
         buildPhase: resources
       - path: ../server/data/product-pages.json
         buildPhase: resources
+      - path: ../server/data/home-catalog.json
+        buildPhase: resources
       - path: Shared
     dependencies:
       - target: HomeShare

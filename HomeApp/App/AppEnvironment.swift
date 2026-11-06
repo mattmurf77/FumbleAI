@@ -89,6 +89,7 @@ struct AppDependencies {
 
     // In-app feedback (live: Home server + on-device queue; in-memory for previews/tests)
     var feedback: any FeedbackSubmitting = InMemoryFeedbackSubmitter()
+    var remoteCatalogEnabled = false
 
     // Extras outside the HomeCore protocols (nil for in-memory wiring)
     var account: AccountHooks? = nil
@@ -197,6 +198,7 @@ struct AppDependencies {
 
         // INTEGRATION: Feedback — POST {HomeServerURL}/v1/feedback; queued in Application Support/Feedback when offline
         d.feedback = FeedbackClient(config: config)
+        d.remoteCatalogEnabled = true
         return d
     }
 }
@@ -248,6 +250,7 @@ final class AppEnvironment {
     let exteriorSeeder: any ExteriorSeeding
 
     let feedback: any FeedbackSubmitting
+    let catalog: HomeGuideContent
 
     let fitChecker = FitChecker()
     let recurrence: RecurrenceEngine
@@ -288,6 +291,7 @@ final class AppEnvironment {
         roomPlanImporter = d.roomPlanImporter; roughIn = d.roughIn; blocks = d.blocks; photoTrace = d.photoTrace; receipts = d.receipts
         addresses = d.addresses; footprints = d.footprints; snapshots = d.snapshots; yardSeeder = d.yardSeeder; exteriorSeeder = d.exteriorSeeder
         feedback = d.feedback
+        catalog = HomeGuideContent(config: d.config, remoteEnabled: d.remoteCatalogEnabled)
         recurrence = RecurrenceEngine(calendar: d.clock.calendar)
         account = d.account
         nicknameWriter = d.setDeviceNickname
@@ -347,6 +351,7 @@ final class AppEnvironment {
         }
         observeTimeChanges()
         retryPendingFeedback()
+        refreshPublicCatalog()
         await reminders.replan(reason: .launch)
         scheduleAppRefresh()
     }
@@ -367,7 +372,12 @@ final class AppEnvironment {
     func sceneBecameActive() async {
         guard !storageUnavailable else { return }
         retryPendingFeedback()
+        refreshPublicCatalog()
         await reminders.replan(reason: .foreground)
+    }
+
+    private func refreshPublicCatalog() {
+        Task { await catalog.refresh() }
     }
 
     /// Sends feedback saved while offline (in the background; a sleeping server can take a while to answer).

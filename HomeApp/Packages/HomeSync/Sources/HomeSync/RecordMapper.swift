@@ -45,7 +45,10 @@ public struct RecordMapper: Sendable {
     static func coerce(_ v: SyncValue, to kind: SyncColumn.Kind) -> SyncValue {
         switch (kind, v) {
         case (_, .null): return .null
-        case (.int, .double(let d)): return .int(Int64(d))
+        case (.int, .double(let d)):
+            // Remote values may be non-finite, fractional or outside Int64. Keep invalid values for
+            // the store to reject instead of trapping or silently truncating an amount/count.
+            return Int64(exactly: d).map(SyncValue.int) ?? v
         case (.double, .int(let i)): return .double(Double(i))
         case (.datetime, .string(let s)):
             let f = ISO8601DateFormatter()

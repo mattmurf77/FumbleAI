@@ -147,7 +147,13 @@ public final class SyncStore: @unchecked Sendable {
     /// Column metadata for `type` (cached).
     public func schema(_ type: RecordType) throws -> SyncTableSchema {
         lock.lock(); if let s = schemaCache[type] { lock.unlock(); return s }; lock.unlock()
-        let s = try database.writer.read { try SyncSchema.introspect($0, type) }
+        return try database.writer.read { try schema(type, in: $0) }
+    }
+
+    /// Inside a write transaction reuse its connection; opening another read here is non-reentrant.
+    func schema(_ type: RecordType, in db: Database) throws -> SyncTableSchema {
+        lock.lock(); if let s = schemaCache[type] { lock.unlock(); return s }; lock.unlock()
+        let s = try SyncSchema.introspect(db, type)
         lock.lock(); schemaCache[type] = s; lock.unlock()
         return s
     }
@@ -218,7 +224,7 @@ public final class SyncStore: @unchecked Sendable {
     /// Moves a downloaded asset into `Attachments/` and marks it `local` (post-commit of the apply, LLD §5.6).
     public func adoptAttachmentFile(id: UUID, from url: URL) async throws {
         guard let a = try await database.read({ try Attachment.fetchOne($0, id: id) }) else { return }
-        try files.adopt(downloaded: url, id: a.id, ext: a.fileExt)
+        try files.adopt(downloaded: url, attachment: a)
         try await database.write(origin: .sync) { tx in try AttachmentStore.setLocalState(tx.db, id: id, state: "local") }
     }
 
@@ -252,7 +258,7 @@ public final class SyncTransaction {
 
     /// Current row (including soft-deleted) as `[column: value]`, without `id` or derived caches.
     public func row(_ ref: RecordRef) throws -> SyncRow? {
-        let schema = try store.schema(ref.type)
+        let schema = try store.schema(ref.type, in: db)
         guard let r = try Row.fetchOne(db, sql: "SELECT * FROM \(ref.type.tableName) WHERE id = ?", arguments: [ref.id.db]) else { return nil }
         var out: SyncRow = [:]
         for c in schema.columns { out[c.name] = Self.syncValue(r[c.name] as DatabaseValue? ?? .null, c.kind) }
@@ -261,6 +267,11 @@ public final class SyncTransaction {
 
     public func exists(_ ref: RecordRef) throws -> Bool {
         try Row.fetchOne(db, sql: "SELECT 1 FROM \(ref.type.tableName) WHERE id = ?", arguments: [ref.id.db]) != nil
+    }
+
+    /// Property document originals are explicitly device-only, including on recovery and direct record requests.
+    public func isDeviceOnly(_ ref: RecordRef) throws -> Bool {
+        try AttachmentStore.isDeviceDocument(ref, in: db)
     }
 
     static func syncValue(_ v: DatabaseValue, _ kind: SyncColumn.Kind) -> SyncValue {
@@ -290,10 +301,23 @@ public final class SyncTransaction {
     /// default on insert). Recomputes derived columns, reindexes FTS, and tracks chores whose `next_due_on`
     /// inputs changed (completions, rule, start).
     public func apply(_ ref: RecordRef, values: SyncRow) throws -> SyncApplyOutcome {
-        let schema = try store.schema(ref.type)
+        let schema = try store.schema(ref.type, in: db)
+        let old = try row(ref)
+        let effective = (old ?? [:]).merging(values) { _, incoming in incoming }
+        if try isDeviceOnly(ref) { return .rejected("device-only document") }
+        if ref.type == .attachment, effective["owner_type"]?.stringValue == "property" {
+            return .rejected("device-only document")
+        }
+        if ref.type != .property, let previous = old?["property_id"], let incoming = values["property_id"], incoming != previous {
+            return .rejected("a record cannot change homes")
+        }
+        let propertyId = ref.type == .property ? ref.id : effective["property_id"]?.stringValue.flatMap(UUID.init(uuidString:))
         var cols: [String: DatabaseValue] = [:]
         for c in schema.columns {
             guard let v = values[c.name] else { continue }
+            if case .double(let number) = v, !number.isFinite || c.kind == .int {
+                return .rejected("\(c.name): invalid number")
+            }
             if let allowed = c.enumValues, case .string(let s) = v, !allowed.contains(s) { return .unsupported(column: c.name, value: s) }
             if let parent = c.references, case .string(let s) = v {
                 guard let pid = UUID(uuidString: s) else { return .rejected("\(c.name): bad id") }
@@ -302,7 +326,17 @@ public final class SyncTransaction {
             }
             cols[c.name] = Self.databaseValue(v)
         }
-        let old = try row(ref)
+        // Validate the merged row, not just incoming columns. A partial update must not reuse a
+        // previously stored parent from a different home when another relationship changes.
+        for c in schema.columns {
+            guard let parent = c.references, let value = effective[c.name], !value.isNull else { continue }
+            guard case .string(let raw) = value, let id = UUID(uuidString: raw) else { return .rejected("\(c.name): bad id") }
+            let parentRef = RecordRef(parent, id)
+            if parentRef == ref { continue }
+            guard let parentRow = try row(parentRef) else { return .missingParent(parentRef) }
+            let parentHome = parent == .property ? id : parentRow["property_id"]?.stringValue.flatMap(UUID.init(uuidString:))
+            guard parentHome == propertyId else { return .rejected("\(c.name): parent belongs to another home") }
+        }
         if old == nil, let missing = schema.columns.first(where: { $0.notNull && !$0.hasDefault && cols[$0.name] == nil }) {
             return .rejected("missing required field \(missing.name)")
         }
@@ -354,6 +388,7 @@ public final class SyncTransaction {
     /// Fetched deletion: hard-delete locally (children cascade), drop system fields and any outbox entry.
     public func deleteLocal(_ ref: RecordRef) throws {
         guard try exists(ref) else { return }
+        guard try !isDeviceOnly(ref) else { return }
         if ref.type == .attachment, let a = try Attachment.fetchOne(db, id: ref.id) {
             store.files.remove(id: a.id, ext: a.fileExt)
             try db.execute(sql: "DELETE FROM attachment_local WHERE attachment_id = ?", arguments: [ref.id.db])
@@ -398,7 +433,7 @@ public final class SyncTransaction {
     public func enqueueAll(property: UUID? = nil) throws -> [RecordRef] {
         var out: [RecordRef] = []
         for t in SyncSchema.applyOrder {
-            let schema = try store.schema(t)
+            let schema = try store.schema(t, in: db)
             let fields = Set(schema.columns.map(\.name))
             let sql: String
             var args: StatementArguments = []

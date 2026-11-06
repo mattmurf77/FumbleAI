@@ -53,8 +53,8 @@ struct HomeNextActionView: View {
                             Label(best.title, systemImage: best.symbol)
                                 .font(.title3.weight(.semibold)).foregroundStyle(theme.ink)
                             Text(best.reason).font(.subheadline).foregroundStyle(theme.ink2)
-                            if case .maintenance(let idea) = best.action, property.currencyCode == "USD", let cost = idea.costLabel {
-                                Text(cost + " · US professional guide · " + idea.sourceLabel)
+                            if case .maintenance(let idea) = best.action, property.currencyCode == "USD", let cost = env.catalog.price(idea, mode: .hirePro) {
+                                Text(cost + " · US professional guide · " + (env.catalog.guide(idea, mode: .hirePro)?.sourceLabel ?? idea.sourceLabel))
                                     .font(.footnote).foregroundStyle(theme.ink2)
                             }
                             Text(best.button)
