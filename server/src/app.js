@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { LruCache } from './cache.js';
 import { renderProductPage } from './product-pages.js';
-import { FeedbackStore, RateLimiter, ValidationError, validateFeedback, STATUSES, CATEGORIES, isUuid, createPgPool, renderAdminPage } from './feedback.js';
+import { FeedbackStore, RateLimiter, ValidationError, IdempotencyConflict, validateRequestId, validateFeedback, STATUSES, CATEGORIES, isUuid, createPgPool, renderAdminPage } from './feedback.js';
+import { createCatalogResource, catalogResponse } from './catalog.js';
 import { buildQuery, fetchOverpass, normalize, DEFAULT_OVERPASS_URLS, UpstreamError } from './overpass.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -74,7 +75,7 @@ function parseCoord(raw, min, max) {
  *   feedbackDb?: { query: (text: string, params?: unknown[]) => Promise<{ rows: any[] }> } | null,
  * }} [deps] `feedbackDb` overrides the Postgres pool built from DATABASE_URL (tests pass a fake).
  */
-export function createApp({ env = process.env, fetchImpl = fetch, now = Date.now, log = console.log, templates = loadTemplates(), feedbackDb } = {}) {
+export function createApp({ env = process.env, fetchImpl = fetch, now = Date.now, log = console.log, templates = loadTemplates(), catalog = createCatalogResource(), feedbackDb } = {}) {
   const apiKey = env.HOME_API_KEY?.trim() || null;
   const adminKey = env.HOME_ADMIN_KEY?.trim() || null;
   const databaseUrl = env.DATABASE_URL?.trim() || null;
@@ -210,7 +211,8 @@ export function createApp({ env = process.env, fetchImpl = fetch, now = Date.now
       return await fn(await storePromise);
     } catch (err) {
       if (err instanceof ValidationError || err instanceof BodyError) throw err;
-      log(`feedback database error: ${err?.message ?? err}`);
+      // PostgreSQL errors may include submitted text. Keep logs free of feedback contents.
+      log(`feedback database error: ${/^[A-Z0-9]{5}$/.test(err?.code ?? '') ? err.code : 'unavailable'}`);
       return send(res, 503, { error: 'database_unavailable', message: 'The feedback database is not reachable. Try again later.' });
     }
   }
@@ -220,7 +222,9 @@ export function createApp({ env = process.env, fetchImpl = fetch, now = Date.now
     const ipHit = ipLimiter.hit(`ip:${clientIp(req)}`);
     if (!ipHit.ok) return send(res, 429, { error: 'rate_limited', message: 'Too much feedback at once. Try again later.' }, { 'Retry-After': String(ipHit.retryAfterS) });
     let feedback;
+    let requestId;
     try {
+      requestId = validateRequestId(req.headers['x-home-request-id']);
       feedback = validateFeedback(await readJson(req));
     } catch (err) {
       if (err instanceof BodyError) return send(res, err.status, { error: err.error, message: err.message });
@@ -232,8 +236,15 @@ export function createApp({ env = process.env, fetchImpl = fetch, now = Date.now
       if (!hit.ok) return send(res, 429, { error: 'rate_limited', message: 'Too much feedback at once. Try again later.' }, { 'Retry-After': String(hit.retryAfterS) });
     }
     return withStore(res, async (store) => {
-      const saved = await store.insert(feedback);
-      return send(res, 201, { id: saved.id, createdAt: saved.createdAt }, { 'Cache-Control': 'no-store' });
+      try {
+        const saved = await store.insert(feedback, { requestId });
+        return send(res, 201, { id: saved.id, createdAt: saved.createdAt }, { 'Cache-Control': 'no-store' });
+      } catch (err) {
+        if (err instanceof IdempotencyConflict) {
+          return send(res, 409, { error: 'idempotency_conflict', message: 'This request identifier was already used for different feedback.' }, { 'Cache-Control': 'no-store' });
+        }
+        throw err;
+      }
     });
   }
 
@@ -321,6 +332,12 @@ export function createApp({ env = process.env, fetchImpl = fetch, now = Date.now
       return send(res, 200, templatesBody, { ETag: templatesEtag, 'Cache-Control': 'public, max-age=3600' });
     }
 
+    if (path === '/v1/catalog') {
+      const response = catalogResponse(catalog, { method: req.method, headers: req.headers });
+      res.writeHead(response.status, response.headers);
+      return res.end(response.body ?? undefined);
+    }
+
     if (path === '/v1/footprint') {
       const lat = parseCoord(url.searchParams.get('lat'), -90, 90);
       const lon = parseCoord(url.searchParams.get('lon'), -180, 180);
@@ -376,7 +393,7 @@ export function createApp({ env = process.env, fetchImpl = fetch, now = Date.now
       await (await storePromise).ensureSchema();
       return 'feedback table ready';
     } catch (err) {
-      return `feedback table not ready yet: ${err?.message ?? err}`;
+      return `feedback table not ready yet: ${/^[A-Z0-9]{5}$/.test(err?.code ?? '') ? err.code : 'unavailable'}`;
     }
   };
 
