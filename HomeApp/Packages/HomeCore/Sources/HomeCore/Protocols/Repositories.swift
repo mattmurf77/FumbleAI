@@ -53,11 +53,13 @@ public protocol ChoreRepository: Sendable {
     func chores(_ query: ChoreQuery) async throws -> [Chore]
     func observeChores(_ query: ChoreQuery) -> AsyncStream<[Chore]>
     func completions(chore: UUID) async throws -> [ChoreCompletion]
-    func create(_ draft: ChoreDraft) async throws -> Chore
+    func create(_ draft: ChoreDraft, estimates: [WorkEstimate]) async throws -> Chore
     /// Saves edits; recomputes `nextDueOn` if the rule or start changed.
-    func update(_ chore: Chore) async throws
+    func update(_ chore: Chore, estimates: [WorkEstimate]) async throws
     func complete(_ id: UUID, by person: UUID?, at: Date) async throws -> ChoreCompletion
-    func skip(_ id: UUID, at: Date) async throws
+    @discardableResult func skip(_ id: UUID, at: Date) async throws -> ChoreCompletion
+    /// Undo the specific most recent completion, including its history and prior due date.
+    func undoCompletion(_ id: UUID) async throws
     /// Manual "Reschedule to…" (plain overlay field).
     func reschedule(_ id: UUID, to: LocalDate) async throws
     func setPaused(_ id: UUID, _ paused: Bool) async throws
@@ -72,21 +74,25 @@ public protocol ChoreRepository: Sendable {
 
 /// Projects and cost line items (LLD `ProjectServicing`).
 public protocol ProjectRepository: Sendable {
+    func reviewCSVImport(_ rows: [ProjectCSVItem], propertyID: UUID) async throws -> [ProjectCSVDecision]
+    func importCompletedCSV(_ rows: [ProjectCSVItem], propertyID: UUID) async throws -> [ProjectCSVDecision]
     func project(_ id: UUID) async throws -> Project?
     func projects(_ query: ProjectQuery) async throws -> [Project]
     func observeProjects(_ query: ProjectQuery) -> AsyncStream<[Project]>
-    func create(_ draft: ProjectDraft) async throws -> Project
-    func update(_ project: Project) async throws
+    /// Completed work with recorded costs and counts of linked evidence, using the same project rows as Past Work.
+    func observeHistory(propertyId: UUID) -> AsyncStream<[HomeHistoryEntry]>
+    func create(_ draft: ProjectDraft, estimates: [WorkEstimate]) async throws -> Project
+    func update(_ project: Project, estimates: [WorkEstimate]) async throws
     /// Non-done transitions (stamps startedOn when entering in-progress).
     func setStatus(_ id: UUID, _ status: Project.Status) async throws
     /// The Done sheet: actual cost, completion date, hours and an optional receipt.
-    func markDone(_ id: UUID, actual: Money?, completedOn: LocalDate, hours: Double?, receipt: AttachmentDraft?) async throws
+    func markDone(_ id: UUID, actual: Money?, completedOn: LocalDate, hours: Double?, receipt: AttachmentDraft?, workAction: Project.WorkActionEdit) async throws
     /// done → in progress, keeps actuals.
     func reopen(_ id: UUID) async throws
     func delete(_ id: UUID) async throws
     func lineItems(project: UUID) async throws -> [CostLineItem]
     func observeLineItems(project: UUID) -> AsyncStream<[CostLineItem]>
-    func upsertLineItem(_ item: CostLineItem) async throws
+    func upsertLineItem(_ item: CostLineItem, receipt: AttachmentDraft?) async throws
     func deleteLineItem(_ id: UUID) async throws
 }
 
@@ -104,6 +110,8 @@ public protocol ThingRepository: Sendable {
 
 /// Inventory items and storage spots (LLD `InventoryServicing`, §11).
 public protocol InventoryRepository: Sendable {
+    /// Called only after the owner confirms buying the missing units on a to-do supply line.
+    func buySelectedSupply(_ line: ShoppingLine, propertyId: UUID) async throws
     func item(_ id: UUID) async throws -> InventoryItem?
     func items(_ query: InventoryQuery) async throws -> [InventoryItem]
     func observeItems(_ query: InventoryQuery) -> AsyncStream<[InventoryItem]>
@@ -159,6 +167,9 @@ public protocol PeopleRepository: Sendable {
 
 /// Photos, receipts, manuals, underlays. Binaries in Application Support/Attachments.
 public protocol AttachmentRepository: Sendable {
+    func observeDocuments(propertyId: UUID) -> AsyncStream<[HomeDocument]>
+    func fileDocument(_ draft: AttachmentDraft, propertyId: UUID, details: HomeDocumentDetails) async throws -> HomeDocument
+    func updateDocument(_ original: HomeDocument, details: HomeDocumentDetails) async throws
     func attachments(ownerType: Attachment.OwnerType, ownerId: UUID) async throws -> [Attachment]
     /// Copies the file into the store, computes sha256/size, inserts the row (upload state `needs_upload`).
     func add(_ draft: AttachmentDraft, ownerType: Attachment.OwnerType, ownerId: UUID, property: UUID) async throws -> Attachment
@@ -191,3 +202,23 @@ public typealias ChoreServicing = ChoreRepository
 public typealias ProjectServicing = ProjectRepository
 public typealias ThingServicing = ThingRepository
 public typealias InventoryServicing = InventoryRepository
+
+public extension ProjectRepository {
+    func markDone(_ id: UUID, actual: Money?, completedOn: LocalDate, hours: Double?, receipt: AttachmentDraft?) async throws {
+        try await markDone(id, actual: actual, completedOn: completedOn, hours: hours, receipt: receipt, workAction: .keep)
+    }
+
+    func upsertLineItem(_ item: CostLineItem) async throws {
+        try await upsertLineItem(item, receipt: nil)
+    }
+}
+
+public extension ChoreRepository {
+    func create(_ draft: ChoreDraft) async throws -> Chore { try await create(draft, estimates: []) }
+    func update(_ chore: Chore) async throws { try await update(chore, estimates: []) }
+}
+
+public extension ProjectRepository {
+    func create(_ draft: ProjectDraft) async throws -> Project { try await create(draft, estimates: []) }
+    func update(_ project: Project) async throws { try await update(project, estimates: []) }
+}

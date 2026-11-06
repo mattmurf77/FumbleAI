@@ -4,6 +4,38 @@ name: TestFlight
 # Setup guide: docs/setup/TESTFLIGHT.md
 on:
   workflow_dispatch:
+    inputs:
+      prepare_home_brief:
+        description: "Prepare Home Brief’s US draft purchase and price before upload"
+        type: boolean
+        required: false
+        default: false
+      catalog_only:
+        description: "Only update the selected Apple draft metadata; skip signing and build upload"
+        type: boolean
+        required: false
+        default: false
+      resume_home_brief_id:
+        description: "Optional Apple ID of a partially created Home Brief draft"
+        type: string
+        required: false
+      review_screenshot_run:
+        description: "Catalog-only: successful iOS build run ID containing the Home Brief review PNG"
+        type: string
+        required: false
+      fill_storefront_draft:
+        description: "Catalog-only: fill blank 1.0 en-US listing copy, support and privacy URLs"
+        type: boolean
+        required: false
+        default: false
+      select_build_number:
+        description: "Catalog-only: select a processed eligible iOS 1.0 build on the empty 1.0 draft"
+        type: string
+        required: false
+      listing_screenshot_run:
+        description: "Catalog-only: successful iOS build run ID for three English App Store listing screenshots"
+        type: string
+        required: false
 
 concurrency:
   group: testflight
@@ -11,11 +43,12 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   beta:
     name: Build and upload to TestFlight
-    runs-on: macos-15
+    runs-on: ${{ inputs.catalog_only && 'ubuntu-latest' || 'macos-26' }}
     timeout-minutes: 60
     env:
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -33,21 +66,86 @@ jobs:
       LANG: en_US.UTF-8
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require an isolated build selection
+        if: inputs.select_build_number != ''
+        env:
+          BUILD_ONLY: ${{ inputs.catalog_only && !inputs.prepare_home_brief && !inputs.fill_storefront_draft && inputs.resume_home_brief_id == '' && inputs.review_screenshot_run == '' }}
+          BUILD_NUMBER_TO_SELECT: ${{ inputs.select_build_number }}
+        run: |
+          if [[ "$BUILD_ONLY" != true || ! "$BUILD_NUMBER_TO_SELECT" =~ ^[1-9][0-9]{0,17}$ ]]; then
+            echo "Choose only catalog_only and a positive numeric select_build_number." >&2
+            exit 1
+          fi
+
+      - name: Require an isolated draft storefront update
+        if: inputs.fill_storefront_draft
+        env:
+          DRAFT_ONLY: ${{ inputs.catalog_only && !inputs.prepare_home_brief && inputs.review_screenshot_run == '' && inputs.resume_home_brief_id == '' }}
+        run: |
+          if [[ "$DRAFT_ONLY" != true ]]; then
+            echo "Choose only catalog_only and fill_storefront_draft." >&2
+            exit 1
+          fi
+
+      - name: Verify source of Home Brief review screenshot
+        if: inputs.review_screenshot_run != ''
+        env:
+          REVIEW_RUN_ID: ${{ inputs.review_screenshot_run }}
+          REVIEW_MODE_ONLY: ${{ inputs.catalog_only && !inputs.prepare_home_brief && inputs.resume_home_brief_id == '' }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/verify-home-brief-artifact.sh
+
+      - name: Verify source of public listing screenshots
+        if: inputs.listing_screenshot_run != ''
+        env:
+          REVIEW_RUN_ID: ${{ inputs.listing_screenshot_run }}
+          REVIEW_MODE_ONLY: ${{ inputs.catalog_only && !inputs.prepare_home_brief && !inputs.fill_storefront_draft && inputs.select_build_number == '' && inputs.resume_home_brief_id == '' && inputs.review_screenshot_run == '' }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/verify-home-brief-artifact.sh iphone-screenshots
+
+      - name: Download verified public listing captures
+        if: inputs.listing_screenshot_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: mattmurf77/FumbleAI
+          run-id: ${{ inputs.listing_screenshot_run }}
+          name: iphone-screenshots
+          path: ${{ runner.temp }}/home-listing-screenshots
+
+      - name: Download verified iPhone review attachment
+        if: inputs.review_screenshot_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: mattmurf77/FumbleAI
+          run-id: ${{ inputs.review_screenshot_run }}
+          name: home-brief-review-screenshot
+          path: ${{ runner.temp }}/home-brief-review
 
       - name: Check required secrets
+        env:
+          CATALOG_ONLY: ${{ inputs.catalog_only }}
         run: |
           missing=0
-          for name in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8 HOME_TEAM_ID HOME_BUNDLE_ID; do
+          names=(APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8 HOME_BUNDLE_ID)
+          if [[ "$CATALOG_ONLY" != true ]]; then names+=(HOME_TEAM_ID); fi
+          for name in "${names[@]}"; do
             if [ -z "${!name}" ]; then echo "::error::Missing GitHub secret $name (see docs/setup/TESTFLIGHT.md)"; missing=1; fi
           done
           exit $missing
 
       - name: Select latest stable Xcode
+        if: ${{ !inputs.catalog_only }}
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
       - name: Install XcodeGen
+        if: ${{ !inputs.catalog_only }}
         run: brew install xcodegen
 
       - name: Set up Ruby and fastlane
@@ -57,10 +155,54 @@ jobs:
           bundler-cache: true
 
       - name: Generate Xcode project
+        if: ${{ !inputs.catalog_only }}
         working-directory: HomeApp
         run: xcodegen generate
 
+      - name: Prepare Home Brief draft purchase
+        if: (inputs.prepare_home_brief || inputs.catalog_only) && inputs.review_screenshot_run == '' && !inputs.fill_storefront_draft && inputs.select_build_number == '' && inputs.listing_screenshot_run == ''
+        env:
+          RESUME_DRAFT_ID: ${{ inputs.resume_home_brief_id }}
+        run: |
+          if [[ -z "$RESUME_DRAFT_ID" ]]; then
+            bundle exec fastlane ios prepare_home_brief
+          elif [[ "$RESUME_DRAFT_ID" =~ ^[0-9]+$ ]]; then
+            bundle exec fastlane ios prepare_home_brief "resume_id:$RESUME_DRAFT_ID"
+          else
+            echo "Use the numeric Apple ID reported when the draft was created."
+            exit 1
+          fi
+
+      - name: Attach Home Brief screenshot and review notes
+        if: inputs.catalog_only && inputs.review_screenshot_run != ''
+        env:
+          REVIEW_RUN_ID: ${{ inputs.review_screenshot_run }}
+        run: bundle exec fastlane ios attach_home_brief_review
+
+      - name: Fill and verify blank draft storefront fields
+        if: inputs.catalog_only && inputs.fill_storefront_draft
+        env:
+          HOME_STOREFRONT_DRAFT_ONLY: "true"
+        run: bundle exec fastlane ios fill_home_storefront_draft
+
+      - name: Select and verify the specified draft build
+        if: inputs.catalog_only && inputs.select_build_number != ''
+        env:
+          HOME_BUILD_SELECTION_ONLY: "true"
+          HOME_SELECTED_BUILD: ${{ inputs.select_build_number }}
+        run: bundle exec fastlane ios select_home_draft_build
+
+      - name: Attach three verified listing screenshots to the 1.0 draft
+        if: inputs.catalog_only && inputs.listing_screenshot_run != ''
+        env:
+          HOME_LISTING_SCREENSHOT_RUN: ${{ inputs.listing_screenshot_run }}
+        run: bundle exec fastlane ios attach_home_listing_screenshots
+
       - name: Build and upload (fastlane beta)
+        if: ${{ !inputs.catalog_only }}
+        env:
+          HOME_DISTRIBUTION_P12_BASE64: ${{ secrets.HOME_DISTRIBUTION_P12_BASE64 }}
+          HOME_DISTRIBUTION_P12_PASSWORD: ${{ secrets.HOME_DISTRIBUTION_P12_PASSWORD }}
         run: bundle exec fastlane beta
 
       - name: Keep the build log if it failed

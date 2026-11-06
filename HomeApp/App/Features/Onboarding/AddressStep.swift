@@ -14,7 +14,7 @@ struct AddressStep: View {
                 OnboardingStepLabel(step: 1)
                 Text("Where's your home?")
                     .font(.largeTitle.weight(.bold))
-                Text("We use the address to lay out your yard from the satellite view. It stays on your devices and iCloud.")
+                Text("An address is optional. Apple Maps looks up addresses as you type. If you add a yard, the footprint service uses its approximate coordinates.")
                     .foregroundStyle(.secondary)
 
                 HStack {

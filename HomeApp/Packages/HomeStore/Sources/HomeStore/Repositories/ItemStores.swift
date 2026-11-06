@@ -48,23 +48,28 @@ public struct ChoreStore: ChoreRepository {
     }
     public func completions(chore: UUID) async throws -> [ChoreCompletion] { try await db.read { try Self.completions($0, chore: chore) } }
 
-    public func create(_ draft: ChoreDraft) async throws -> Chore {
+    public func create(_ draft: ChoreDraft, estimates: [WorkEstimate]) async throws -> Chore {
         let c = ChoreLogic.make(from: draft, now: db.clock.now, engine: db.engine)
         return try await db.write { tx in
             let saved = try tx.save(c)
+            try Self.putPreparation(c, in: tx)
+            try WorkEstimateStore.put(estimates, owner: .chore(c.id), propertyId: c.propertyId, in: tx.db)
             tx.emit(.created(.chore(c.id)))
             return saved
         }
     }
 
-    public func update(_ chore: Chore) async throws {
+    public func update(_ chore: Chore, estimates: [WorkEstimate]) async throws {
         try await db.write { tx in
             var c = chore
-            let old = try tx.require(Chore.self, c.id, includeDeleted: true)
+            let old = try tx.require(Chore.self, c.id)
+            guard old.propertyId == c.propertyId else { throw WorkEstimateError("A to-do cannot change homes.") }
             if (old.repeatRule != c.repeatRule || old.startOn != c.startOn) && c.closedAt == nil && old.nextDueOn == c.nextDueOn {
                 c = ChoreLogic.recomputeNextDue(c, completions: try Self.completions(tx.db, chore: c.id), engine: tx.engine)
             }
             try tx.save(c)
+            try Self.putPreparation(c, in: tx)
+            try WorkEstimateStore.put(estimates, owner: .chore(c.id), propertyId: c.propertyId, in: tx.db)
             tx.emit(.updated(.chore(c.id)))
         }
     }
@@ -72,6 +77,7 @@ public struct ChoreStore: ChoreRepository {
     private func act(_ id: UUID, _ outcome: ChoreCompletion.Outcome, by: UUID?, at: Date) async throws -> ChoreCompletion {
         try await db.write { tx in
             let c = try tx.require(Chore.self, id)
+            guard c.isOpen else { throw RepositoryError.invalid("This task is already closed or paused.") }
             let (updated, completion) = ChoreLogic.act(on: c, outcome: outcome, by: by, at: at, calendar: tx.calendar, engine: tx.engine)
             try tx.save(updated)
             let saved = try tx.save(completion, stamp: false)
@@ -81,7 +87,21 @@ public struct ChoreStore: ChoreRepository {
     }
 
     public func complete(_ id: UUID, by person: UUID?, at: Date) async throws -> ChoreCompletion { try await act(id, .done, by: person, at: at) }
-    public func skip(_ id: UUID, at: Date) async throws { _ = try await act(id, .skipped, by: nil, at: at) }
+    @discardableResult public func skip(_ id: UUID, at: Date) async throws -> ChoreCompletion {
+        try await act(id, .skipped, by: nil, at: at)
+    }
+
+    public func undoCompletion(_ id: UUID) async throws {
+        try await db.write { tx in
+            let action = try tx.require(ChoreCompletion.self, id)
+            let chore = try tx.require(Chore.self, action.choreId)
+            let history = try Self.completions(tx.db, chore: chore.id)
+            let restored = try ChoreLogic.undo(action, on: chore, history: history, engine: tx.engine)
+            try tx.softDelete(action)
+            try tx.save(restored)
+            tx.emit(.updated(.chore(chore.id)))
+        }
+    }
 
     public func reschedule(_ id: UUID, to: LocalDate) async throws { try await mutate(id) { $0.nextDueOn = to; $0.closedAt = nil } }
     public func setPaused(_ id: UUID, _ paused: Bool) async throws { try await mutate(id) { $0.isPaused = paused } }
@@ -89,8 +109,14 @@ public struct ChoreStore: ChoreRepository {
     public func turnIntoProject(_ id: UUID) async throws -> Project {
         try await db.write { tx in
             let c = try tx.require(Chore.self, id, includeDeleted: true)
-            let p = ProjectLogic.make(from: ChoreLogic.projectDraft(from: c), now: tx.now, today: tx.today)
+            let property = try tx.require(Property.self, c.propertyId)
+            let p = ProjectLogic.make(from: ChoreLogic.projectDraft(from: c), now: tx.now, today: tx.today, propertyCurrency: property.currencyCode)
             let saved = try tx.save(p)
+            // Keep the original worksheet on the to-do and copy its exact values as project scenarios.
+            try tx.db.execute(sql: """
+                INSERT INTO work_estimate(property_id, project_id, mode, details_json)
+                SELECT property_id, ?, mode, details_json FROM work_estimate WHERE chore_id=? AND property_id=?
+                """, arguments: [p.id.db, c.id.db, c.propertyId.db])
             tx.emit(.created(.project(p.id)))
             return saved
         }
@@ -158,22 +184,24 @@ public struct ProjectStore: ProjectRepository {
     public func projects(_ query: ProjectQuery) async throws -> [Project] { try await db.read { try Self.query($0, query) } }
     public func observeProjects(_ query: ProjectQuery) -> AsyncStream<[Project]> { db.observe { try Self.query($0, query) } }
 
-    public func create(_ draft: ProjectDraft) async throws -> Project {
-        let p = ProjectLogic.make(from: draft, now: db.clock.now, today: db.clock.today)
-        return try await db.write { tx in
+    public func create(_ draft: ProjectDraft, estimates: [WorkEstimate]) async throws -> Project {
+        try await db.write { tx in
+            let property = try tx.require(Property.self, draft.propertyId)
+            let p = ProjectLogic.make(from: draft, now: tx.now, today: tx.today, propertyCurrency: property.currencyCode)
             let saved = try tx.save(p)
+            try WorkEstimateStore.put(estimates, owner: .project(p.id), propertyId: p.propertyId, in: tx.db)
             tx.emit(.created(.project(p.id)))
             return saved
         }
     }
 
-    public func update(_ project: Project) async throws {
+    public func update(_ project: Project, estimates: [WorkEstimate]) async throws {
         try await db.write { tx in
-            var p = project
-            _ = try tx.require(Project.self, p.id, includeDeleted: true)
-            if p.status == .done && p.completedOn == nil { p.completedOn = tx.today }
-            try tx.save(p)
-            tx.emit(.updated(.project(p.id)))
+            let old = try tx.require(Project.self, project.id)
+            guard old.propertyId == project.propertyId else { throw WorkEstimateError("A project cannot change homes.") }
+            try tx.save(project)
+            try WorkEstimateStore.put(estimates, owner: .project(project.id), propertyId: project.propertyId, in: tx.db)
+            tx.emit(.updated(.project(project.id)))
         }
     }
 
@@ -181,7 +209,7 @@ public struct ProjectStore: ProjectRepository {
         try await mutate(id) { p, today in p = ProjectLogic.setStatus(p, status, today: today) }
     }
 
-    public func markDone(_ id: UUID, actual: Money?, completedOn: LocalDate, hours: Double?, receipt: AttachmentDraft?) async throws {
+    public func markDone(_ id: UUID, actual: Money?, completedOn: LocalDate, hours: Double?, receipt: AttachmentDraft?, workAction: Project.WorkActionEdit) async throws {
         var prepared: Attachment?
         if let receipt {
             let pid = try await db.read { try Project.fetchOne($0, id: id)?.propertyId }
@@ -189,12 +217,14 @@ public struct ProjectStore: ProjectRepository {
             prepared = try AttachmentStore.prepare(receipt, ownerType: .project, ownerId: id, property: pid, files: files, now: db.clock.now)
         }
         let attachment = prepared
-        try await db.write { tx in
-            var p = try tx.require(Project.self, id)
-            p = ProjectLogic.markDone(p, actual: actual, completedOn: completedOn, hours: hours)
-            try tx.save(p)
-            if let attachment { try AttachmentStore.insert(attachment, in: tx) }
-            tx.emit(.updated(.project(id)))
+        try await AttachmentStore.committing(attachment, files: files) {
+            try await db.write { tx in
+                var p = try tx.require(Project.self, id)
+                p = ProjectLogic.markDone(p, actual: actual, completedOn: completedOn, hours: hours, workAction: workAction)
+                try tx.save(p)
+                if let attachment { try AttachmentStore.insert(attachment, in: tx) }
+                tx.emit(.updated(.project(id)))
+            }
         }
     }
 
@@ -213,13 +243,29 @@ public struct ProjectStore: ProjectRepository {
     public func lineItems(project: UUID) async throws -> [CostLineItem] { try await db.read { try Self.lineItems($0, project: project) } }
     public func observeLineItems(project: UUID) -> AsyncStream<[CostLineItem]> { db.observe { try Self.lineItems($0, project: project) } }
 
-    public func upsertLineItem(_ item: CostLineItem) async throws {
+    public func upsertLineItem(_ item: CostLineItem, receipt: AttachmentDraft?) async throws {
         guard item.amount.cents >= 0 else { throw RepositoryError.invalid("amount must be ≥ 0") }
-        try await db.write { tx in
-            var i = item
-            if let old = try tx.get(CostLineItem.self, i.id, includeDeleted: true) { i.createdAt = old.createdAt }
-            try tx.save(i)
-            tx.emit(.updated(.project(i.projectId)))
+        let staged = try receipt.map {
+            try AttachmentStore.prepare($0, ownerType: .costLineItem, ownerId: item.id,
+                                        property: item.propertyId, files: files, now: db.clock.now)
+        }
+        try await AttachmentStore.committing(staged, files: files) {
+            try await db.write { tx in
+                let project = try tx.require(Project.self, item.projectId)
+                guard project.propertyId == item.propertyId else { throw RepositoryError.invalid("Project belongs to a different home") }
+                guard project.currencyCode == item.amount.currency else { throw RepositoryError.invalid("Enter the amount in " + project.currencyCode) }
+                var i = item
+                if let old = try tx.get(CostLineItem.self, i.id, includeDeleted: true) {
+                    guard old.deletedAt == nil else { throw RepositoryError.notFound(RecordRef(.costLineItem, i.id)) }
+                    i.createdAt = old.createdAt
+                }
+                if let staged {
+                    try AttachmentStore.insert(staged, in: tx)
+                    i.receiptAttachmentId = staged.id
+                }
+                try tx.save(i)
+                tx.emit(.updated(.project(i.projectId)))
+            }
         }
     }
 

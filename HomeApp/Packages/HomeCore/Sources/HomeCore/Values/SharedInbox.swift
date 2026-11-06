@@ -132,3 +132,72 @@ public enum SharedInbox {
         return kind == .receipt ? "New purchase" : "New project"
     }
 }
+
+extension SharedInbox {
+    /// The extension carries the original file through to the same CSV/TSV review used by Files.
+    /// It never sends spreadsheet content through the shared-text shortcut.
+    public struct Spreadsheet: Codable, Equatable, Sendable {
+        public let name: String
+        public let bytes: Data
+        public static let openInFiles = "Export a CSV or TSV copy, save it to Files, then open it in Home Blueprint."
+
+        public static func fileExtension(name: String?, type: String? = nil) -> String? {
+            switch type?.lowercased() {
+            case "public.comma-separated-values-text", "text/csv": return "csv"
+            case "public.tab-separated-values-text", "text/tab-separated-values": return "tsv"
+            default: break
+            }
+            let path = (name ?? "").replacingOccurrences(of: "\\", with: "/")
+            let ext = (path as NSString).pathExtension.lowercased()
+            return ["csv", "tsv"].contains(ext) ? ext : nil
+        }
+
+        /// Some hosts only offer a text preview, with no file URL or type. An identifiable project-table
+        /// header must not turn into dozens of chores, and a preview cannot stand in for original file bytes.
+        public static func isProjectTablePreview(_ text: String) -> Bool {
+            let prefix = text.prefix(4096)
+            guard let newline = prefix.firstIndex(where: \.isNewline) else { return false }
+            let header = String(prefix[..<newline])
+            guard let separator = header.first(where: { $0 == "," || $0 == "\t" || $0 == ";" }),
+                  let file = try? ProjectCSV(data: Data((header + "\nExample" + String(separator) + "1").utf8)) else { return false }
+            let mapping = ProjectCSVMapping(file)
+            return mapping.columns[.title] != nil && mapping.columns.count >= 2
+        }
+
+        public init(name input: String?, ext: String, bytes: Data) throws {
+            guard ["csv","tsv"].contains(ext), !bytes.isEmpty, bytes.count <= ProjectCSV.maxBytes else {
+                throw ProjectCSVError("Choose a nonempty CSV or TSV file up to 4 MB.")
+            }
+            // Never store a provider URL, path, query string, or transfer directory.
+            let proposed = (input ?? "").replacingOccurrences(of: "\\", with: "/")
+            let pathOnly = proposed.split(separator: "?", maxSplits: 1).first.map(String.init) ?? ""
+            let leaf = (pathOnly as NSString).lastPathComponent
+                .components(separatedBy: .controlCharacters).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+            let suffix = (leaf as NSString).pathExtension
+            let matches = suffix.lowercased() == ext
+            let stem = matches ? (leaf as NSString).deletingPathExtension : leaf
+            let filename = stem.isEmpty || stem == "." || stem == ".." ? "Projects" : String(stem.prefix(255))
+            self.name = filename + "." + (matches ? suffix : ext)
+            self.bytes = bytes
+        }
+
+        public static func read(_ url: URL, name: String?, ext: String) throws -> Self {
+            guard url.isFileURL else { throw ProjectCSVError(openInFiles) }
+            let info = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+            guard info.isRegularFile == true else { throw ProjectCSVError(openInFiles) }
+            if let size = info.fileSize, size > ProjectCSV.maxBytes {
+                throw ProjectCSVError("This spreadsheet exceeds 4 MB. Export a smaller CSV or TSV.")
+            }
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            var bytes = Data()
+            while let part = try handle.read(upToCount: min(65_536, ProjectCSV.maxBytes + 1 - bytes.count)), !part.isEmpty {
+                bytes.append(part)
+                guard bytes.count <= ProjectCSV.maxBytes else {
+                    throw ProjectCSVError("This spreadsheet exceeds 4 MB. Export a smaller CSV or TSV.")
+                }
+            }
+            return try Self(name: name, ext: ext, bytes: bytes)
+        }
+    }
+}

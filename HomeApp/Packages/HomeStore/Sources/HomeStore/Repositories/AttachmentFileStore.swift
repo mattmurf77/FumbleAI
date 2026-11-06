@@ -11,30 +11,68 @@ public struct AttachmentFileStore: Sendable {
     }
     public func url(for a: Attachment) -> URL { url(for: a.id, ext: a.fileExt) }
 
-    public func exists(_ a: Attachment) -> Bool { FileManager.default.fileExists(atPath: url(for: a).path) }
+    static func validExtension(_ ext: String) -> Bool {
+        ext.range(of: #"^[a-zA-Z0-9]{1,8}$"#, options: .regularExpression) != nil
+    }
+
+    public func exists(_ a: Attachment) -> Bool {
+        Self.validExtension(a.fileExt) && FileManager.default.fileExists(atPath: url(for: a).path)
+    }
 
     /// Copies `source` into the store, returning (size, sha256 hex).
     public func importFile(from source: URL, id: UUID, ext: String) throws -> (size: Int, sha256: String) {
+        guard Self.validExtension(ext) else { throw RepositoryError.invalid("Invalid document extension") }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let data = try Data(contentsOf: source)
+        let info = try source.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        guard info.isRegularFile == true else { throw RepositoryError.invalid("Choose a document file") }
+        if ext.lowercased() == "pdf", let size = info.fileSize, size > Attachment.maxPDFBytes {
+            throw RepositoryError.invalid("PDF is larger than 25 MB")
+        }
+        let data = try Data(contentsOf: source, options: .mappedIfSafe)
         if ext.lowercased() == "pdf", data.count > Attachment.maxPDFBytes {
             throw RepositoryError.invalid("PDF is larger than 25 MB")
         }
         let dest = url(for: id, ext: ext)
-        try? FileManager.default.removeItem(at: dest)
         try data.write(to: dest, options: .atomic)
         return (data.count, SHA256.hex(data))
     }
 
     /// Moves a downloaded file (e.g. a CloudKit asset temp file) into the store.
     public func adopt(downloaded source: URL, id: UUID, ext: String) throws {
+        guard Self.validExtension(ext) else { throw RepositoryError.invalid("Invalid document extension") }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let dest = url(for: id, ext: ext)
-        try? FileManager.default.removeItem(at: dest)
-        do { try FileManager.default.moveItem(at: source, to: dest) } catch { try FileManager.default.copyItem(at: source, to: dest) }
+        guard source.standardizedFileURL != dest.standardizedFileURL else { return }
+        let bytes = try Data(contentsOf: source, options: .mappedIfSafe)
+        try bytes.write(to: dest, options: .atomic)
+        try? FileManager.default.removeItem(at: source)
     }
 
-    public func remove(id: UUID, ext: String) { try? FileManager.default.removeItem(at: url(for: id, ext: ext)) }
+    /// A synced original must match the immutable metadata before replacing a previously good local file.
+    public func adopt(downloaded source: URL, attachment: Attachment) throws {
+        guard Self.validExtension(attachment.fileExt), attachment.byteSize >= 0,
+              attachment.fileExt.lowercased() != "pdf" || attachment.byteSize <= Attachment.maxPDFBytes else {
+            throw RepositoryError.invalid("Invalid document metadata")
+        }
+        let info = try source.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard info.isRegularFile == true, info.fileSize == attachment.byteSize else {
+            throw RepositoryError.invalid("The downloaded document size does not match its record")
+        }
+        let bytes = try Data(contentsOf: source, options: .mappedIfSafe)
+        guard bytes.count == attachment.byteSize, SHA256.hex(bytes) == attachment.sha256.lowercased() else {
+            throw RepositoryError.invalid("The downloaded document does not match its original")
+        }
+        let dest = url(for: attachment)
+        guard source.standardizedFileURL != dest.standardizedFileURL else { return }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try bytes.write(to: dest, options: .atomic)
+        try? FileManager.default.removeItem(at: source)
+    }
+
+    public func remove(id: UUID, ext: String) {
+        guard Self.validExtension(ext) else { return }
+        try? FileManager.default.removeItem(at: url(for: id, ext: ext))
+    }
 }
 
 /// Minimal pure-Swift SHA-256 (FIPS 180-4) so HomeStore needs no CryptoKit/swift-crypto (Linux tests).

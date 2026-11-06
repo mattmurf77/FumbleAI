@@ -12,10 +12,23 @@ struct OnboardingFlow: View {
     @Environment(AppEnvironment.self) private var env
     @State private var model: OnboardingModel
     let onFinished: () -> Void
+    @State private var showingPlanSetup = false
+    private var addingPlan = false
+    private var bringRecords: (() -> Void)?
 
-    init(onFinished: @escaping () -> Void) {
+    init(bringRecords: (() -> Void)? = nil, onFinished: @escaping () -> Void) {
+        self.bringRecords = bringRecords
         self.onFinished = onFinished
         _model = State(initialValue: OnboardingModel())
+    }
+
+    /// Continue the normal plan builder for a home that was started with records only.
+    init(addingPlan: Bool, onFinished: @escaping () -> Void) {
+        self.onFinished = onFinished
+        self.addingPlan = addingPlan
+        let model = OnboardingModel()
+        model.restore = .ready
+        _model = State(initialValue: model)
     }
 
     /// Previews / tests: start from a prepared model.
@@ -33,7 +46,20 @@ struct OnboardingFlow: View {
                 OnboardingStatusView(title: "Restoring your home…", subtitle: "Your plan is coming down from iCloud.")
             case .ready:
                 NavigationStack(path: $model.routes) {
-                    AddressStep(model: model)
+                    Group {
+                        if addingPlan || showingPlanSetup {
+                            AddressStep(model: model)
+                        } else {
+                            welcome
+                        }
+                    }
+                        .toolbar {
+                            if addingPlan {
+                                ToolbarItem(placement: .cancellationAction) { Button("Close") { onFinished() } }
+                            } else if showingPlanSetup && model.routes.isEmpty {
+                                ToolbarItem(placement: .cancellationAction) { Button("Back") { showingPlanSetup = false } }
+                            }
+                        }
                         .navigationDestination(for: OnboardingModel.Route.self) { route in
                             destination(route)
                         }
@@ -41,6 +67,45 @@ struct OnboardingFlow: View {
             }
         }
         .task { await model.runRestoreCheck(env, onFinished: onFinished) }
+    }
+
+    private var welcome: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Image(systemName: "house.and.flag.fill")
+                    .font(.system(size: 46)).foregroundStyle(Color.accentColor).accessibilityHidden(true)
+                Text("Home Blueprint").font(.largeTitle.bold()).accessibilityAddTraits(.isHeader)
+                Text("Keep up with home tasks and keep a record of the work you’ve done.")
+                    .font(.title3).foregroundStyle(.secondary)
+                Button {
+                    Task { await model.startWithRecords(env, onFinished: onFinished) }
+                } label: {
+                    Label("Start with tasks and projects", systemImage: "checklist").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                .accessibilityIdentifier("onboarding.startRecords")
+                if let bringRecords {
+                    Button {
+                        Task { await model.startWithRecords(env, onFinished: bringRecords) }
+                    } label: {
+                        Label("Bring in existing records", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered).controlSize(.large)
+                    .accessibilityIdentifier("onboarding.bringRecords")
+                }
+                Button {
+                    showingPlanSetup = true
+                } label: {
+                    Label("Set up my floor plan", systemImage: "square.3.layers.3d").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered).controlSize(.large)
+                if model.isSaving { ProgressView("Saving your home…") }
+                if let error = model.commitError { Text(error).foregroundStyle(.secondary) }
+            }
+            .disabled(model.isSaving)
+            .padding(24).frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
+        }
     }
 
     @ViewBuilder

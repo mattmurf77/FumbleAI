@@ -1,0 +1,136 @@
+import SwiftUI
+import HomeCore
+
+/// One editable plan for a recommendation and for a saved to-do. Nothing is bought or added to stock here.
+struct DIYReadinessView: View {
+    @Environment(AppEnvironment.self) private var env
+    let propertyId: UUID
+    @Binding var plan: [ChoreSupply]
+    @State private var items: [InventoryItem]?
+    @State private var things: [Thing]?
+    @State private var locations: [UUID: String] = [:]
+    @State private var names = SchedulePlaceNames()
+    @State private var matching: ChoreSupply?
+    @State private var adding = ""
+    @State private var error: String?
+
+    private func optionsKey(_ supply: ChoreSupply) -> String {
+        ChoreSupply.unitKey(supply.unit) + (supply.isEquipment ? "|tool" : "|supply")
+    }
+
+    private var availableOptions: [String: [HomeSupplyOption]] {
+        guard let items, let things else { return [:] }
+        var options: [String: [HomeSupplyOption]] = [:]
+        for supply in plan where options[optionsKey(supply)] == nil {
+            options[optionsKey(supply)] = HomeSupplyOption.options(for: supply, property: propertyId, items: items, things: things,
+                locationOfItem: { locations[$0.id] ?? names.name($0.scope) }, locationOfThing: { names.name($0.scope) })
+        }
+        return options
+    }
+
+    var body: some View {
+        let options = availableOptions
+        // Let List and Form give each disclosure its own row and hit-testing region.
+        Group {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Check what you have, then select only what you need to buy.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                if items == nil || things == nil { ProgressView("Checking home records…") }
+            }
+            .sheet(item: $matching) { supply in
+                HomeSupplyPicker(need: supply, options: options[optionsKey(supply)] ?? []) { choice in
+                    guard let index = plan.firstIndex(where: { $0.id == supply.id }) else { return }
+                    var candidate = plan
+                    candidate[index].name = choice.name
+                    candidate[index].isEquipment = supply.isEquipment || choice.isEquipment
+                    candidate[index].confirmedOnHand = nil
+                    candidate[index].requested = false
+                    do { try ChoreSupply.validate(candidate); plan = candidate; error = nil }
+                    catch { self.error = error.localizedDescription }
+                }
+            }
+            .task(id: propertyId) {
+                names = await SchedulePlaceNames.load(env, property: propertyId)
+                for await values in env.inventory.observeItems(.init(propertyId: propertyId)) {
+                    items = values
+                    let resolved = (try? await env.inventory.locations(of: values.map(\.id))) ?? []
+                    locations = Dictionary(resolved.map { ($0.id, $0.displayPath) }, uniquingKeysWith: { first, _ in first })
+                }
+            }
+            .task(id: propertyId) { for await values in env.things.observeThings(.init(propertyId: propertyId)) { things = values } }
+            ForEach($plan) { $supply in
+                let stock = SupplyReadiness(supply, propertyId: propertyId, inventory: items ?? [], things: things ?? [])
+                let missing = max(0, Double(supply.quantity) - (stock.onHand ?? 0))
+                DisclosureGroup {
+                    VStack(alignment: .leading, spacing: 12) {
+                        TextField("Supply or tool name", text: $supply.name)
+                        Stepper("Quantity needed: \(supply.quantity)", value: $supply.quantity, in: 1...9_999)
+                        TextField("Unit, e.g. ea or box", text: $supply.unit)
+                        Toggle("Reusable equipment", isOn: $supply.isEquipment)
+                        if let choices = options[optionsKey(supply)], !choices.isEmpty {
+                            Button("Choose an item at home") { matching = supply }
+                                .accessibilityIdentifier("supplies.match." + supply.name)
+                        }
+                        if let count = supply.confirmedOnHand {
+                            Stepper("Checked at home: \(count)", value: Binding(get: { supply.confirmedOnHand ?? 0 }, set: { supply.confirmedOnHand = $0 }), in: 0...9_999)
+                            Button("Use catalog count") { supply.confirmedOnHand = nil }
+                        } else { Button("Enter count checked at home") { supply.confirmedOnHand = Int(min(9_999, stock.onHand ?? 0)) } }
+                        Button("Remove from this to-do", role: .destructive) { plan.removeAll { $0.id == supply.id } }
+                    }.padding(.top, 8).buttonStyle(.borderless)
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(supply.name) · \(supply.quantity) \(supply.unit)").font(.subheadline.weight(.semibold))
+                        if items == nil || things == nil { Text("Checking home records…").font(.caption) }
+                        else {
+                            let status = stock.onHand.map { amount in
+                                (amount >= Double(supply.quantity) ? "Ready · " : (amount == 0 ? "" : "Partial stock · ")) + amount.formatted() + " " + supply.unit + " on hand"
+                            } ?? "Check at home"
+                            Text(status).font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("supplies.readiness." + supply.name)
+                            let paths = Set(stock.inventory.compactMap { locations[$0.id] } + stock.equipment.map { names.name($0.scope) }).filter { !$0.isEmpty }.sorted()
+                            if !paths.isEmpty { Text(paths.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary) }
+                            if supply.requested && missing > 0 { Label("Selected for Shopping list", systemImage: "cart").font(.caption) }
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("supplies.row." + supply.name)
+                }
+                if stock.onHand == nil,
+                   let candidate = options[optionsKey(supply)]?.first(where: { $0.isPossibleMatch(for: supply) }) {
+                    Button { matching = supply } label: {
+                        Label("Check possible match: " + candidate.name, systemImage: "magnifyingglass")
+                            .font(.footnote)
+                    }.buttonStyle(.borderless)
+                    .accessibilityIdentifier("supplies.possible." + supply.name)
+                }
+                if items != nil && things != nil && (missing > 0 || supply.requested) {
+                    let action = supply.requested ? "Remove \(supply.name) from shopping list" : "Add \(supply.name) to shopping list"
+                    Button { supply.requested.toggle() } label: {
+                        HStack {
+                            Label(action, systemImage: supply.requested ? "checkmark.circle.fill" : "cart.badge.plus")
+                            Spacer()
+                            if missing > 0 { Text("\(Int(ceil(missing))) \(supply.unit)").foregroundStyle(.secondary) }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(action)
+                    .accessibilityValue(missing > 0 ? "\(Int(ceil(missing))) \(supply.unit)" : "Already on hand")
+                    .accessibilityAddTraits(supply.requested ? .isSelected : [])
+                    .accessibilityIdentifier("supplies.request." + supply.name)
+                }
+            }
+            HStack {
+                TextField("Add supply or equipment", text: $adding).onSubmit(add).accessibilityIdentifier("supplies.name")
+                Button("Add", action: add).buttonStyle(.borderless).disabled(adding.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("supplies.add")
+            }
+            if let error { Text(error).font(.footnote).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func add() {
+        let next = ChoreSupply(name: adding.trimmingCharacters(in: .whitespacesAndNewlines))
+        do { try ChoreSupply.validate(plan + [next]); plan.append(next); adding = ""; error = nil }
+        catch { self.error = error.localizedDescription }
+    }
+}

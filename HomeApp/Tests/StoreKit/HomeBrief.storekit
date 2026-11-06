@@ -1,0 +1,28 @@
+{
+  "identifier": "1481AD60-5CC8-4F21-8CC8-A1F13D3CACE9",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "14.99",
+      "familyShareable": false,
+      "internalID": "A864EC2B-5304-49BE-B580-D033A77E353C",
+      "localizations": [
+        {
+          "description": "Export selected home projects as a PDF.",
+          "displayName": "Home Brief",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "app.fumble.home.homebrief",
+      "referenceName": "Home Brief",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA"
+  },
+  "subscriptionGroups": [],
+  "version": { "major": 3, "minor": 0 }
+}

@@ -171,7 +171,7 @@ public struct InMemoryInventoryRepository: InventoryRepository {
                 let detail = t.attributes["filterSize"]?.displayText ?? t.attributes["bulbBase"]?.displayText
                 lines.append(ShoppingLine(reason: .replacementDue, ref: .thing(tid), label: t.name + (detail.map { " – \($0)" } ?? "")))
             }
-            return lines
+            return ChoreShopping.merged(existing: lines, supplies: ChoreShopping.lines(property: property, chores: s.liveChores, inventory: s.liveInventory, things: s.liveThings))
         }
     }
 }
@@ -197,6 +197,10 @@ public struct InMemoryRecentlyDeletedRepository: RecentlyDeletedRepository {
         for x in s.inventory.values { add(.inventoryItem, x.id, x.name, "Item", s.locationText(x.scope), x.deletedAt, x.propertyId) }
         for x in s.measurements.values { add(.measurement, x.id, x.label, "Measurement", s.spaceName(x.spaceId), x.deletedAt, x.propertyId) }
         for x in s.people.values { add(.person, x.id, x.name, "Person", nil, x.deletedAt, x.propertyId) }
+        for a in s.attachments.values where a.kind != .underlay {
+            let entry = HomeDocument(attachment: a, details: s.documentDetails[a.id])
+            add(.attachment, a.id, entry.details.title, "Document", nil, a.deletedAt, a.propertyId)
+        }
         return out.sorted { $0.deletedAt > $1.deletedAt }
     }
 
@@ -247,18 +251,27 @@ public struct InMemoryRecentlyDeletedRepository: RecentlyDeletedRepository {
             case .level: s.levels[ref.id] = nil
             case .space: s.spaces[ref.id] = nil
             case .storageSpot: s.spots[ref.id] = nil
-            case .chore: s.chores[ref.id] = nil
-            case .project: s.projects[ref.id] = nil
+            case .chore:
+                s.workEstimates[.chore(ref.id)] = nil
+                s.chores[ref.id] = nil
+            case .project:
+                s.workEstimates[.project(ref.id)] = nil
+                s.projects[ref.id] = nil
             case .thing: s.things[ref.id] = nil
             case .inventoryItem: s.inventory[ref.id] = nil
             case .measurement: s.measurements[ref.id] = nil
             case .person: s.people[ref.id] = nil
             case .opening: s.openings[ref.id] = nil
             case .costLineItem: s.lineItems[ref.id] = nil
-            case .attachment: s.attachments[ref.id] = nil
+            case .attachment:
+                if s.attachments[ref.id]?.ownerType == .property, let url = InMemoryAttachmentRepository.files.get(ref.id) { try? FileManager.default.removeItem(at: url) }
+                s.attachments[ref.id] = nil; s.documentDetails[ref.id] = nil
             case .choreCompletion: s.completions[ref.id] = nil
             case .choreCalendarLink: s.calendarLinks[ref.id] = nil
-            case .property: s.properties[ref.id] = nil
+            case .property:
+                for task in s.chores.values where task.propertyId == ref.id { s.workEstimates[.chore(task.id)] = nil }
+                for project in s.projects.values where project.propertyId == ref.id { s.workEstimates[.project(project.id)] = nil }
+                s.properties[ref.id] = nil
             }
         }
     }
@@ -269,5 +282,15 @@ public struct InMemoryRecentlyDeletedRepository: RecentlyDeletedRepository {
         }
         for r in refs { try await purge(r) }
         return refs.count
+    }
+}
+
+extension InMemoryInventoryRepository {
+    public func buySelectedSupply(_ line: ShoppingLine, propertyId: UUID) async throws {
+        try store.write { s in
+            var (item, chores) = try ChoreShopping.purchase(line, property: propertyId, chores: s.liveChores, inventory: s.liveInventory, things: s.liveThings)
+            item.updatedAt = store.now; s.inventory[item.id] = item
+            for c in chores { s.chores[c.id] = c }
+        }
     }
 }

@@ -15,10 +15,13 @@ public struct InMemorySnapshot: Sendable, Equatable {
     public var chores: [UUID: Chore] = [:]
     public var completions: [UUID: ChoreCompletion] = [:]
     public var calendarLinks: [UUID: ChoreCalendarLink] = [:]
+    var workEstimates: [WorkEstimateOwner: [Chore.WorkMode: WorkEstimate]] = [:]
+    public var csvImportSignatures: [UUID: [String: UUID]] = [:]
     public var projects: [UUID: Project] = [:]
     public var lineItems: [UUID: CostLineItem] = [:]
     public var inventory: [UUID: InventoryItem] = [:]
     public var attachments: [UUID: Attachment] = [:]
+    public var documentDetails: [UUID: HomeDocumentDetails] = [:]
     public var settings = AppSettings()
     public init() {}
 

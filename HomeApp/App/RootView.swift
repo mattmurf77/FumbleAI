@@ -9,8 +9,12 @@ struct RootView: View {
     @State private var property: Property?
     @State private var loaded = false
     @State private var showOnboarding = false
+    @State private var bringRecords = false
+    @State private var incomingFiles: [ProjectCSVFile] = []
+    @State private var reviewingCSV: ProjectCSVFile?
+    @State private var importError: String?
     @State private var accountError: String?
-    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = true
+    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = false
 
     /// Feedback "Page" when the visible screen doesn't name itself with `.feedbackPage(_:)`.
     private var rootFeedbackPage: String {
@@ -20,22 +24,76 @@ struct RootView: View {
     var body: some View {
         @Bindable var env = env
         Group {
-            if !loaded {
+            if env.storageUnavailable {
+                ContentUnavailableView {
+                    Label("Your home could not be opened", systemImage: "externaldrive.badge.exclamationmark")
+                } description: {
+                    Text("Unlock your iPhone, check its available storage, then reopen Home Blueprint to try again. Keep the app installed to preserve your local records.")
+                }
+            } else if !loaded {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if showOnboarding {
-                OnboardingFlow(onFinished: { showOnboarding = false })
+                OnboardingFlow(bringRecords: {
+                    showOnboarding = false
+                    bringRecords = true
+                }, onFinished: { showOnboarding = false })
             } else {
                 MainTabView()
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let file = incomingFiles.first, !showOnboarding, property != nil, reviewingCSV == nil {
+                Button {
+                    reviewingCSV = file
+                } label: {
+                    Label("Review spreadsheet: " + file.name, systemImage: "tablecells")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }.background(.regularMaterial)
+            }
+        }
+        .onOpenURL { url in
+            if !url.isFileURL { env.handle(url: url); return }
+            guard OpenSpreadsheet.accepts(url) else { return }
+            Task {
+                do {
+                    let incoming = try await Task.detached(priority: .userInitiated) { try OpenSpreadsheet.read(url) }.value
+                    guard incomingFiles.count < 5 else {
+                        importError = "Finish reviewing open spreadsheets, then open this file again."; return
+                    }
+                    incomingFiles.append(incoming)
+                } catch { importError = error.localizedDescription }
+            }
+        }
+        .sheet(isPresented: $bringRecords) {
+            if let property {
+                NavigationStack {
+                    BringRecordsView(property: property)
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { bringRecords = false } } }
+                }
+            } else { ProgressView("Opening your home…") }
+        }
+        .sheet(item: $reviewingCSV, onDismiss: {
+            if !incomingFiles.isEmpty { incomingFiles.removeFirst() }
+        }) { file in
+            if let property {
+                NavigationStack {
+                    ProjectCSVImportView(property: property, initialFile: file)
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { reviewingCSV = nil } } }
+                }
+            }
+        }
+        .alert("Couldn’t open spreadsheet", isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(importError ?? "") }
         .onChange(of: rootFeedbackPage, initial: true) { _, page in FeedbackPageTracker.shared.rootPage = page }
         #if canImport(UIKit)
         // Floating feedback button on every screen (own window, above sheets) + shake to send feedback.
-        .onAppear { FeedbackPresenter.shared.install(env: env) }
+        .onAppear { if !env.storageUnavailable { FeedbackPresenter.shared.install(env: env) } }
         .onChange(of: showFeedbackButton) { _, show in FeedbackPresenter.shared.setButtonVisible(show) }
         #endif
         .task {
+            guard !env.storageUnavailable else { return }
             for await p in env.plan.observeCurrentProperty() {
                 property = p
                 if p == nil { showOnboarding = true }
@@ -60,7 +118,7 @@ struct RootView: View {
                              secondaryButton: .cancel(Text("Not now")) { env.accountPrompt = nil })
             }
         }
-        .alert("Something needs attention", isPresented: Binding(get: { env.startupError != nil }, set: { if !$0 { env.startupError = nil } })) {
+        .alert("Something needs attention", isPresented: Binding(get: { !env.storageUnavailable && env.startupError != nil }, set: { if !$0 { env.startupError = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(env.startupError ?? "")

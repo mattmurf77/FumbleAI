@@ -227,6 +227,8 @@ extension Thing: DatabaseModel {
 }
 
 extension Chore: DatabaseModel {
+    // Device-local preparation joins the existing task without changing the shipped CloudKit record shape.
+    static var selectSQL: String { "SELECT chore.*, cp.work_mode AS _work_mode, cp.guide_id AS _guide, cp.supplies_json AS _supplies FROM chore LEFT JOIN chore_preparation cp ON cp.chore_id=chore.id" }
     init(row: Row) throws {
         self.init(id: try row.uuid("id"), propertyId: try row.uuid("property_id"), scope: try row.scope(), title: row["title"] ?? "",
                   notes: row["notes"], assigneeId: row.uuidOpt("assignee_id"), repeatRule: try row.json("repeat_rule_json", RepeatRule.self),
@@ -235,6 +237,9 @@ extension Chore: DatabaseModel {
                   calendarEnabled: row.bool("calendar_enabled"), linkedThingId: row.uuidOpt("linked_thing_id"),
                   isPaused: row.bool("is_paused"), closedAt: row["closed_at"],
                   createdAt: row.date("created_at"), updatedAt: row.date("updated_at"), deletedAt: row["deleted_at"])
+        guideID = row["_guide"]
+        workMode = (row["_work_mode"] as String?).flatMap(Chore.WorkMode.init(rawValue:))
+        supplyPlan = try row.json("_supplies", [ChoreSupply].self)
     }
     func columns() throws -> Columns {
         var c = Columns()
@@ -292,21 +297,21 @@ extension Project: DatabaseModel {
     init(row: Row) throws {
         let cur: String = row["currency_code"] ?? "USD"
         self.init(id: try row.uuid("id"), propertyId: try row.uuid("property_id"), scope: try row.scope(), title: row["title"] ?? "",
-                  notes: row["notes"], status: row.enumValue("status"), priority: row["priority"],
+                  notes: row["notes"], status: row.enumValue("status"), workAction: row.enumOpt("work_action"), priority: row["priority"],
                   estCost: (row["est_cost_cents"] as Int64?).map { Money(cents: $0, currency: cur) },
                   actualCost: (row["actual_cost_cents"] as Int64?).map { Money(cents: $0, currency: cur) },
                   estHours: row["est_hours"], actualHours: row["actual_hours"], targetOn: row.localDateOpt("target_on"),
-                  startedOn: row.localDateOpt("started_on"), completedOn: row.localDateOpt("completed_on"), vendor: row["vendor"],
+                  startedOn: row.localDateOpt("started_on"), completedOn: row.localDateOpt("completed_on"), completedYear: row["completed_year"], vendor: row["vendor"],
                   spawnedFromChoreId: row.uuidOpt("spawned_from_chore_id"), currencyCode: cur,
                   createdAt: row.date("created_at"), updatedAt: row.date("updated_at"), deletedAt: row["deleted_at"])
     }
     func columns() throws -> Columns {
         var c = Columns()
         c.set("property_id", uuid: propertyId); c.set("scope", scope: scope); c.set("title", title); c.set("notes", notes)
-        try c.set("status", enum: status); c.set("priority", priority)
+        try c.set("status", enum: status); try c.set("work_action", enum: workAction); c.set("priority", priority)
         c.set("est_cost_cents", estCost?.cents); c.set("actual_cost_cents", actualCost?.cents); c.set("currency_code", currencyCode)
         c.set("est_hours", estHours); c.set("actual_hours", actualHours); c.set("target_on", date: targetOn)
-        c.set("started_on", date: startedOn); c.set("completed_on", date: completedOn); c.set("vendor", vendor)
+        c.set("started_on", date: startedOn); c.set("completed_on", date: completedOn); c.set("completed_year", completedOn == nil ? completedYear : nil); c.set("vendor", vendor)
         c.set("spawned_from_chore_id", uuid: spawnedFromChoreId)
         c.setTimestamps(self)
         return c

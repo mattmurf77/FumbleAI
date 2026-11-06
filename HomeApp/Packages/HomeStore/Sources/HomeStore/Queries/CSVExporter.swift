@@ -3,7 +3,7 @@ import GRDB
 import HomeCore
 import PlanKit
 
-/// CSV export (LLD §13, spec 09 FR-SES-20..25): 11 CSVs + README.txt (+ optional attachments/) in a temp folder,
+/// CSV export (LLD §13, spec 09 FR-SES-20..25): record CSVs + README.txt (+ optional attachments/) in a temp folder,
 /// zipped with `NSFileCoordinator(.forUploading)` on Apple platforms. Where that API is unavailable (Linux) the
 /// folder URL is returned instead of a zip.
 public struct CSVExporter: ExportService {
@@ -15,7 +15,7 @@ public struct CSVExporter: ExportService {
     }
 
     public static let fileNames = ["spaces.csv", "chores.csv", "chore_completions.csv", "projects.csv", "cost_line_items.csv", "things.csv",
-                                   "inventory.csv", "measurements.csv", "storage_spots.csv", "people.csv", "budget_summary.csv"]
+                                   "inventory.csv", "measurements.csv", "storage_spots.csv", "people.csv", "budget_summary.csv", "work_estimates.csv"]
 
     public func exportCSV(property: UUID, options: ExportOptions) async throws -> URL {
         let today = db.clock.today
@@ -27,13 +27,19 @@ public struct CSVExporter: ExportService {
         for (file, (header, rows)) in tables { try CSV.file(header: header, rows: rows).write(to: folder.appendingPathComponent(file)) }
         try Data(Self.readme.utf8).write(to: folder.appendingPathComponent("README.txt"))
         if options.includeAttachments {
-            let atts = try await db.read { d in try Attachment.fetchAll(d, where: "property_id = ?", [property.db]) }
+            let (atts, documents) = try await db.read { d in
+                (try Attachment.fetchAll(d, where: "property_id = ?", [property.db]), try AttachmentStore.documents(d, propertyId: property))
+            }
             let dir = folder.appendingPathComponent("attachments", isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            var exported: [UUID: String] = [:]
             for a in atts where files.exists(a) {
                 let dest = dir.appendingPathComponent("\(a.ownerType.rawValue)-\(a.ownerId.db)-\(a.id.db).\(a.fileExt)")
-                try? FileManager.default.copyItem(at: files.url(for: a), to: dest)
+                try FileManager.default.copyItem(at: files.url(for: a), to: dest)
+                exported[a.id] = "attachments/" + dest.lastPathComponent
             }
+            let rows = try documents.map { try $0.exportRow(includedPath: exported[$0.id]) }
+            try CSV.file(header: HomeDocument.exportHeader, rows: rows).write(to: folder.appendingPathComponent("documents.csv"))
         }
         return try Self.zip(folder: folder, name: name, into: work)
     }
@@ -69,7 +75,11 @@ public struct CSVExporter: ExportService {
         Lengths: inches with 2 decimals; *_display columns use your chosen units.\r
         IDs are included so a later version can re-import the data. Deleted items are not exported.\r
         Files: spaces, chores, chore_completions, projects, cost_line_items, things, inventory, measurements,\r
-        storage_spots, people, budget_summary (+ attachments/ when "Include photos and receipts" is on).\r
+        storage_spots, people, budget_summary, work_estimates (+ documents.csv and attachments/ when "Include documents, photos and receipts" is on).\r
+        Work estimates: one row per DIY or professional worksheet, with known cash subtotals, missing-price counts,\r
+        own hours, scope, assumptions, and the original worksheet JSON (including every line and price source).\r
+        An incomplete subtotal is not the final job price. Estimates are separate from actual spending and home value.\r
+        This is a portable record export; it does not restore an entire home into the app.\r
 
         """
 
@@ -100,12 +110,12 @@ public struct CSVExporter: ExportService {
 
         let chores = ChoreStore.sort(try Chore.fetchAll(d, where: pw, pa))
         out["chores.csv"] = (["id", "title", "room", "floor", "scope", "assignee", "repeat", "next_due_on", "due_time", "reminder_on",
-                              "calendar_on", "linked_thing", "paused", "closed_at", "notes"],
-            chores.map { c in
+                              "calendar_on", "linked_thing", "paused", "closed_at", "notes", "work_mode", "task_guide", "supplies_json"],
+            try chores.map { c in
                 [c.id.db, c.title, room(c.scope), floor(c.scope), c.scope.kind.rawValue, L.personName(c.assigneeId) ?? "",
                  c.repeatRule?.humanText ?? "", c.nextDueOn?.description ?? "",
                  c.dueMinutes.map { String(format: "%02d:%02d", $0 / 60, $0 % 60) } ?? "", b(c.remindEnabled), b(c.calendarEnabled),
-                 L.thingName(c.linkedThingId) ?? "", b(c.isPaused), CSV.instant(c.closedAt), c.notes ?? ""]
+                 L.thingName(c.linkedThingId) ?? "", b(c.isPaused), CSV.instant(c.closedAt), c.notes ?? "", c.workMode?.rawValue ?? "", c.guideID ?? "", try HomeJSON.encodeString(c.supplyPlan ?? [])]
             })
 
         let titles = Dictionary(chores.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
@@ -119,15 +129,40 @@ public struct CSVExporter: ExportService {
         let projects = try Project.fetchAll(d, where: pw, pa).sorted { $0.title < $1.title }
         let lines = try CostLineItem.fetchAll(d, where: pw, pa).sorted { ($0.createdAt, $0.id.db) < ($1.createdAt, $1.id.db) }
         out["projects.csv"] = (["id", "title", "room", "floor", "scope", "status", "est_cost", "actual_cost", "spent_effective", "currency",
-                                "est_hours", "actual_hours", "target_on", "started_on", "completed_on", "vendor", "spawned_from_chore", "notes"],
+                                "est_hours", "actual_hours", "target_on", "started_on", "completed_on", "vendor", "spawned_from_chore", "notes", "work_action"],
             projects.map { p in
                 [p.id.db, p.title, room(p.scope), floor(p.scope), p.scope.kind.rawValue, p.status.rawValue, p.estCost?.plainString ?? "",
                  p.actualCost?.plainString ?? "", Money(cents: RollupMath.spentCents(p, lineItems: lines), currency: p.currencyCode).plainString,
                  p.currencyCode, num(p.estHours), num(p.actualHours), p.targetOn?.description ?? "", p.startedOn?.description ?? "",
-                 p.completedOn?.description ?? "", p.vendor ?? "", id(p.spawnedFromChoreId), p.notes ?? ""]
+                 p.completedOn?.description ?? p.completedYear.map(String.init) ?? "", p.vendor ?? "", id(p.spawnedFromChoreId), p.notes ?? "", p.workAction?.rawValue ?? ""]
             })
 
         let ptitles = Dictionary(projects.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
+        let worksheets = try Row.fetchAll(d, sql: """
+            SELECT w.*, COALESCE(c.title, p.title) AS owner_title
+            FROM work_estimate w
+            LEFT JOIN chore c ON c.id=w.chore_id AND c.property_id=w.property_id AND c.deleted_at IS NULL
+            LEFT JOIN project p ON p.id=w.project_id AND p.property_id=w.property_id AND p.deleted_at IS NULL
+            JOIN property h ON h.id=w.property_id AND h.deleted_at IS NULL
+            WHERE w.property_id=? AND (c.id IS NOT NULL OR p.id IS NOT NULL)
+            ORDER BY w.chore_id, w.project_id, w.mode
+            """, arguments: pa)
+        out["work_estimates.csv"] = (["owner_type", "owner_id", "owner_title", "work_mode", "currency", "known_low", "known_high",
+                                      "is_complete", "unpriced_line_count", "own_hours", "has_unknown_own_hours", "scope_quantity",
+                                      "scope_unit", "assumptions", "worksheet_json"], try worksheets.map { row in
+            let json: String = row["details_json"]
+            let estimate = try HomeJSON.decode(WorkEstimate.self, from: json)
+            guard estimate.mode.rawValue == row["mode"] as String else {
+                throw WorkEstimateError("The saved estimate has an inconsistent work method.")
+            }
+            let totals = try estimate.totals()
+            let chore: String? = row["chore_id"]
+            return [chore == nil ? "project" : "chore", chore ?? row["project_id"], row["owner_title"], estimate.mode.rawValue,
+                    estimate.currency, totals.knownLow?.plainString ?? "", totals.knownHigh?.plainString ?? "", b(totals.isComplete),
+                    String(totals.unpricedLineCount), NSDecimalNumber(decimal: totals.ownHours).stringValue, b(totals.hasUnknownOwnHours),
+                    estimate.scopeQuantity.map { NSDecimalNumber(decimal: $0).stringValue } ?? "", estimate.scopeUnit,
+                    estimate.assumptions ?? "", json]
+        })
         let attById = Dictionary(try Attachment.fetchAll(d, where: pw, pa).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         out["cost_line_items.csv"] = (["id", "project_id", "project_title", "label", "kind", "amount", "currency", "vendor", "incurred_on",
                                        "hours", "receipt_file"],

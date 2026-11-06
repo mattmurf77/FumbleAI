@@ -82,6 +82,57 @@ enum SharedCaptureInbox {
         return taken
     }
 
+    /// One keychain item per spreadsheet avoids racing the shared text/PDF queue. Reading does not consume it.
+    /// Keep the payload until the owner closes the import review; relaunch can recover an interrupted review.
+    private static let spreadsheetService = "HomeBlueprint.CaptureInbox.spreadsheet"
+    struct PendingSpreadsheet: Identifiable {
+        let id: UUID
+        let file: SharedInbox.Spreadsheet?
+    }
+
+    static func saveSpreadsheet(_ file: SharedInbox.Spreadsheet) -> Bool {
+        guard accessGroup != nil, !file.bytes.isEmpty, file.bytes.count <= ProjectCSV.maxBytes else { return false }
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        let key = UUID().uuidString.lowercased()
+        guard let data = try? encoder.encode(file), writeData(data, service: spreadsheetService, account: key) else { return false }
+        guard readData(service: spreadsheetService, account: key) == data else {
+            deleteData(service: spreadsheetService, account: key)
+            return false
+        }
+        return true
+    }
+
+    static func nextSpreadsheet() -> PendingSpreadsheet? {
+        #if canImport(Security)
+        guard let accessGroup else { return nil }
+        let lookup: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: spreadsheetService,
+            kSecAttrAccessGroup as String: accessGroup, kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(lookup as CFDictionary, &result) == errSecSuccess,
+              let rows = result as? [[String: Any]] else { return nil }
+        let ids = rows.compactMap { row -> (String, Date)? in
+            guard let key = row[kSecAttrAccount as String] as? String, UUID(uuidString: key) != nil else { return nil }
+            return (key, row[kSecAttrCreationDate as String] as? Date ?? .distantPast)
+        }.sorted { ($0.1, $0.0) < ($1.1, $1.0) }
+        guard let key = ids.first?.0, let id = UUID(uuidString: key),
+              let data = readData(service: spreadsheetService, account: key) else { return nil }
+        let file = try? PropertyListDecoder().decode(SharedInbox.Spreadsheet.self, from: data)
+        guard let file, !file.bytes.isEmpty, file.bytes.count <= ProjectCSV.maxBytes,
+              SharedInbox.Spreadsheet.fileExtension(name: file.name) != nil else { return .init(id: id, file: nil) }
+        return .init(id: id, file: file)
+        #else
+        return nil
+        #endif
+    }
+
+    static func finishSpreadsheet(_ id: UUID) {
+        deleteData(service: spreadsheetService, account: id.uuidString.lowercased())
+    }
+
     // MARK: Keychain
 
     #if canImport(Security)

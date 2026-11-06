@@ -25,14 +25,15 @@ public enum MergePolicy {
     }
 
     /// Merged row for `type`. `server` is the fetched/conflicting server row, `local` the current local row,
-    /// `changed` the outbox changed-field set. `today` is the fallback for a done project without a completion date.
-    public static func merge(_ type: RecordType, server: SyncRow, local: SyncRow, changed: Set<String>, today: LocalDate) -> SyncRow {
+    /// `changed` the outbox changed-field set.
+    public static func merge(_ type: RecordType, server: SyncRow, local: SyncRow, changed: Set<String>, today _: LocalDate) -> SyncRow {
         var merged = server
         var overlay = changed.filter { !$0.contains(".") }
         // Groups.
         for g in groups(type) where !overlay.isDisjoint(with: g) { overlay.formUnion(g) }
-        // Project: status + completed_on are paired.
-        if type == .project, !overlay.isDisjoint(with: ["status", "completed_on"]) { overlay.formUnion(["status", "completed_on"]) }
+        // Keep exact, year-only and unknown completion dates consistent with project status.
+        let completionFields: Set<String> = ["status", "completed_on", "completed_year"]
+        if type == .project, !overlay.isDisjoint(with: completionFields) { overlay.formUnion(completionFields) }
         // Thing attributes: key-level overlay.
         var attributeKeys: Set<String> = []
         if type == .thing {
@@ -41,6 +42,10 @@ public enum MergePolicy {
         }
         for c in overlay where c != "updated_at" && c != "created_at" {
             if let v = local[c] { merged[c] = v }
+        }
+        if type == .project, merged["completed_year"] != nil,
+           merged["status"]?.stringValue != "done" || merged["completed_on"]?.stringValue != nil {
+            merged["completed_year"] = .null
         }
         if !attributeKeys.isEmpty {
             merged["attributes_json"] = mergeAttributes(server: server["attributes_json"], local: local["attributes_json"], keys: attributeKeys)
@@ -56,11 +61,6 @@ public enum MergePolicy {
         }
         // deleted_at: delete wins unless the local side changed it (explicit restore or local delete) — the overlay
         // above already implements that; nothing else to do.
-        // Project: done needs completed_on.
-        if type == .project, merged["status"] == .string("done"), merged["completed_on"]?.isNull ?? true {
-            let other = [server["completed_on"], local["completed_on"]].compactMap { $0 }.first { !$0.isNull }
-            merged["completed_on"] = other ?? .string(today.description)
-        }
         return merged
     }
 

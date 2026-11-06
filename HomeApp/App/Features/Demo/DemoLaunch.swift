@@ -14,6 +14,9 @@ struct DemoLaunch: Equatable {
         case addOutside = "add-outside", outdoorTemplates = "outdoor-templates", settings
         /// 2nd floor: the Primary Bedroom's reach-in closet sits inside the room.
         case planUpstairs = "plan-upstairs"
+        #if DEBUG
+        case testCSVReview = "test-csv-review", testDocumentReview = "test-document-review"
+        #endif
     }
 
     let screen: Screen
@@ -34,6 +37,9 @@ struct DemoLaunch: Equatable {
 
     var tab: AppTab {
         switch screen {
+        #if DEBUG
+        case .testCSVReview, .testDocumentReview: return .home
+        #endif
         case .onboarding, .home, .settings: return .home
         case .plan, .planOutside, .addOutside, .outdoorTemplates, .planUpstairs: return .plan
         case .todos, .quickAdd: return .todos
@@ -53,6 +59,10 @@ struct DemoLaunch: Equatable {
 
     var sheet: DemoSheet? {
         switch screen {
+        #if DEBUG
+        case .testCSVReview: return .testCSVReview
+        case .testDocumentReview: return .testDocumentReview
+        #endif
         case .quickAdd: return .quickAdd
         case .tellHome: return .tellHome
         case .sharedReceipt: return .sharedReceipt
@@ -66,6 +76,9 @@ struct DemoLaunch: Equatable {
 
 enum DemoSheet: String, Identifiable {
     case quickAdd, tellHome, sharedReceipt, addOutside, outdoorTemplates, settings
+    #if DEBUG
+    case testCSVReview, testDocumentReview
+    #endif
     var id: String { rawValue }
 
     static let sampleList = """
@@ -83,6 +96,10 @@ enum DemoSheet: String, Identifiable {
     @MainActor @ViewBuilder
     var view: some View {
         switch self {
+        #if DEBUG
+        case .testCSVReview: DemoCaptureInputs(mode: .csv)
+        case .testDocumentReview: DemoCaptureInputs(mode: .permit)
+        #endif
         case .quickAdd:
             QuickCaptureSheet(initialText: Self.sampleList)
         case .tellHome:

@@ -49,7 +49,7 @@ final class FeedbackPresenter: NSObject, UIAdaptivePresentationControllerDelegat
                 Task { @MainActor in FeedbackPresenter.shared.present() }
             }
         }
-        let show = UserDefaults.standard.object(forKey: FeedbackSettings.showButtonKey) as? Bool ?? true
+        let show = UserDefaults.standard.bool(forKey: FeedbackSettings.showButtonKey)
         setButtonVisible(show)
     }
 

@@ -4,12 +4,16 @@ on:
   pull_request:
     paths:
       - "HomeApp/**"
+      - "server/data/home-catalog.json"
       - ".github/workflows/ios-build.yml"
+      - ".github/scripts/test-iphone.sh"
   push:
     branches: [main]
     paths:
       - "HomeApp/**"
+      - "server/data/home-catalog.json"
       - ".github/workflows/ios-build.yml"
+      - ".github/scripts/test-iphone.sh"
   workflow_dispatch:
 
 concurrency:
@@ -21,18 +25,28 @@ permissions:
 
 jobs:
   build:
-    name: Build app and test packages
-    runs-on: macos-15
-    timeout-minutes: 60
+    name: ${{ matrix.title }}
+    runs-on: macos-26
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: HomeUITests
+            title: Homeowner journeys and Release archive
+            xcode: latest-stable
+          - suite: HomeTests
+            title: Apple billing and iPhone app services
+            xcode: "26.2"
     env:
       SPM_DIR: ${{ github.workspace }}/.spm
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select latest stable Xcode
+      - name: Select Xcode for the test runtime
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: ${{ matrix.xcode }}
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -42,7 +56,6 @@ jobs:
         with:
           path: |
             .spm
-            HomeApp/Packages/*/.build
           key: spm-${{ runner.os }}-${{ hashFiles('HomeApp/project.yml', 'HomeApp/**/Package.swift', 'HomeApp/**/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
@@ -50,30 +63,95 @@ jobs:
         working-directory: HomeApp
         run: xcodegen generate
 
-      - name: Build app (iOS Simulator, unsigned)
+      - name: Build and test on iPhone
+        timeout-minutes: 35
         working-directory: HomeApp
+        env:
+          TEST_SUITE: ${{ matrix.suite }}
         run: |
           set -o pipefail
-          # Report every compile error in one run instead of stopping at the first failing file.
-          defaults write com.apple.dt.Xcode IDEBuildingContinueBuildingAfterErrors -bool YES
-          xcodebuild \
-            -project Home.xcodeproj \
-            -scheme Home \
-            -destination 'generic/platform=iOS Simulator' \
-            -clonedSourcePackagesDirPath "$SPM_DIR" \
-            -skipPackagePluginValidation \
-            -skipMacroValidation \
-            build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
-            | if command -v xcbeautify >/dev/null; then xcbeautify --renderer github-actions; else cat; fi
+          ../.github/scripts/test-iphone.sh "$TEST_SUITE" | if command -v xcbeautify >/dev/null; then xcbeautify --renderer github-actions; else cat; fi
 
-      # Pure packages first (fast, no Apple frameworks), then the platform packages, whose macOS builds also
-      # compile the CloudKit / EventKit / UserNotifications / MapKit / SwiftUI code paths.
-      - name: Test Swift packages (macOS)
+      - name: Export iPhone screenshots
+        if: ${{ !cancelled() && matrix.suite == 'HomeUITests' }}
+        run: |
+          if [[ -d "$RUNNER_TEMP/HomeUITests.xcresult" ]]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/HomeUITests.xcresult" \
+              --output-path "$RUNNER_TEMP/HomeBlueprintScreens" || echo "The xcresult contains no exportable screenshots."
+          fi
+
+      - name: Save iPhone screenshots
+        if: ${{ !cancelled() && matrix.suite == 'HomeUITests' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: iphone-screenshots
+          path: ${{ runner.temp }}/HomeBlueprintScreens
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Export the App Review purchase screenshot
+        if: ${{ !cancelled() && matrix.suite == 'HomeTests' }}
+        run: |
+          if [[ -d "$RUNNER_TEMP/HomeTests.xcresult" ]]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/HomeTests.xcresult" \
+              --test-id 'HomeBriefReviewScreenshotTests/testCaptureHomeBriefPurchaseForReview()' \
+              --output-path "$RUNNER_TEMP/HomeBriefReview" || echo "No purchase screenshot was produced."
+          fi
+
+      - name: Save App Review purchase screenshot
+        if: ${{ !cancelled() && matrix.suite == 'HomeTests' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-brief-review-screenshot
+          path: ${{ runner.temp }}/HomeBriefReview
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Save iPhone test results
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iphone-test-results-${{ matrix.suite }}
+          path: ${{ runner.temp }}/${{ matrix.suite }}.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Validate an unsigned Release archive
+        if: ${{ !cancelled() && matrix.suite == 'HomeUITests' }}
+        working-directory: HomeApp
+        run: |
+          xcodebuild -project Home.xcodeproj -scheme Home -configuration Release -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath "$SPM_DIR" -skipPackagePluginValidation -skipMacroValidation \
+            -archivePath "$RUNNER_TEMP/HomeBlueprint.xcarchive" archive CODE_SIGNING_ALLOWED=NO HOME_CLOUD_SYNC=NO -quiet
+          app="$RUNNER_TEMP/HomeBlueprint.xcarchive/Products/Applications/Home.app"
+          test -f "$app/Home" && test -f "$app/PrivacyInfo.xcprivacy" && test -d "$app/PlugIns/HomeShare.appex"
+          expected=$(ruby -ryaml -e 'print YAML.load_file("project.yml").fetch("settings").fetch("base").fetch("MARKETING_VERSION")')
+          for info in "$app/Info.plist" "$app/PlugIns/HomeShare.appex/Info.plist"; do
+            test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$info")" = "$expected"
+          done
+          test -z "$(find "$app" -name '*.storekit' -print -quit)"
+
+  packages:
+    name: Test all eight Swift packages
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - uses: actions/cache@v4
+        with:
+          path: HomeApp/Packages/*/.build
+          key: package-tests-${{ runner.os }}-${{ hashFiles('HomeApp/**/Package.swift', 'HomeApp/**/Package.resolved') }}
+      - name: Test Swift packages (macOS)
         run: |
           set -euo pipefail
+          failed=0
           for pkg in PlanKit HomeCore HomeStore HomeSync HomeSchedule HomeCapture HomeExterior PlanCanvas; do
             echo "::group::swift test $pkg"
-            swift test --package-path "HomeApp/Packages/$pkg"
+            swift test --package-path "HomeApp/Packages/$pkg" || failed=1
             echo "::endgroup::"
           done
+          exit "$failed"

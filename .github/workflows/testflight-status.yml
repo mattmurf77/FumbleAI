@@ -1,6 +1,6 @@
 name: TestFlight status
 
-# Manual only: prints the processing state of recent TestFlight builds. Builds and uploads nothing.
+# Manual read-only inventory of TestFlight, the Home Brief catalog and App Store version metadata.
 on:
   workflow_dispatch:
 

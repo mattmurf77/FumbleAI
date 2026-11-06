@@ -12,6 +12,8 @@ struct ChoreDetailView: View {
     let choreID: UUID
 
     @State private var chore: Chore?
+    @State private var property: Property?
+    @State private var estimateRevision = 0
     @State private var missing = false
     @State private var names = SchedulePlaceNames()
     @State private var people: [UUID: String] = [:]
@@ -20,17 +22,19 @@ struct ChoreDetailView: View {
     @State private var ownership: CalendarOwnership = .notEnabled
     @State private var notificationStatus: PermissionStatus = .notDetermined
 
+    @State private var quoteRequest = false
     @State private var editing = false
     @State private var rescheduling = false
     @State private var rescheduleDate = LocalDate(2026, 1, 1)
     @State private var confirmDelete = false
     @State private var spawnedProject: ProjectRoute?
     @State private var undo: UndoState?
+    @State private var acting = false
     @State private var doneFeedback = 0
     @State private var errorText: String?
     @State private var texting = false
 
-    private struct UndoState: Equatable { var message: String; var previousDue: LocalDate?; var token = UUID() }
+    private struct UndoState: Equatable { var message: String; var completionID: UUID; var token = UUID() }
     struct ProjectRoute: Identifiable, Hashable { let id: UUID }
 
     private var today: LocalDate { env.clock.today }
@@ -53,7 +57,9 @@ struct ChoreDetailView: View {
                 ToolbarItem(placement: .primaryAction) { Button("Edit") { editing = true } }
             }
         }
-        .sheet(isPresented: $editing) { ChoreForm(choreID: choreID) }
+        .sheet(isPresented: $editing) {
+            ChoreForm(choreID: choreID) { _ in estimateRevision += 1 }
+        }
         .sheet(isPresented: $rescheduling) { rescheduleSheet }
         .sheet(isPresented: $texting) {
             if let c = chore { MessageComposer(text: reminderMessage(c)) { texting = false } }
@@ -69,6 +75,7 @@ struct ChoreDetailView: View {
         } message: { Text(errorText ?? "") }
         .sensoryFeedback(.success, trigger: doneFeedback)
         .overlay(alignment: .bottom) { undoBar }
+        .sheet(isPresented: $quoteRequest) { ChoreQuoteRequestView(title: chore?.title ?? "") }
         .task { await observe() }
         .task(id: chore?.updatedAt) { await loadExtras() }
     }
@@ -115,6 +122,26 @@ struct ChoreDetailView: View {
             }
 
             Section { dueCard(c) }
+            Section("Work plan") {
+                LabeledContent("How", value: c.workMode?.label ?? "Decide later")
+                if let property, property.id == c.propertyId {
+                    WorkEstimateLink(propertyId: property.id, currency: property.currencyCode, country: property.address?.countryCode,
+                                     title: c.title, preferredMode: c.workMode, owner: .chore(c.id))
+                        .id(estimateRevision)
+                }
+                if c.workMode == .diy, let plan = c.supplyPlan, !plan.isEmpty {
+                    ForEach(plan) { item in
+                        LabeledContent(item.name, value: "\(item.quantity) \(item.unit)")
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(item.name)
+                            .accessibilityValue("\(item.quantity) \(item.unit)")
+                            .accessibilityIdentifier("todo.supplyDetail." + item.name)
+                    }
+                    NavigationLink { ShoppingListView() } label: { Label("Shopping list", systemImage: "cart") }
+                }
+                if c.workMode == .hirePro { Button("Prepare a written estimate request") { quoteRequest = true } }
+                Button(c.workMode == .diy ? "Check readiness and edit supplies" : "Edit work plan") { editing = true }
+            }
 
             Section("Schedule") {
                 LabeledContent("Repeat", value: c.repeatRule?.humanText ?? "Doesn't repeat")
@@ -221,6 +248,12 @@ struct ChoreDetailView: View {
                 if c.isOpen {
                     Button { Task { await act(.done) } } label: { Label("Mark done", systemImage: "checkmark") }
                         .buttonStyle(.borderedProminent)
+                } else if c.closedAt != nil, let latest = completions.first {
+                    Button("Reopen to-do") { Task { await performUndo(latest.id) } }
+                        .buttonStyle(.bordered)
+                        .disabled(acting)
+                        .accessibilityHint("Undoes the last completion and restores its due date.")
+                        .accessibilityIdentifier("todo.reopen")
                 }
             }
             if c.closedAt == nil {
@@ -297,7 +330,7 @@ struct ChoreDetailView: View {
             HStack {
                 Text(undo.message).foregroundStyle(.white)
                 Spacer()
-                Button("Undo") { Task { await performUndo(undo) } }
+                Button("Undo") { Task { await performUndo(undo.completionID) } }
                     .foregroundStyle(.yellow)
                     .bold()
             }
@@ -317,6 +350,7 @@ struct ChoreDetailView: View {
     @MainActor
     private func observe() async {
         guard let property = try? await env.plan.currentProperty() else { missing = true; return }
+        self.property = property
         names = await SchedulePlaceNames.load(env, property: property.id)
         let list = (try? await env.people.people(property: property.id)) ?? []
         people = Dictionary(list.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
@@ -344,30 +378,35 @@ struct ChoreDetailView: View {
 
     @MainActor
     private func act(_ outcome: ChoreCompletion.Outcome) async {
-        guard let c = chore else { return }
-        let previous = c.nextDueOn
+        guard let c = chore, !acting else { return }
+        acting = true
+        defer { acting = false }
         do {
+            let completion: ChoreCompletion
             if outcome == .done {
                 // Done in-app defaults to the assignee (FR-CHR-21).
-                _ = try await env.chores.complete(c.id, by: c.assigneeId, at: env.clock.now)
+                completion = try await env.chores.complete(c.id, by: c.assigneeId, at: env.clock.now)
                 doneFeedback += 1
             } else {
-                try await env.chores.skip(c.id, at: env.clock.now)
+                completion = try await env.chores.skip(c.id, at: env.clock.now)
             }
-            withAnimation { undo = UndoState(message: outcome == .done ? "Marked done" : "Skipped", previousDue: previous) }
+            withAnimation { undo = UndoState(message: outcome == .done ? "Marked done" : "Skipped", completionID: completion.id) }
             await loadExtras()
         } catch {
             errorText = error.localizedDescription
         }
     }
 
-    /// Restores the previous due date. NOTE: `ChoreRepository` has no "delete completion" call yet, so the
-    /// completion row stays in history (see INTEGRATION_NOTES/schedule.md).
     @MainActor
-    private func performUndo(_ state: UndoState) async {
-        withAnimation { undo = nil }
-        guard let due = state.previousDue else { return }
-        do { try await env.chores.reschedule(choreID, to: due) } catch { errorText = error.localizedDescription }
+    private func performUndo(_ completionID: UUID) async {
+        guard !acting else { return }
+        acting = true
+        defer { acting = false }
+        do {
+            try await env.chores.undoCompletion(completionID)
+            withAnimation { undo = nil }
+            await loadExtras()
+        } catch { errorText = error.localizedDescription }
     }
 
     @MainActor

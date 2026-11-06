@@ -22,27 +22,34 @@ public struct InMemoryChoreRepository: ChoreRepository {
     public func observeChores(_ query: ChoreQuery) -> AsyncStream<[Chore]> { store.observe { Self.filter($0, query) } }
     public func completions(chore: UUID) async throws -> [ChoreCompletion] { store.read { $0.liveCompletions.filter { $0.choreId == chore } } }
 
-    public func create(_ draft: ChoreDraft) async throws -> Chore {
+    public func create(_ draft: ChoreDraft, estimates: [WorkEstimate]) async throws -> Chore {
+        try ChoreSupply.validate(draft.supplyPlan ?? [])
         let c = ChoreLogic.make(from: draft, now: store.now, engine: store.engine)
-        store.write(events: [.created(.chore(c.id))]) { $0.chores[c.id] = c }
+        try store.write(events: [.created(.chore(c.id))]) { snapshot in
+            snapshot.chores[c.id] = c
+            try InMemoryWorkEstimateRepository.put(estimates, owner: .chore(c.id), propertyId: c.propertyId, in: &snapshot)
+        }
         return c
     }
 
-    public func update(_ chore: Chore) async throws {
+    public func update(_ chore: Chore, estimates: [WorkEstimate]) async throws {
+        try ChoreSupply.validate(chore.supplyPlan ?? [])
         var c = chore
         c.updatedAt = store.now
         try store.write(events: [.updated(.chore(c.id))]) { s in
-            guard let old = s.chores[c.id] else { throw notFound(.chore, c.id) }
+            guard let old = s.chores[c.id], old.deletedAt == nil, old.propertyId == c.propertyId else { throw notFound(.chore, c.id) }
             if (old.repeatRule != c.repeatRule || old.startOn != c.startOn) && c.closedAt == nil && old.nextDueOn == c.nextDueOn {
                 c = ChoreLogic.recomputeNextDue(c, completions: Array(s.completions.values), engine: store.engine)
             }
             s.chores[c.id] = c
+            try InMemoryWorkEstimateRepository.put(estimates, owner: .chore(c.id), propertyId: c.propertyId, in: &s)
         }
     }
 
     private func act(_ id: UUID, _ outcome: ChoreCompletion.Outcome, by: UUID?, at: Date) throws -> ChoreCompletion {
         try store.write(events: [.choreCompleted(id), .updated(.chore(id))]) { s in
             guard let c = s.chores[id], c.deletedAt == nil else { throw notFound(.chore, id) }
+            guard c.isOpen else { throw RepositoryError.invalid("This task is already closed or paused.") }
             let (updated, completion) = ChoreLogic.act(on: c, outcome: outcome, by: by, at: at,
                                                        calendar: store.clock.calendar, engine: store.engine)
             s.chores[id] = updated
@@ -52,7 +59,22 @@ public struct InMemoryChoreRepository: ChoreRepository {
     }
 
     public func complete(_ id: UUID, by person: UUID?, at: Date) async throws -> ChoreCompletion { try act(id, .done, by: person, at: at) }
-    public func skip(_ id: UUID, at: Date) async throws { _ = try act(id, .skipped, by: nil, at: at) }
+    @discardableResult public func skip(_ id: UUID, at: Date) async throws -> ChoreCompletion {
+        try act(id, .skipped, by: nil, at: at)
+    }
+
+    public func undoCompletion(_ id: UUID) async throws {
+        guard let action = store.read({ $0.completions[id] }) else { throw notFound(.choreCompletion, id) }
+        try store.write(events: [.updated(.chore(action.choreId))]) { s in
+            guard var current = s.completions[id], let chore = s.chores[action.choreId] else { throw notFound(.choreCompletion, id) }
+            let history = s.liveCompletions.filter { $0.choreId == chore.id }
+            var restored = try ChoreLogic.undo(current, on: chore, history: history, engine: store.engine)
+            restored.updatedAt = store.now
+            current.deletedAt = store.now; current.updatedAt = store.now
+            s.completions[id] = current
+            s.chores[chore.id] = restored
+        }
+    }
 
     public func reschedule(_ id: UUID, to: LocalDate) async throws {
         try mutate(id) { $0.nextDueOn = to; $0.closedAt = nil }
@@ -61,10 +83,16 @@ public struct InMemoryChoreRepository: ChoreRepository {
     public func setPaused(_ id: UUID, _ paused: Bool) async throws { try mutate(id) { $0.isPaused = paused } }
 
     public func turnIntoProject(_ id: UUID) async throws -> Project {
-        guard let c = store.read({ $0.chores[id] }) else { throw notFound(.chore, id) }
-        let p = ProjectLogic.make(from: ChoreLogic.projectDraft(from: c), now: store.now, today: store.today)
-        store.write(events: [.created(.project(p.id))]) { $0.projects[p.id] = p }
-        return p
+        let projectID = UUID()
+        return try store.write(events: [.created(.project(projectID))]) { snapshot in
+            guard let chore = snapshot.chores[id] else { throw notFound(.chore, id) }
+            let currency = snapshot.properties[chore.propertyId]?.currencyCode ?? "USD"
+            let project = ProjectLogic.make(from: ChoreLogic.projectDraft(from: chore), id: projectID, now: store.now,
+                                            today: store.today, propertyCurrency: currency)
+            snapshot.projects[projectID] = project
+            snapshot.workEstimates[.project(projectID)] = snapshot.workEstimates[.chore(id)]
+            return project
+        }
     }
 
     public func delete(_ id: UUID) async throws {
@@ -114,19 +142,23 @@ public struct InMemoryProjectRepository: ProjectRepository {
     public func projects(_ query: ProjectQuery) async throws -> [Project] { store.read { Self.filter($0, query) } }
     public func observeProjects(_ query: ProjectQuery) -> AsyncStream<[Project]> { store.observe { Self.filter($0, query) } }
 
-    public func create(_ draft: ProjectDraft) async throws -> Project {
-        let p = ProjectLogic.make(from: draft, now: store.now, today: store.today)
-        store.write(events: [.created(.project(p.id))]) { $0.projects[p.id] = p }
+    public func create(_ draft: ProjectDraft, estimates: [WorkEstimate]) async throws -> Project {
+        let currency = store.read { $0.properties[draft.propertyId]?.currencyCode ?? "USD" }
+        let p = ProjectLogic.make(from: draft, now: store.now, today: store.today, propertyCurrency: currency)
+        try store.write(events: [.created(.project(p.id))]) { snapshot in
+            snapshot.projects[p.id] = p
+            try InMemoryWorkEstimateRepository.put(estimates, owner: .project(p.id), propertyId: p.propertyId, in: &snapshot)
+        }
         return p
     }
 
-    public func update(_ project: Project) async throws {
+    public func update(_ project: Project, estimates: [WorkEstimate]) async throws {
         var p = project
         p.updatedAt = store.now
-        if p.status == .done && p.completedOn == nil { p.completedOn = store.today }
         try store.write(events: [.updated(.project(p.id))]) { s in
-            guard s.projects[p.id] != nil else { throw notFound(.project, p.id) }
+            guard let old = s.projects[p.id], old.deletedAt == nil, old.propertyId == p.propertyId else { throw notFound(.project, p.id) }
             s.projects[p.id] = p
+            try InMemoryWorkEstimateRepository.put(estimates, owner: .project(p.id), propertyId: p.propertyId, in: &s)
         }
     }
 
@@ -134,8 +166,8 @@ public struct InMemoryProjectRepository: ProjectRepository {
         try mutate(id) { $0 = ProjectLogic.setStatus($0, status, today: store.today) }
     }
 
-    public func markDone(_ id: UUID, actual: Money?, completedOn: LocalDate, hours: Double?, receipt: AttachmentDraft?) async throws {
-        try mutate(id) { $0 = ProjectLogic.markDone($0, actual: actual, completedOn: completedOn, hours: hours) }
+    public func markDone(_ id: UUID, actual: Money?, completedOn: LocalDate, hours: Double?, receipt: AttachmentDraft?, workAction: Project.WorkActionEdit) async throws {
+        try mutate(id) { $0 = ProjectLogic.markDone($0, actual: actual, completedOn: completedOn, hours: hours, workAction: workAction) }
         if let receipt, let pid = store.read({ $0.projects[id]?.propertyId }) {
             _ = try await InMemoryAttachmentRepository(store: store).add(receipt, ownerType: .project, ownerId: id, property: pid)
         }
@@ -154,10 +186,28 @@ public struct InMemoryProjectRepository: ProjectRepository {
     public func lineItems(project: UUID) async throws -> [CostLineItem] { store.read { $0.liveLineItems.filter { $0.projectId == project } } }
     public func observeLineItems(project: UUID) -> AsyncStream<[CostLineItem]> { store.observe { $0.liveLineItems.filter { $0.projectId == project } } }
 
-    public func upsertLineItem(_ item: CostLineItem) async throws {
+    public func upsertLineItem(_ item: CostLineItem, receipt: AttachmentDraft?) async throws {
         guard item.amount.cents >= 0 else { throw RepositoryError.invalid("amount must be ≥ 0") }
-        var i = item; i.updatedAt = store.now
-        store.write(events: [.updated(.project(i.projectId))]) { $0.lineItems[i.id] = i }
+        let staged = try receipt.map {
+            try InMemoryAttachmentRepository.prepare($0, ownerType: .costLineItem, ownerId: item.id,
+                                                     property: item.propertyId, now: store.now)
+        }
+        try store.write(events: [.updated(.project(item.projectId))]) { s in
+            guard let project = s.projects[item.projectId], project.deletedAt == nil,
+                  project.propertyId == item.propertyId else { throw notFound(.project, item.projectId) }
+            guard project.currencyCode == item.amount.currency else { throw RepositoryError.invalid("Enter the amount in " + project.currencyCode) }
+            var i = item; i.updatedAt = store.now
+            if let old = s.lineItems[i.id] {
+                guard old.deletedAt == nil else { throw notFound(.costLineItem, i.id) }
+                i.createdAt = old.createdAt
+            }
+            if let staged {
+                s.attachments[staged.id] = staged
+                i.receiptAttachmentId = staged.id
+            }
+            s.lineItems[i.id] = i
+        }
+        if let staged, let receipt { InMemoryAttachmentRepository.files.set(staged.id, receipt.fileURL) }
     }
 
     public func deleteLineItem(_ id: UUID) async throws {
@@ -318,15 +368,19 @@ public struct InMemoryAttachmentRepository: AttachmentRepository {
     }
 
     public func add(_ d: AttachmentDraft, ownerType: Attachment.OwnerType, ownerId: UUID, property: UUID) async throws -> Attachment {
-        let size = (try? FileManager.default.attributesOfItem(atPath: d.fileURL.path)[.size] as? Int) ?? 0
-        let now = store.now
-        let a = Attachment(propertyId: property, ownerType: ownerType, ownerId: ownerId, kind: d.kind, fileExt: d.fileExt,
-                           uti: d.uti, byteSize: size, widthPx: d.widthPx, heightPx: d.heightPx,
-                           sha256: String(PlannedNotification.stableHash(d.fileURL.absoluteString), radix: 16),
-                           caption: d.caption, ocrText: d.ocrText, capturedAt: d.capturedAt, createdAt: now, updatedAt: now)
+        let a = try Self.prepare(d, ownerType: ownerType, ownerId: ownerId, property: property, now: store.now)
         store.write(events: [.recordsChanged([RecordRef(.attachment, a.id)])]) { $0.attachments[a.id] = a }
         InMemoryAttachmentRepository.files.set(a.id, d.fileURL)
         return a
+    }
+
+    static func prepare(_ d: AttachmentDraft, ownerType: Attachment.OwnerType, ownerId: UUID,
+                        property: UUID, now: Date) throws -> Attachment {
+        let size = try d.fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        return Attachment(propertyId: property, ownerType: ownerType, ownerId: ownerId, kind: d.kind, fileExt: d.fileExt,
+                           uti: d.uti, byteSize: size, widthPx: d.widthPx, heightPx: d.heightPx,
+                           sha256: String(PlannedNotification.stableHash(d.fileURL.absoluteString), radix: 16),
+                           caption: d.caption, ocrText: d.ocrText, capturedAt: d.capturedAt, createdAt: now, updatedAt: now)
     }
 
     public func delete(_ id: UUID) async throws {

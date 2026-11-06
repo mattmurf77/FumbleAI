@@ -47,7 +47,7 @@ public struct FeedbackSubmission: Codable, Hashable, Sendable, Identifiable {
     /// Server limit on `page`.
     public static let maxPageLength = 200
 
-    /// Client-side id, used to de-duplicate the offline queue. Not sent to the server.
+    /// Stable submission id for the offline queue and the helper's X-Home-Request-ID retry header.
     public var id: UUID
     public var category: FeedbackCategory
     public var message: String
@@ -151,7 +151,7 @@ public struct FeedbackReceipt: Hashable, Sendable {
 public enum FeedbackError: Error, Equatable, Sendable, LocalizedError {
     /// Empty or longer than 5,000 characters.
     case invalidMessage
-    /// The server rejected the content (HTTP 400/413); retrying won't help.
+    /// The server rejected the content or reused request identifier (HTTP 400/409/413); retrying won't help.
     case rejected(String)
 
     public var errorDescription: String? {

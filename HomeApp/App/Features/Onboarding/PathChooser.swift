@@ -15,7 +15,7 @@ struct PathChooser: View {
                 OnboardingStepLabel(step: 2)
                 Text("How do you want to create your plan?")
                     .font(.title.weight(.bold))
-                Text("All four make the same editable plan. You can switch methods or refine it any time.")
+                Text("Choose how to start. You can edit the rooms and measurements later.")
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 6)
 

@@ -18,10 +18,22 @@ public struct AttachmentStore: AttachmentRepository {
 
     public func add(_ draft: AttachmentDraft, ownerType: Attachment.OwnerType, ownerId: UUID, property: UUID) async throws -> Attachment {
         let a = try Self.prepare(draft, ownerType: ownerType, ownerId: ownerId, property: property, files: files, now: db.clock.now)
-        return try await db.write { tx in
-            let saved = try Self.insert(a, in: tx)
-            tx.emit(.recordsChanged([RecordRef(.attachment, a.id)]))
-            return saved
+        return try await Self.committing(a, files: files) {
+            try await db.write { tx in
+                let saved = try Self.insert(a, in: tx)
+                tx.emit(.recordsChanged([RecordRef(.attachment, a.id)]))
+                return saved
+            }
+        }
+    }
+
+    /// A new binary has a unique ID. Remove it if its owning transaction fails.
+    static func committing<T>(_ staged: Attachment?, files: AttachmentFileStore,
+                              write: () async throws -> T) async throws -> T {
+        do { return try await write() }
+        catch {
+            if let staged { files.remove(id: staged.id, ext: staged.fileExt) }
+            throw error
         }
     }
 

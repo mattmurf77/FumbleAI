@@ -50,6 +50,7 @@ struct AppDependencies {
     var plan: any PlanRepository
     var planCommitter: any PlanCommitting
     var chores: any ChoreRepository
+    var estimates: any WorkEstimateRepository
     var projects: any ProjectRepository
     var things: any ThingRepository
     var inventory: any InventoryRepository
@@ -88,11 +89,14 @@ struct AppDependencies {
 
     // In-app feedback (live: Home server + on-device queue; in-memory for previews/tests)
     var feedback: any FeedbackSubmitting = InMemoryFeedbackSubmitter()
+    var remoteCatalogEnabled = false
 
     // Extras outside the HomeCore protocols (nil for in-memory wiring)
     var account: AccountHooks? = nil
     var setDeviceNickname: (@Sendable (String) -> Void)? = nil
-    /// Non-fatal problem while opening the real store (the app then runs on an in-memory store).
+    /// True when startup must stop before any editing, background work, or sync.
+    var storageUnavailable = false
+    /// Startup information for the app shell.
     var startupError: String? = nil
 
     /// In-memory wiring (HomeCoreTesting). `sample: true` loads the SampleHome house; false starts empty (onboarding).
@@ -101,7 +105,7 @@ struct AppDependencies {
         let device = StaticDeviceIdentity(deviceId: "in-memory-device", nickname: "This iPhone")
         return AppDependencies(
             config: config, clock: clock, device: device, events: home.store.bus,
-            plan: home.plan, planCommitter: home.plan, chores: home.chores, projects: home.projects, things: home.things,
+            plan: home.plan, planCommitter: home.plan, chores: home.chores, estimates: InMemoryWorkEstimateRepository(store: home.store), projects: home.projects, things: home.things,
             inventory: home.inventory, measurements: home.measurements, people: home.people, attachments: home.attachments,
             settings: home.settings, recentlyDeleted: home.recentlyDeleted,
             search: home.search, rollups: home.rollups, lensStats: home.lensStats, export: home.export, diagnostics: home.diagnostics,
@@ -125,16 +129,14 @@ struct AppDependencies {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             store = try HomeStore.live(directory: directory, clock: d.clock, events: d.events)
         } catch {
-            // Keep the app usable (in-memory) and tell the user; data would be lost on relaunch.
+            // Keep the existing database intact. The shell shows recovery instructions instead of an editor.
+            d.storageUnavailable = true
             d.startupError = "Couldn’t open the Home database: \(error.localizedDescription)"
-            do {
-                store = try HomeStore.inMemory(clock: d.clock, events: d.events)
-            } catch {
-                return d   // in-memory HomeCoreTesting wiring as the last resort
-            }
+            return d
         }
         d.events = store.database.bus
         d.plan = store.plan;                 d.planCommitter = store.planCommitter
+        d.estimates = store.estimates
         d.chores = store.chores;             d.projects = store.projects
         d.things = store.things;             d.inventory = store.inventory
         d.measurements = store.measurements; d.people = store.people
@@ -164,7 +166,7 @@ struct AppDependencies {
                 },
                 eraseLocalDataForNewAccount: { try await sync.eraseLocalDataForNewAccount() },
                 confirmReupload: { zone in try await sync.confirmReupload(zoneName: zone) })
-        } else if d.startupError == nil {
+        } else if config.cloudSyncEnabled {
             d.startupError = "iCloud sync couldn’t start. Your data stays on this iPhone."
         }
 
@@ -196,6 +198,7 @@ struct AppDependencies {
 
         // INTEGRATION: Feedback — POST {HomeServerURL}/v1/feedback; queued in Application Support/Feedback when offline
         d.feedback = FeedbackClient(config: config)
+        d.remoteCatalogEnabled = true
         return d
     }
 }
@@ -213,6 +216,7 @@ final class AppEnvironment {
     let plan: any PlanRepository
     let planCommitter: any PlanCommitting
     let chores: any ChoreRepository
+    let estimates: any WorkEstimateRepository
     let projects: any ProjectRepository
     let things: any ThingRepository
     let inventory: any InventoryRepository
@@ -246,6 +250,7 @@ final class AppEnvironment {
     let exteriorSeeder: any ExteriorSeeding
 
     let feedback: any FeedbackSubmitting
+    let catalog: HomeGuideContent
 
     let fitChecker = FitChecker()
     let recurrence: RecurrenceEngine
@@ -265,7 +270,8 @@ final class AppEnvironment {
     var syncStatus: SyncStatus = .upToDate(lastSync: nil)
     /// iCloud account situation waiting for the user's decision (FR-SYN-32/33); RootView presents it.
     var accountPrompt: AccountPrompt?
-    /// Non-fatal startup problem to show once (database could not be opened, sync unavailable).
+    let storageUnavailable: Bool
+    /// A nonfatal sync warning, or the database failure when storageUnavailable is true.
     var startupError: String?
 
     @ObservationIgnored private var eventTask: Task<Void, Never>?
@@ -277,6 +283,7 @@ final class AppEnvironment {
     init(_ d: AppDependencies) {
         config = d.config; clock = d.clock; device = d.device; events = d.events
         plan = d.plan; planCommitter = d.planCommitter; chores = d.chores; projects = d.projects; things = d.things
+        estimates = d.estimates
         inventory = d.inventory; measurements = d.measurements; people = d.people; attachments = d.attachments
         settings = d.settings; recentlyDeleted = d.recentlyDeleted
         search = d.search; rollups = d.rollups; lensStats = d.lensStats; export = d.export; diagnostics = d.diagnostics
@@ -284,9 +291,11 @@ final class AppEnvironment {
         roomPlanImporter = d.roomPlanImporter; roughIn = d.roughIn; blocks = d.blocks; photoTrace = d.photoTrace; receipts = d.receipts
         addresses = d.addresses; footprints = d.footprints; snapshots = d.snapshots; yardSeeder = d.yardSeeder; exteriorSeeder = d.exteriorSeeder
         feedback = d.feedback
+        catalog = HomeGuideContent(config: d.config, remoteEnabled: d.remoteCatalogEnabled)
         recurrence = RecurrenceEngine(calendar: d.clock.calendar)
         account = d.account
         nicknameWriter = d.setDeviceNickname
+        storageUnavailable = d.storageUnavailable
         startupError = d.startupError
     }
 
@@ -304,7 +313,7 @@ final class AppEnvironment {
 
     /// Called once from the root view's `.task`. Starts sync and the post-commit reaction loop (HLD §3.1).
     func start() async {
-        guard !started else { return }
+        guard !storageUnavailable, !started else { return }
         started = true
         try? await sync.start()
         selectedLens = await settings.load().lastLens
@@ -342,6 +351,7 @@ final class AppEnvironment {
         }
         observeTimeChanges()
         retryPendingFeedback()
+        refreshPublicCatalog()
         await reminders.replan(reason: .launch)
         scheduleAppRefresh()
     }
@@ -360,8 +370,14 @@ final class AppEnvironment {
     }
 
     func sceneBecameActive() async {
+        guard !storageUnavailable else { return }
         retryPendingFeedback()
+        refreshPublicCatalog()
         await reminders.replan(reason: .foreground)
+    }
+
+    private func refreshPublicCatalog() {
+        Task { await catalog.refresh() }
     }
 
     /// Sends feedback saved while offline (in the background; a sleeping server can take a while to answer).
@@ -372,6 +388,7 @@ final class AppEnvironment {
 
     /// `home://chore/<uuid>` etc.
     func handle(url: URL) {
+        guard !storageUnavailable else { return }
         if let ref = ItemRef(url: url) { pendingDeepLink = ref }
     }
 
@@ -407,6 +424,7 @@ final class AppEnvironment {
 
     /// BGAppRefresh body: replan, reconcile calendar, sync, purge > 30-day deletes, then reschedule.
     func runBackgroundRefresh() async {
+        guard !storageUnavailable else { return }
         scheduleAppRefresh()
         await reminders.replan(reason: .backgroundRefresh)
         await calendar.reconcileOwned()

@@ -76,6 +76,22 @@ final class OnboardingModel {
         }
     }
 
+    /// A property alone is sufficient for whole-home chores and projects. Layout setup can follow later.
+    func startWithRecords(_ env: AppEnvironment, onFinished: @escaping () -> Void) async {
+        guard !isSaving, restore == .ready, !env.storageUnavailable else { return }
+        isSaving = true
+        commitError = nil
+        defer { isSaving = false }
+        do {
+            if try await env.plan.currentProperty() == nil {
+                try await env.plan.saveProperty(Property())
+            }
+            onFinished()
+        } catch {
+            commitError = "Your home could not be saved. Try again."
+        }
+    }
+
     // MARK: Address
 
     func updateSuggestions(_ env: AppEnvironment) async {
@@ -153,7 +169,13 @@ final class OnboardingModel {
         defer { isSaving = false }
         do {
             let propertyId: UUID
-            if let existing = try await env.plan.currentProperty() {
+            if var existing = try await env.plan.currentProperty() {
+                if existing.address == nil, let resolved {
+                    existing.address = resolved.address
+                    existing.latitude = resolved.coordinate.latitude
+                    existing.longitude = resolved.coordinate.longitude
+                    try await env.plan.saveProperty(existing)
+                }
                 propertyId = existing.id
             } else {
                 let line = resolved?.address.line ?? ""

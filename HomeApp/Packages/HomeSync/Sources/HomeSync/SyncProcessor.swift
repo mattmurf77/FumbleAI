@@ -50,6 +50,7 @@ public actor SyncProcessor {
         guard let mapper = mappers[ref.type] else { return nil }
         let assetURL = ref.type == .attachment ? try await store.attachmentFileURL(id: ref.id) : nil
         let built = try await store.perform { st -> (SyncRecord, Int64?)? in
+            guard try !st.isDeviceOnly(ref) else { return nil }
             guard let row = try st.row(ref) else { return nil }
             let entry = try st.outboxEntry(ref)
             let system = try st.systemFields(ref)
@@ -113,14 +114,19 @@ public actor SyncProcessor {
         switch error {
         case .serverRecordChanged(let server):
             // Merge: server + local changed columns; apply locally; keep the outbox; send again on the server's tag.
+            guard server.ref == ref, server.zoneName == sent.zoneName else { return .failed("Conflicting record identity does not match") }
             let serverRow = mapper.row(from: server)
-            try await store.perform { st in
+            let rejection = try await store.perform { st -> String? in
+                if let reason = try Self.invalidZone(server, ref: ref, st: st) { return reason }
                 if let local = try st.row(ref), let e = try st.outboxEntry(ref) {
                     let merged = MergePolicy.merge(ref.type, server: serverRow, local: local, changed: e.changedFields, today: st.today)
-                    _ = try st.apply(ref, values: merged)
+                    let outcome = try st.apply(ref, values: merged)
+                    guard outcome == .applied else { return "Conflicting record could not be applied: \(outcome)" }
                 }
                 if let sf = server.systemFields { try st.setSystemFields(ref, zone: server.zoneName, data: sf) }
+                return nil
             }
+            if let rejection { return .failed(rejection) }
             return .resend(PendingChange(ref: ref, zoneName: sent.zoneName, op: .save))
         case .zoneNotFound:
             return .recreateZone(sent.zoneName)
@@ -207,12 +213,30 @@ public actor SyncProcessor {
 
     enum ApplyResult { case applied(merged: Bool, asset: URL?), parked, skipped }
 
+    /// The CloudKit zone is the household boundary, including partial records and conflict replies.
+    static func invalidZone(_ record: SyncRecord, ref: RecordRef, st: SyncTransaction) throws -> String? {
+        let home: UUID?
+        if ref.type == .property {
+            home = ref.id
+        } else if let raw = record.fields["propertyId"]?.stringValue {
+            home = UUID(uuidString: raw)
+        } else {
+            home = try st.row(ref)?["property_id"]?.stringValue.flatMap(UUID.init(uuidString:))
+        }
+        guard let home else { return "missing household identity" }
+        return record.zoneName == Property.zoneName(for: home) ? nil : "record belongs to another household zone"
+    }
+
     static func applyOne(_ rec: SyncRecord, st: SyncTransaction, mappers: RecordMapperRegistry, parking: URL) throws -> ApplyResult {
         guard let t = rec.type, let id = rec.id, let mapper = mappers[t] else {
             try park(rec, missing: "schema:recordType=\(rec.recordType)", st: st, parking: parking)
             return .parked
         }
         let ref = RecordRef(t, id)
+        if let reason = try invalidZone(rec, ref: ref, st: st) {
+            try park(rec, missing: "rejected:\(reason)", st: st, parking: parking)
+            return .parked
+        }
         var row = mapper.row(from: rec)
         var merged = false
         if let e = try st.outboxEntry(ref) {

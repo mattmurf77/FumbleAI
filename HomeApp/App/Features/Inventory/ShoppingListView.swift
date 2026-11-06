@@ -14,24 +14,41 @@ struct ShoppingListView: View {
     @State private var locations: [UUID: ItemLocation] = [:]
     @State private var filter: TIK.ShoppingFilter = .all
     @State private var buying: ShoppingLine?
+    @State private var editingStockCheck: ShoppingLine.StockReport?
     @State private var quantityText = ""
     @State private var errorText: String?
 
     private var today: LocalDate { env.clock.today }
     private var visible: [ShoppingLine] { lines.filter { filter.includes($0) } }
+    private var supplies: [ShoppingLine] { visible.filter { $0.reason == .toDoSupply } }
     private var due: [ShoppingLine] { visible.filter { $0.reason == .replacementDue } }
     private var low: [ShoppingLine] { visible.filter { $0.reason == .low } }
 
     var body: some View {
-        List {
-            Section {
-                Picker("Show", selection: $filter) {
-                    ForEach(TIK.ShoppingFilter.allCases) { f in
-                        Text("\(f.title) · \(lines.filter { f.includes($0) }.count)").tag(f)
-                    }
-                }
-                .pickerStyle(.segmented)
+        shoppingList
+            .sheet(item: $editingStockCheck) { report in ChoreForm(choreID: report.id) }
+            .feedbackPage("Shopping list")
+            .navigationTitle("Shopping list")
+            .toolbar { ToolbarItem(placement: .primaryAction) { shareButton } }
+            .overlay { emptyState }
+            .alert(buyTitle, isPresented: showsPurchase, presenting: buying) { line in
+                purchaseActions(line)
+            } message: { line in
+                Text(purchaseMessage(line))
             }
+            .alert("Something went wrong", isPresented: showsError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorText ?? "")
+            }
+            .task { property = try? await env.plan.currentProperty() }
+            .task(id: property?.id) { await observeList() }
+    }
+
+    private var shoppingList: some View {
+        List {
+            Section { filterPicker }
+            supplySection
             if !due.isEmpty {
                 Section("Filters & bulbs due") {
                     ForEach(due) { line in row(line, subtitle: "Replacement due · no spares left", symbol: "wrench.and.screwdriver") }
@@ -46,63 +63,97 @@ struct ShoppingListView: View {
                 Section {
                     EmptyView()
                 } footer: {
-                    Text("Low items come from the “running low” flag. Filters and bulbs come from appliances with a due to-do and no spares left.")
+                    Text("To-do supplies appear when you select missing items in a DIY plan. Low items come from the “running low” flag. Filters and bulbs come from appliances with a due to-do and no spares left.")
                 }
             }
         }
-        .feedbackPage("Shopping list")
-        .navigationTitle("Shopping list")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                ShareLink(item: TIK.shoppingText(visible)) { Image(systemName: "square.and.arrow.up") }
-                    .disabled(visible.isEmpty)
-                    .accessibilityLabel("Share list")
+    }
+
+    private var filterPicker: some View {
+        Picker("Show", selection: $filter) {
+            ForEach(TIK.ShoppingFilter.allCases) { option in
+                let count = lines.filter { option.includes($0) }.count
+                Text("\(option.title) · \(count)").tag(option)
             }
         }
-        .overlay {
-            if loaded && lines.isEmpty {
-                ContentUnavailableView("You’re stocked up.", systemImage: "cart",
-                                       description: Text("Mark pantry items as running low to add them here."))
+        .pickerStyle(.segmented)
+    }
+
+    @ViewBuilder private var supplySection: some View {
+        if !supplies.isEmpty {
+            Section("For your to-dos") {
+                ForEach(supplies) { line in
+                    if let checks = line.conflictingCounts {
+                        countReview(line, checks: checks)
+                    } else {
+                        row(line, subtitle: "Buy " + TIK.quantityLabel(line.quantity, unit: line.unit), symbol: "checklist")
+                    }
+                }
             }
         }
-        .alert(buyTitle, isPresented: Binding(get: { buying != nil }, set: { if !$0 { buying = nil } }), presenting: buying) { line in
+    }
+
+    private var shareButton: some View {
+        ShareLink(item: TIK.shoppingText(visible)) { Image(systemName: "square.and.arrow.up") }
+            .disabled(visible.isEmpty)
+            .accessibilityLabel("Share list")
+    }
+
+    @ViewBuilder private var emptyState: some View {
+        if loaded && lines.isEmpty {
+            ContentUnavailableView("You’re stocked up.", systemImage: "cart",
+                                   description: Text("Mark pantry items as running low to add them here."))
+        }
+    }
+
+    private var showsPurchase: Binding<Bool> {
+        Binding(get: { buying != nil }, set: { if !$0 { buying = nil } })
+    }
+
+    private var showsError: Binding<Bool> {
+        Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })
+    }
+
+    @ViewBuilder private func purchaseActions(_ line: ShoppingLine) -> some View {
+        if line.reason != .toDoSupply {
             TextField(line.reason == .low ? "New quantity" : "Spares", text: $quantityText)
                 .keyboardType(.decimalPad)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") { Task { await bought(line) } }
-        } message: { line in
-            Text(line.reason == .low ? "How many do you have now?" : "Add spares so the next replacement is covered.")
         }
-        .alert("Something went wrong", isPresented: Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorText ?? "")
+        Button("Cancel", role: .cancel) {}
+        Button(line.reason == .toDoSupply ? "Record purchase" : "Save") { Task { await bought(line) } }
+    }
+
+    private func purchaseMessage(_ line: ShoppingLine) -> String {
+        if line.reason == .toDoSupply {
+            let amount = TIK.quantityLabel(line.quantity, unit: line.unit)
+            return "Add \(amount) to your inventory and clear the matching to-do requests."
         }
-        .task { property = try? await env.plan.currentProperty() }
-        .task(id: property?.id) {
-            guard let pid = property?.id else { return }
-            for await update in env.inventory.observeShoppingList(property: pid, on: today) {
-                lines = update
-                loaded = true
-                let ids = update.compactMap { l -> UUID? in if case .inventory(let id) = l.ref { return id }; return nil }
-                let locs = (try? await env.inventory.locations(of: ids)) ?? []
-                locations = Dictionary(locs.map { ($0.itemId, $0) }, uniquingKeysWith: { a, _ in a })
+        return line.reason == .low ? "How many do you have now?" : "Add spares so the next replacement is covered."
+    }
+
+    private func observeList() async {
+        guard let pid = property?.id else { return }
+        for await update in env.inventory.observeShoppingList(property: pid, on: today) {
+            lines = update
+            loaded = true
+            let ids = update.compactMap { line -> UUID? in
+                if case .inventory(let id) = line.ref { return id }
+                return nil
             }
+            let locs = (try? await env.inventory.locations(of: ids)) ?? []
+            locations = Dictionary(locs.map { ($0.itemId, $0) }, uniquingKeysWith: { a, _ in a })
         }
     }
 
     private var buyTitle: String {
         guard let b = buying else { return "" }
+        if b.reason == .toDoSupply { return "Bought \(b.label)?" }
         return b.reason == .low ? "Bought \(b.label)" : "Add spares for \(b.label)"
     }
 
     private func row(_ line: ShoppingLine, subtitle: String, symbol: String?) -> some View {
         HStack(spacing: 12) {
-            Button { beginBuy(line) } label: {
-                Image(systemName: "circle").font(.title3).foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Bought \(line.label)")
+            buyButton(line)
             VStack(alignment: .leading, spacing: 2) {
                 Text(line.label)
                 if !subtitle.isEmpty {
@@ -114,6 +165,43 @@ struct ShoppingListView: View {
                 Text(owner).font(.caption).foregroundStyle(.secondary)
             }
             if let symbol { Image(systemName: symbol).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func buyButton(_ line: ShoppingLine) -> some View {
+        Button { beginBuy(line) } label: {
+            Image(systemName: "circle").font(.title3).foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Bought \(line.label)")
+        .accessibilityIdentifier((line.reason == .toDoSupply ? "shopping.todo." : "shopping.stock.") + line.label)
+    }
+
+    private func countReview(_ line: ShoppingLine, checks: [ShoppingLine.StockReport]) -> some View {
+        DisclosureGroup {
+            Text("Open a to-do to correct its checked count or switch back to the catalog count.")
+                .font(.footnote).foregroundStyle(.secondary)
+            ForEach(checks) { report in stockReportButton(report, unit: line.unit) }
+        } label: {
+            countReviewLabel(line, checks: checks)
+        }
+    }
+
+    private func stockReportButton(_ report: ShoppingLine.StockReport, unit: String?) -> some View {
+        let quantity = TIK.quantityLabel(Double(report.count), unit: unit)
+        let reviewLabel = "Review \(report.taskTitle), checked \(report.count) \(unit ?? "")"
+        return Button { editingStockCheck = report } label: {
+            LabeledContent(report.taskTitle, value: quantity).frame(minHeight: 44)
+        }
+        .accessibilityLabel(Text(reviewLabel))
+    }
+
+    private func countReviewLabel(_ line: ShoppingLine, checks: [ShoppingLine.StockReport]) -> some View {
+        let counts = Set(checks.map(\.count)).sorted().map(String.init).joined(separator: ", ")
+        let summary = "Review checked counts: \(counts) \(line.unit ?? "")"
+        return VStack(alignment: .leading, spacing: 3) {
+            Label(line.label, systemImage: "questionmark.circle")
+            Text(summary).font(.subheadline).foregroundStyle(.secondary)
         }
     }
 
@@ -143,6 +231,10 @@ struct ShoppingListView: View {
         let entered = Double(quantityText.replacingOccurrences(of: ",", with: "."))
         buying = nil
         do {
+            if line.reason == .toDoSupply, let property {
+                try await env.inventory.buySelectedSupply(line, propertyId: property.id)
+                return
+            }
             switch line.ref {
             case .inventory(let id):
                 guard var item = try await env.inventory.item(id) else { return }

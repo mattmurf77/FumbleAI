@@ -3,10 +3,12 @@ import Foundation
 /// Pure chore rules shared by HomeStore and the in-memory store (LLD §9.1–9.2, §5.4).
 public enum ChoreLogic {
     public static func make(from d: ChoreDraft, id: UUID = UUID(), now: Date, engine: RecurrenceEngine) -> Chore {
-        Chore(id: id, propertyId: d.propertyId, scope: d.scope, title: d.title, notes: d.notes, assigneeId: d.assigneeId,
+        var chore = Chore(id: id, propertyId: d.propertyId, scope: d.scope, title: d.title, notes: d.notes, assigneeId: d.assigneeId,
               repeatRule: d.repeatRule, startOn: d.startOn, nextDueOn: d.noDueDate && d.repeatRule == nil ? nil : engine.firstDue(rule: d.repeatRule, start: d.startOn),
               dueMinutes: d.dueMinutes, remindEnabled: d.remindEnabled, remindOffsetMin: d.remindOffsetMin,
               calendarEnabled: d.calendarEnabled, linkedThingId: d.linkedThingId, createdAt: now, updatedAt: now)
+        chore.guideID = d.guideID; chore.workMode = d.workMode; chore.supplyPlan = d.supplyPlan
+        return chore
     }
 
     /// Applies a done/skip action. Returns the updated chore and the new completion row.
@@ -30,6 +32,25 @@ public enum ChoreLogic {
             c.closedAt = date
         }
         return (c, completion)
+    }
+
+    public static func undo(_ action: ChoreCompletion, on chore: Chore, history: [ChoreCompletion],
+                            engine: RecurrenceEngine) throws -> Chore {
+        guard action.choreId == chore.id, action.deletedAt == nil, chore.deletedAt == nil,
+              !history.contains(where: { $0.id != action.id && $0.deletedAt == nil && $0.doneAt >= action.doneAt }) else {
+            throw RepositoryError.invalid("A newer action changed this task. Reopen it to see the latest history.")
+        }
+        // Avoid replacing a manual reschedule performed after marking this occurrence done.
+        let expected = chore.repeatRule.flatMap {
+            engine.nextDue(rule: $0, start: chore.startOn, currentDue: action.dueOn ?? action.doneOn, actedOn: action.doneOn)
+        }
+        guard chore.nextDueOn == expected, (chore.closedAt != nil) == (expected == nil) else {
+            throw RepositoryError.invalid("This task was rescheduled after that action.")
+        }
+        var restored = chore
+        restored.closedAt = nil
+        restored.nextDueOn = action.dueOn
+        return restored
     }
 
     /// Recomputes `nextDueOn` from the latest completion after a sync merge (§5.4 / §9.2).
@@ -61,14 +82,17 @@ public enum ChoreLogic {
 
 /// Pure project rules (LLD §8.1, §5.4 "Paired status/completed_on").
 public enum ProjectLogic {
-    public static func make(from d: ProjectDraft, id: UUID = UUID(), now: Date, today: LocalDate) -> Project {
-        var p = Project(id: id, propertyId: d.propertyId, scope: d.scope, title: d.title, notes: d.notes, status: d.status,
+    public static func make(from d: ProjectDraft, id: UUID = UUID(), now: Date, today: LocalDate, propertyCurrency: String = "USD") -> Project {
+        var p = Project(id: id, propertyId: d.propertyId, scope: d.scope, title: d.title, notes: d.notes, status: d.status, workAction: d.workAction,
                         priority: d.priority, estCost: d.estCost, actualCost: d.actualCost, estHours: d.estHours,
                         actualHours: d.actualHours, targetOn: d.targetOn, completedOn: d.completedOn, vendor: d.vendor,
-                        spawnedFromChoreId: d.spawnedFromChoreId, currencyCode: d.estCost?.currency ?? d.actualCost?.currency ?? "USD",
+                        spawnedFromChoreId: d.spawnedFromChoreId, currencyCode: d.estCost?.currency ?? d.actualCost?.currency ?? propertyCurrency,
                         createdAt: now, updatedAt: now)
         p = setStatus(p, d.status, today: today)
-        if d.status == .done, let c = d.completedOn { p.completedOn = c }
+        if d.status == .done {
+            p.completedOn = d.completedOn
+            p.completedYear = d.completedOn == nil ? d.completedYear : nil
+        }
         return p
     }
 
@@ -78,19 +102,22 @@ public enum ProjectLogic {
         var p = project
         p.status = status
         switch status {
-        case .inProgress: if p.startedOn == nil { p.startedOn = today }; p.completedOn = nil
-        case .done: if p.completedOn == nil { p.completedOn = today }
-        default: p.completedOn = nil
+        case .inProgress: if p.startedOn == nil { p.startedOn = today }; p.completedOn = nil; p.completedYear = nil
+        case .done: if p.completedOn == nil && p.completedYear == nil { p.completedOn = today }
+        default: p.completedOn = nil; p.completedYear = nil
         }
         return p
     }
 
-    public static func markDone(_ project: Project, actual: Money?, completedOn: LocalDate, hours: Double?) -> Project {
+    public static func markDone(_ project: Project, actual: Money?, completedOn: LocalDate, hours: Double?, workAction: Project.WorkActionEdit = .keep) -> Project {
         var p = project
         p.status = .done
+        if case .set(let action) = workAction { p.workAction = action }
         p.completedOn = completedOn
-        if let actual { p.actualCost = actual }
-        if let hours { p.actualHours = hours }
+        p.completedYear = nil
+        // The completion form is prefilled with existing actuals. Clearing an override restores line-item totals.
+        p.actualCost = actual
+        p.actualHours = hours
         if p.startedOn == nil { p.startedOn = completedOn }
         return p
     }

@@ -3,7 +3,7 @@ import HomeCore
 import HomeCoreTesting
 
 /// The Done sheet (FR-PRJ-12, HLD §4.8, AC-PRJ-3/6): final cost, completion date, hours and an optional scanned
-/// receipt. Prefilled with the line-item sum (else the estimate), today, and line-item hours (else the estimate).
+/// receipt. Recorded actuals and dated line items stay separate from estimates and receipt suggestions.
 /// Confirm calls `ProjectRepository.markDone`; the project then leaves Future Projects and shows in Past Work.
 struct DoneSheet: View {
     @Environment(AppEnvironment.self) private var env
@@ -15,11 +15,9 @@ struct DoneSheet: View {
 
     @State private var actualText = ""
     @State private var hoursText = ""
+    @State private var workAction: Project.WorkAction?
     @State private var completedOn = LocalDate(2026, 1, 1)
     @State private var receipt: ScannedReceipt?
-    @State private var costFromReceipt = false
-    @State private var receiptTotalText: String?
-    @State private var dateFromReceipt = false
     @State private var saving = false
     @State private var errorText: String?
     @State private var didLoad = false
@@ -46,8 +44,7 @@ struct DoneSheet: View {
                 }
 
                 Section("Final cost") {
-                    ProjectMoneyField(title: "Actual cost", text: $actualText, currency: currency, fromReceipt: costFromReceipt)
-                        .onChange(of: actualText) { _, new in if new != receiptTotalText { costFromReceipt = false } }
+                    ProjectMoneyField(title: "Actual cost", text: $actualText, currency: currency)
                     if !liveItems.isEmpty {
                         LabeledContent("Line items total", value: lineSum.formatted())
                             .font(.footnote).foregroundStyle(.secondary)
@@ -62,11 +59,14 @@ struct DoneSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         DatePicker("Completed", selection: $completedOn.scheduleDate(env.clock.calendar), in: ...Date(),
                                    displayedComponents: .date)
-                        if dateFromReceipt {
-                            Label("From receipt – check", systemImage: "doc.text.viewfinder").font(.footnote).foregroundStyle(.orange)
-                        }
                     }
                     ProjectHoursField(title: "Hours", text: $hoursText)
+                }
+
+                Section {
+                    DisclosureGroup("Work details") {
+                        ProjectWorkActionPicker(selection: $workAction)
+                    }
                 }
 
                 Section("Receipt") {
@@ -80,10 +80,16 @@ struct DoneSheet: View {
                                     .font(.footnote).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Button("Remove", role: .destructive) { clearReceipt() }.font(.footnote)
+                            Button("Remove", role: .destructive) { self.receipt = nil }.font(.footnote)
+                        }
+                        if let total = receipt.guess?.total, total.currency == currency {
+                            Button("Use receipt total as final cost") { actualText = ProjectInput.text(total) }
+                        }
+                        if let date = receipt.guess?.date, date <= env.clock.today {
+                            Button("Use receipt date as completion date") { completedOn = date }
                         }
                     } else {
-                        ReceiptScanButton { apply($0) }
+                        ReceiptScanButton { receipt = $0 }
                     }
                 }
             }
@@ -104,32 +110,14 @@ struct DoneSheet: View {
     private func prefill() {
         guard !didLoad else { return }
         didLoad = true
+        workAction = project.workAction
         completedOn = env.clock.today
         if let a = project.actualCost { actualText = ProjectInput.text(a) }
         else if !liveItems.isEmpty { actualText = ProjectInput.text(lineSum) }
-        else if let est = project.estCost { actualText = ProjectInput.text(est) }
+
         if let h = project.actualHours { hoursText = ProjectInput.text(h) }
         else if lineHours > 0 { hoursText = ProjectInput.text(lineHours) }
-        else { hoursText = ProjectInput.text(project.estHours) }
-    }
 
-    private func apply(_ r: ScannedReceipt) {
-        receipt = r
-        guard let g = r.guess else { return }
-        if let total = g.total {
-            let text = ProjectInput.text(total)
-            receiptTotalText = text
-            actualText = text
-            costFromReceipt = true
-        }
-        if let d = g.date, d <= env.clock.today { completedOn = d; dateFromReceipt = true }
-    }
-
-    private func clearReceipt() {
-        receipt = nil
-        receiptTotalText = nil
-        costFromReceipt = false
-        dateFromReceipt = false
     }
 
     @MainActor
@@ -142,7 +130,8 @@ struct DoneSheet: View {
         let entered: Money? = (money != nil && !liveItems.isEmpty && money == lineSum && project.actualCost == nil) ? nil : money
         do {
             try await env.projects.markDone(project.id, actual: entered, completedOn: completedOn,
-                                            hours: ProjectInput.hours(hoursText) ?? nil, receipt: receipt?.attachmentDraft)
+                                            hours: ProjectInput.hours(hoursText) ?? nil, receipt: receipt?.attachmentDraft,
+                                            workAction: .set(workAction))
             onDone?()
             dismiss()
         } catch {

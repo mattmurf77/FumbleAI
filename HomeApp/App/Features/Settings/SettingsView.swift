@@ -18,7 +18,7 @@ struct SettingsView: View {
     @State private var calendarStatus: PermissionStatus = .unknown
     @State private var calendars: [CalendarInfo] = []
     @State private var errorText: String?
-    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = true
+    @AppStorage(FeedbackSettings.showButtonKey) private var showFeedbackButton = false
 
     private static let offsets: [(Int, String)] = [
         (0, "At time"), (15, "15 minutes before"), (30, "30 minutes before"), (60, "1 hour before"),
@@ -54,6 +54,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("Report a bug, suggest polish or share an idea from any screen. Shake your iPhone to send feedback even when the button is hidden.")
                 }
+                HomeBriefPurchaseView()
                 aboutSection
             }
             .navigationTitle("Settings")
@@ -320,6 +321,8 @@ struct SettingsView: View {
         Section("About") {
             LabeledContent("Version", value: Self.versionText)
             NavigationLink("Diagnostics") { DiagnosticsView() }
+            NavigationLink("Privacy policy") { ProductInfoView(page: .privacy) }
+            NavigationLink("Support") { ProductInfoView(page: .support) }
             NavigationLink("Acknowledgments") { AcknowledgmentsView() }
         }
     }
@@ -365,5 +368,5 @@ private struct AcknowledgmentsView: View {
 }
 
 #Preview {
-    SettingsView().environment(AppEnvironment.preview())
+    SettingsView().environment(AppEnvironment.preview()).environmentObject(BlueprintBilling(isDemo: true))
 }

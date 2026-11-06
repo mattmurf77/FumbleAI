@@ -82,6 +82,9 @@ actor FeedbackClient: FeedbackSubmitting {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         for (name, value) in config.serverHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        // The persisted submission keeps this UUID when a timeout queues a retry. Older
+        // helper versions ignore the header; newer ones return the original receipt once.
+        request.setValue(submission.id.uuidString.lowercased(), forHTTPHeaderField: "X-Home-Request-ID")
         do {
             request.httpBody = try submission.requestBody()
         } catch {
@@ -99,7 +102,7 @@ actor FeedbackClient: FeedbackSubmitting {
         switch http.statusCode {
         case 200..<300:
             return .sent(json?["id"] as? String)
-        case 400, 413:
+        case 400, 409, 413:
             return .rejected((json?["message"] as? String) ?? "HTTP \(http.statusCode)")
         default:
             // 401 (key mismatch), 404 (older server), 429, 5xx, 503 (no database yet): try again later.

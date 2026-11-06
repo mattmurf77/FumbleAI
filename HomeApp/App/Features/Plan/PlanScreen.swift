@@ -26,6 +26,7 @@ struct PlanScreen: View {
     @State private var renameText = ""
     @State private var showSearch = false
     @State private var showSettings = false
+    @State private var showFirstPlan = false
     @State private var showAddFloor = false
     @State private var footerLink: FooterLinkTarget?
     @State private var listToggle = false
@@ -100,6 +101,9 @@ struct PlanScreen: View {
             })
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showFirstPlan) {
+            OnboardingFlow(addingPlan: true) { showFirstPlan = false }
+        }
         .sheet(isPresented: $showAddFloor) {
             if let p = model.property {
                 AddFloorSheet(property: p) { id in model.select(level: id, env: env) }
@@ -298,7 +302,16 @@ struct PlanScreen: View {
     private var canvasArea: some View {
         GeometryReader { g in
             ZStack(alignment: .topLeading) {
-                if showList {
+                if model.loaded && model.property != nil && model.levels.isEmpty {
+                    ContentUnavailableView {
+                        Label("Add your floor plan", systemImage: "square.3.layers.3d")
+                    } description: {
+                        Text("Create a layout to organize work by room. Your existing records stay with your home.")
+                    } actions: {
+                        Button("Set up floor plan") { showFirstPlan = true }.buttonStyle(.borderedProminent)
+                            .accessibilityIdentifier("plan.firstSetup")
+                    }
+                } else if showList {
                     PlanListView(models: [model.model], onSelect: { openRoom($0) }, onAdd: { add(in: $0) })
                 } else if model.geometry == nil {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)

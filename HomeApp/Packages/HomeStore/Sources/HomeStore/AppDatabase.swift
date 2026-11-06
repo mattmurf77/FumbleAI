@@ -28,6 +28,8 @@ public final class AppDatabase: @unchecked Sendable {
     static func configuration() -> Configuration {
         var config = Configuration()
         config.foreignKeysEnabled = true
+        // On reopen, the preceding WAL reader can still be closing after an observation ends.
+        config.busyMode = .timeout(3)
         config.prepareDatabase { db in
             if !db.configuration.readonly {
                 try db.execute(sql: "PRAGMA synchronous = NORMAL")

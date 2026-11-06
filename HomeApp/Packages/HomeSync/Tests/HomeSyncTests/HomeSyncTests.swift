@@ -50,6 +50,23 @@ func seedSample(_ d: Device) async throws {
 }
 
 final class MapperAndMergeTests: XCTestCase {
+    func testOptionalProjectWorkActionRemainsCompatibleWithOlderRecords() async throws {
+        let device = try Device.make(FakeCloud())
+        let mapper = try XCTUnwrap(device.sync.processor.mappers[.project])
+        let id = UUID()
+        let zone = Property.zoneName(for: UUID())
+        let old = mapper.record(id: id, row: ["title": .string("Roof")], zoneName: zone, systemFields: nil, assetURL: nil)
+        XCTAssertNil(mapper.row(from: old)["work_action"], "An older record omits the column")
+        let named = mapper.record(id: id, row: ["work_action": .string("repaired")], zoneName: zone, systemFields: nil, assetURL: nil)
+        XCTAssertEqual(named.fields["workAction"], .string("repaired"))
+        XCTAssertEqual(mapper.row(from: named)["work_action"], .string("repaired"))
+        XCTAssertFalse(RecordMapper.plainKeys.contains("workAction"))
+        let cleared = mapper.record(id: id, row: ["work_action": .null], zoneName: zone, systemFields: nil, assetURL: nil)
+        XCTAssertEqual(mapper.row(from: cleared)["work_action"], .null)
+        let future = mapper.record(id: id, row: ["work_action": .string("future-action")], zoneName: zone, systemFields: nil, assetURL: nil)
+        XCTAssertNil(future.fields["workAction"], "A client must not rewrite an unknown enum value")
+    }
+
     func testMapperRoundTripsEveryTableAndUsesCamelCase() async throws {
         let d = try Device.make(FakeCloud())
         try await seedSample(d)
@@ -86,7 +103,7 @@ final class MapperAndMergeTests: XCTestCase {
         XCTAssertEqual(m["deleted_at"], .date(t1))
         m = MergePolicy.merge(.space, server: server, local: local, changed: ["deleted_at"], today: today)
         XCTAssertEqual(m["deleted_at"], .null)
-        // Project status + completed_on paired; done without date gets one.
+        // Project status + completed_on paired; historical work can have an unknown date.
         server = ["status": .string("done"), "completed_on": .string("2026-09-01")]
         local = ["status": .string("in_progress"), "completed_on": .null]
         m = MergePolicy.merge(.project, server: server, local: local, changed: ["status"], today: today)
@@ -94,7 +111,12 @@ final class MapperAndMergeTests: XCTestCase {
         local = ["status": .string("done"), "completed_on": .null]
         server = ["status": .string("planned"), "completed_on": .null]
         m = MergePolicy.merge(.project, server: server, local: local, changed: ["status"], today: today)
-        XCTAssertEqual(m["completed_on"], .string("2026-09-29"))
+        XCTAssertEqual(m["completed_on"], .null)
+        // A locally entered year replaces an older exact date as a single completion group.
+        local = ["status": .string("done"), "completed_on": .null, "completed_year": .int(2021)]
+        server = ["status": .string("done"), "completed_on": .string("2020-08-15"), "completed_year": .null]
+        m = MergePolicy.merge(.project, server: server, local: local, changed: ["completed_year"], today: today)
+        XCTAssertEqual(m["completed_year"], .int(2021)); XCTAssertEqual(m["completed_on"], .null)
         // Thing attributes: key-level overlay.
         server = ["attributes_json": .string(#"{"filterSize":"16x25x1","merv":8}"#)]
         local = ["attributes_json": .string(#"{"filterSize":"20x25x1","merv":11}"#)]

@@ -58,6 +58,10 @@ struct SharedInboxSheet: View {
     let item: SharedInboxItem
 
     @State private var kind: SharedInbox.Kind
+    @State private var librarySource: DocumentSource?
+    @State private var libraryFileID: UUID?
+    @State private var filedIDs = Set<UUID>()
+    @State private var openingDocument = false
     @State private var thumbnails: [UUID: UIImage] = [:]
     @State private var propertyId: UUID?
     @State private var currency = "USD"
@@ -111,6 +115,18 @@ struct SharedInboxSheet: View {
         NavigationStack {
             Form {
                 receivedSection
+                if !item.files.isEmpty, propertyId != nil {
+                    Section("Documents") {
+                        ForEach(item.files) { incoming in
+                            if filedIDs.contains(incoming.id) { Label(incoming.file.name + " · Filed", systemImage: "checkmark.circle") }
+                            else {
+                                Button { Task { await openDocument(incoming) } } label: {
+                                    Label(item.files.count == 1 ? "File in Documents" : "File \(incoming.file.name) in Documents", systemImage: "folder")
+                                }.disabled(openingDocument).accessibilityIdentifier("share.fileDocument")
+                            }
+                        }
+                    }
+                }
                 Section {
                     Picker("This is", selection: $kind) {
                         Text("Receipt").tag(SharedInbox.Kind.receipt)
@@ -125,7 +141,7 @@ struct SharedInboxSheet: View {
             .navigationTitle("File it")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Discard") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(filedIDs.isEmpty ? "Discard" : "Done") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(saving ? "Saving…" : "Save") { Task { await save() } }
                         .bold()
@@ -140,7 +156,21 @@ struct SharedInboxSheet: View {
         .interactiveDismissDisabled(saving)
         .task { await load() }
         .onChange(of: kind) { _, k in if k == .receipt { Task { await readReceipt() } } }
-        .onDisappear { item.cleanUp() }
+        .sheet(item: $librarySource) { file in
+            if let pid = propertyId { NavigationStack { DocumentEditor(propertyId: pid, source: file, defaultCategory: item.kind == .receipt ? .receipt : .other, currency: currency) {
+                if let id = libraryFileID { filedIDs.insert(id) }
+            } } }
+        }
+        .onDisappear { if librarySource == nil { item.cleanUp() } }
+    }
+
+    @MainActor private func openDocument(_ incoming: SharedInboxItem.LocalFile) async {
+        guard !openingDocument else { return }; openingDocument = true; defer { openingDocument = false }
+        do {
+            let url = incoming.url, name = incoming.file.name
+            let file = try await Task.detached { try DocumentSource.receive(url, filename: name) }.value
+            libraryFileID = incoming.id; librarySource = file
+        } catch { errorText = error.localizedDescription }
     }
 
     // MARK: Sections

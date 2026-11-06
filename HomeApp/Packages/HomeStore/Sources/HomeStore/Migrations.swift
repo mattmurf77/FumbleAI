@@ -19,8 +19,118 @@ enum Migrations {
         m.registerMigration(v1Search) { db in try db.execute(sql: searchSQL) }
         // Rebuilds `thing` (chore / inventory_item reference it); GRDB defers FK checks to the end of the migration.
         m.registerMigration(v2OutdoorThings) { db in try db.execute(sql: outdoorThingsSQL) }
+        m.registerMigration("v4_undated_past_work") { db in try db.execute(sql: undatedPastWorkSQL) }
+        m.registerMigration("v5_project_work_action") { db in
+            try db.execute(sql: """
+                ALTER TABLE project ADD COLUMN work_action TEXT
+                CHECK (work_action IN ('serviced','repaired','replaced','installed','remodeled'))
+                """)
+        }
+        m.registerMigration("v6_project_csv_history") { db in
+            try db.execute(sql: """
+                ALTER TABLE project ADD COLUMN completed_year INTEGER CHECK (completed_year BETWEEN 1 AND 9999);
+                CREATE TABLE project_csv_import (
+                    property_id TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+                    fingerprint TEXT NOT NULL,
+                    project_id TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+                    PRIMARY KEY (property_id, fingerprint)
+                );
+                """)
+        }
+        m.registerMigration("v7_device_document_library") { db in try db.execute(sql: documentLibrarySQL) }
+        m.registerMigration("v8_local_chore_preparation") { db in
+            try db.execute(sql: """
+                CREATE TABLE chore_preparation (
+                    chore_id TEXT PRIMARY KEY NOT NULL REFERENCES chore(id) ON DELETE CASCADE,
+                    work_mode TEXT CHECK(work_mode IN ('diy','hirePro')),
+                    guide_id TEXT,
+                    supplies_json TEXT
+                );
+                """)
+        }
+        m.registerMigration("v9_local_work_estimates") { db in
+            try db.execute(sql: """
+                CREATE TABLE work_estimate (
+                    property_id TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+                    chore_id TEXT REFERENCES chore(id) ON DELETE CASCADE,
+                    project_id TEXT REFERENCES project(id) ON DELETE CASCADE,
+                    mode TEXT NOT NULL CHECK(mode IN ('diy', 'hirePro')),
+                    details_json TEXT NOT NULL,
+                    CHECK((chore_id IS NULL) != (project_id IS NULL)),
+                    UNIQUE(chore_id, mode),
+                    UNIQUE(project_id, mode)
+                );
+                """)
+        }
         return m
     }
+
+    // Rebuild the original attachment table to add whole-property ownership while preserving all existing attachment IDs.
+    static let documentLibrarySQL = #"""
+CREATE TABLE attachment_v7 (
+  id            TEXT PRIMARY KEY NOT NULL,
+  property_id   TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+  owner_type    TEXT NOT NULL CHECK (owner_type IN ('property','chore','chore_completion','project','cost_line_item',
+                   'thing','inventory_item','measurement','space','level','storage_spot')),
+  owner_id      TEXT NOT NULL,                         -- polymorphic: no FK; app-level cascade on purge
+  kind          TEXT NOT NULL CHECK (kind IN ('photo','receipt','manual','document','underlay')),
+  file_ext      TEXT NOT NULL,                         -- 'heic','jpg','pdf','png'
+  uti           TEXT NOT NULL,
+  byte_size     INTEGER NOT NULL,
+  width_px      INTEGER, height_px INTEGER,
+  sha256        TEXT NOT NULL,                         -- dedupe + integrity
+  caption       TEXT,
+  ocr_text      TEXT,                                  -- Vision output (receipts, manuals)
+  captured_at   DATETIME,
+  created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, deleted_at DATETIME
+);
+INSERT INTO attachment_v7 SELECT * FROM attachment;
+DROP TABLE attachment;
+ALTER TABLE attachment_v7 RENAME TO attachment;
+CREATE INDEX attachment_owner ON attachment(owner_type, owner_id) WHERE deleted_at IS NULL;
+CREATE TABLE home_document_local (
+  attachment_id TEXT PRIMARY KEY NOT NULL REFERENCES attachment(id) ON DELETE CASCADE,
+  project_id TEXT REFERENCES project(id) ON DELETE SET NULL,
+  details_json TEXT NOT NULL
+);
+CREATE INDEX home_document_project ON home_document_local(project_id);
+"""#
+
+    // Historical improvements can have an unknown completion date. Existing IDs, receipts, foreign keys,
+    // indexes, outbox entries and recorded dates are preserved by GRDB's deferred FK-checked transaction.
+    static let undatedPastWorkSQL = #"""
+CREATE TABLE project_v4 (
+  id                    TEXT PRIMARY KEY NOT NULL,
+  property_id           TEXT NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+  scope                 TEXT NOT NULL CHECK (scope IN ('space','level','property')),
+  space_id              TEXT REFERENCES space(id) ON DELETE SET NULL,
+  level_id              TEXT REFERENCES level(id) ON DELETE SET NULL,
+  title                 TEXT NOT NULL,
+  notes                 TEXT,
+  status                TEXT NOT NULL DEFAULT 'idea' CHECK (status IN ('idea','planned','in_progress','done')),
+  priority              INTEGER CHECK (priority IS NULL OR priority BETWEEN 1 AND 3),
+  est_cost_cents        INTEGER CHECK (est_cost_cents IS NULL OR est_cost_cents >= 0),
+  actual_cost_cents     INTEGER CHECK (actual_cost_cents IS NULL OR actual_cost_cents >= 0),
+  currency_code         TEXT NOT NULL DEFAULT 'USD',
+  est_hours             REAL,
+  actual_hours          REAL,
+  target_on             TEXT,                          -- 'YYYY-MM-DD'
+  started_on            TEXT,
+  completed_on          TEXT,                          -- optional for historical work
+  vendor                TEXT,
+  spawned_from_chore_id TEXT REFERENCES chore(id) ON DELETE SET NULL,
+  created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, deleted_at DATETIME,
+  CHECK ((scope='space' AND space_id IS NOT NULL AND level_id IS NOT NULL) OR
+         (scope='level' AND space_id IS NULL AND level_id IS NOT NULL) OR
+         (scope='property' AND space_id IS NULL AND level_id IS NULL))
+);
+INSERT INTO project_v4 SELECT * FROM project;
+DROP TABLE project;
+ALTER TABLE project_v4 RENAME TO project;
+CREATE INDEX project_space_status ON project(space_id, status)    WHERE deleted_at IS NULL;
+CREATE INDEX project_level_status ON project(level_id, status)    WHERE deleted_at IS NULL;
+CREATE INDEX project_prop_status  ON project(property_id, status) WHERE deleted_at IS NULL;
+"""#
 
     // MARK: v1_core — synced domain tables (LLD §3.2)
     static let coreSQL = #"""

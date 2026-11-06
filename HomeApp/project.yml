@@ -31,13 +31,15 @@ settings:
     HOME_APS_ENVIRONMENT: development
     # Signing overrides used by the TestFlight lane (manual App Store signing). Defaults keep Xcode's automatic signing.
     HOME_CLOUD_SYNC: "YES"
+    # Unsigned simulators and the TestFlight lane both use local storage without CloudKit entitlements.
+    "HOME_CLOUD_SYNC[sdk=iphonesimulator*]": "NO"
     HOME_SIGN_STYLE: Automatic
     HOME_SIGN_IDENTITY: Apple Development
     HOME_PROFILE_NAME: ""
     # Provisioning profile for the share extension (TestFlight lane; empty = automatic signing).
     HOME_SHARE_PROFILE_NAME: ""
     HOME_ENTITLEMENTS: App/Home.entitlements
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
     CODE_SIGN_STYLE: Automatic
@@ -81,6 +83,10 @@ targets:
           - "PrivacyInfo.xcprivacy"
       - path: App/PrivacyInfo.xcprivacy
         buildPhase: resources
+      - path: ../server/data/product-pages.json
+        buildPhase: resources
+      - path: ../server/data/home-catalog.json
+        buildPhase: resources
       - path: Shared
     dependencies:
       - target: HomeShare
@@ -119,6 +125,12 @@ targets:
         BGTaskSchedulerPermittedIdentifiers:
           - app.fumble.home.refresh
           - app.fumble.home.maintenance
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Project history spreadsheet
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.comma-separated-values-text, public.tab-separated-values-text]
+        LSSupportsOpeningDocumentsInPlace: YES
         CFBundleURLTypes:
           - CFBundleURLName: $(PRODUCT_BUNDLE_IDENTIFIER)
             CFBundleURLSchemes: [home]
@@ -128,6 +140,12 @@ targets:
         NSCalendarsFullAccessUsageDescription: "Home adds your chores to the calendar you choose, including Google calendars added to this iPhone, and updates or removes those events when you edit or delete a chore."
         NSCalendarsUsageDescription: "Home adds your chores to the calendar you choose, including Google calendars added to this iPhone, and updates or removes those events when you edit or delete a chore."
         ITSAppUsesNonExemptEncryption: false
+        HomeContractorPartnerName: $(HOME_CONTRACTOR_PARTNER_NAME)
+        HomeContractorPartnerURL: $(HOME_CONTRACTOR_PARTNER_URL)
+        HomeContractorPartnerDisclosure: $(HOME_CONTRACTOR_PARTNER_DISCLOSURE)
+        HomeFinancingPartnerName: $(HOME_FINANCING_PARTNER_NAME)
+        HomeFinancingPartnerURL: $(HOME_FINANCING_PARTNER_URL)
+        HomeFinancingPartnerDisclosure: $(HOME_FINANCING_PARTNER_DISCLOSURE)
         HomeServerURL: $(HOME_SERVER_URL)
         HomeAPIKey: $(HOME_API_KEY)
         HomeCloudSync: $(HOME_CLOUD_SYNC)
@@ -231,6 +249,8 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Tests/HomeTests
+      - path: Tests/StoreKit/HomeBrief.storekit
+        buildPhase: resources
     dependencies:
       - target: Home
       - package: HomeCore
@@ -244,19 +264,38 @@ targets:
         DEVELOPMENT_TEAM: $(HOME_TEAM_ID)
         CODE_SIGN_STYLE: Automatic
 
+  HomeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/HomeUITests
+      - path: Tests/StoreKit/HomeBrief.storekit
+        buildPhase: resources
+    dependencies:
+      - target: Home
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HOME_BUNDLE_ID).uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        TEST_TARGET_NAME: Home
+
 schemes:
   Home:
     build:
       targets:
         Home: all
         HomeTests: [test]
+        HomeUITests: [test]
     run:
       config: Debug
+      storeKitConfiguration: Tests/StoreKit/HomeBrief.storekit
     test:
       config: Debug
       gatherCoverageData: true
       targets:
         - HomeTests
+        - HomeUITests
     profile:
       config: Release
     analyze:

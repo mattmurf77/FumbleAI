@@ -13,6 +13,12 @@ struct ToDosListView: View {
     /// Everything on a level (rooms + floor-wide).
     var levelID: UUID?
     var title = "To-Dos"
+    @State private var selectedPeriod: HomeTaskPeriod?
+
+    init(scope: Scope? = nil, levelID: UUID? = nil, title: String = "To-Dos", initialPeriod: HomeTaskPeriod? = nil) {
+        self.scope = scope; self.levelID = levelID; self.title = title
+        _selectedPeriod = State(initialValue: initialPeriod)
+    }
 
     @State private var chores: [Chore] = []
     @State private var loaded = false
@@ -22,16 +28,26 @@ struct ToDosListView: View {
     @State private var adding = false
     @State private var capture: CaptureRequest?
     @State private var addedCount: Int?
+    @State private var actingIDs: Set<UUID> = []
     @State private var doneFeedback = 0
     @State private var errorText: String?
 
-    private var today: LocalDate { env.clock.today }
+    @State private var observedDay: LocalDate?
+    @Environment(\.scenePhase) private var scenePhase
+    private var today: LocalDate { observedDay ?? env.clock.today }
 
     private struct Bucket: Identifiable { let id: String; let title: String; let chores: [Chore] }
     private struct CaptureRequest: Identifiable { let id = UUID(); let listen: Bool }
 
     private var buckets: [Bucket] {
         let visible = chores.filter { c in personFilter.map { c.assigneeId == $0 } ?? true }
+        if let selectedPeriod {
+            let result = selectedPeriod.tasks(visible, today: today, calendar: env.clock.calendar)
+            return [
+                Bucket(id: "overdue", title: "Overdue", chores: result.overdue),
+                Bucket(id: "period", title: selectedPeriod.dueLabel, chores: result.due)
+            ].filter { !$0.chores.isEmpty }
+        }
         let open = visible.filter { $0.closedAt == nil && $0.deletedAt == nil }
         let active = open.filter { !$0.isPaused }
         func sorted(_ a: [Chore]) -> [Chore] {
@@ -41,7 +57,7 @@ struct ToDosListView: View {
         let raw: [Bucket] = [
             Bucket(id: "overdue", title: "Overdue", chores: sorted(active.filter { $0.isOverdue(today: today) })),
             Bucket(id: "today", title: "Today", chores: sorted(active.filter { $0.nextDueOn == today })),
-            Bucket(id: "week", title: "This week", chores: sorted(active.filter { ($0.nextDueOn.map { $0 > today && $0 <= week }) ?? false })),
+            Bucket(id: "week", title: "Next 7 days", chores: sorted(active.filter { ($0.nextDueOn.map { $0 > today && $0 <= week }) ?? false })),
             Bucket(id: "later", title: "Later", chores: sorted(active.filter { ($0.nextDueOn.map { $0 > week }) ?? false })),
             Bucket(id: "nodate", title: "No date", chores: sorted(active.filter { $0.nextDueOn == nil })),
             Bucket(id: "paused", title: "Paused", chores: sorted(open.filter(\.isPaused))),
@@ -51,16 +67,28 @@ struct ToDosListView: View {
 
     private var summary: String {
         let active = chores.filter { chore in chore.isOpen && (personFilter.map { p in chore.assigneeId == p } ?? true) }
+        if let selectedPeriod {
+            let result = selectedPeriod.tasks(active, today: today, calendar: env.clock.calendar)
+            let label = selectedPeriod == .day ? "today" : "this " + selectedPeriod.rawValue
+            return "\(result.due.count) due \(label) · \(result.overdue.count) overdue"
+        }
         let dueWeek = active.filter { $0.isDueThisWeek(today: today) }.count
         let overdue = active.filter { $0.isOverdue(today: today) }.count
-        if dueWeek == 0 && overdue == 0 { return "Nothing due this week" }
-        return "\(dueWeek) due this week · \(overdue) overdue"
+        if dueWeek == 0 && overdue == 0 { return "Nothing due in the next 7 days" }
+        return "\(dueWeek) due in the next 7 days · \(overdue) overdue"
     }
 
     var body: some View {
         List {
             if loaded && !chores.isEmpty {
-                Section { Text(summary).font(.subheadline).foregroundStyle(.secondary) }
+                Section {
+                    Picker("Time period", selection: $selectedPeriod) {
+                        Text("All").tag(HomeTaskPeriod?.none)
+                        ForEach(HomeTaskPeriod.allCases) { period in Text(period.label).tag(Optional(period)) }
+                    }
+                    .accessibilityIdentifier("todos.period.picker")
+                    Text(summary).font(.subheadline).foregroundStyle(.secondary)
+                }
             }
             ForEach(buckets) { bucket in
                 Section {
@@ -72,6 +100,7 @@ struct ToDosListView: View {
                                      assignee: c.assigneeId.flatMap { id in people.first { $0.id == id }?.name },
                                      onComplete: completeAction(c))
                         }
+                        .accessibilityIdentifier("todo.open." + c.id.uuidString)
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
                             if c.isOpen {
                                 Button { Task { await complete(c) } } label: { Label("Done", systemImage: "checkmark") }
@@ -87,7 +116,7 @@ struct ToDosListView: View {
                     }
                 } header: {
                     HStack {
-                        Text(bucket.title)
+                        Text(bucket.title).accessibilityIdentifier("todos.bucket." + bucket.id)
                         Spacer()
                         Text("\(bucket.chores.count)")
                     }
@@ -95,6 +124,8 @@ struct ToDosListView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in observedDay = env.clock.today }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { observedDay = env.clock.today } }
         .feedbackPage(title)
         .overlay {
             if !loaded {
@@ -202,6 +233,8 @@ struct ToDosListView: View {
 
     @MainActor
     private func complete(_ c: Chore) async {
+        guard actingIDs.insert(c.id).inserted else { return }
+        defer { actingIDs.remove(c.id) }
         do {
             _ = try await env.chores.complete(c.id, by: c.assigneeId, at: env.clock.now)
             doneFeedback += 1
@@ -210,6 +243,8 @@ struct ToDosListView: View {
 
     @MainActor
     private func skip(_ c: Chore) async {
+        guard actingIDs.insert(c.id).inserted else { return }
+        defer { actingIDs.remove(c.id) }
         do { try await env.chores.skip(c.id, at: env.clock.now) } catch { errorText = error.localizedDescription }
     }
 }

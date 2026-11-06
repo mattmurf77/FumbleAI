@@ -66,7 +66,8 @@ final class StoreTx {
             changed = Set(keys)
         }
         changed.subtract(M.derivedColumns)
-        if origin == .local {
+        // A property-owned original lives only in this device's document library.
+        if origin == .local, (m as? Attachment)?.ownerType != .property {
             try Outbox.upsert(db, type: M.recordType, id: m.id, zone: m.zoneName, op: .save, changedFields: changed, now: now)
             outboxTouched.insert(m.ref)
         }
@@ -84,9 +85,10 @@ final class StoreTx {
 
     /// Hard delete of one row (purge). Enqueues a CloudKit delete for local purges.
     func hardDelete(_ ref: RecordRef, zone: String) throws {
+        let deviceOnly = try AttachmentStore.isDeviceDocument(ref, in: db)
         try db.execute(sql: "DELETE FROM \(ref.type.tableName) WHERE id = ?", arguments: [ref.id.db])
         try db.execute(sql: "DELETE FROM sync_record_meta WHERE record_type = ? AND record_name = ?", arguments: [ref.type.rawValue, ref.id.db])
-        if origin == .local {
+        if origin == .local && !deviceOnly {
             try Outbox.upsert(db, type: ref.type, id: ref.id, zone: zone, op: .delete, changedFields: [], now: now)
             outboxTouched.insert(ref)
         }

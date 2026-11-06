@@ -38,7 +38,11 @@ struct InventoryForm: View {
     @State private var confirmDelete = false
     @State private var errorText: String?
 
-    init(spaceID: UUID?, onSaved: ((InventoryItem) -> Void)? = nil) { mode = .create(spaceID); self.onSaved = onSaved }
+    init(spaceID: UUID?, initialKind: InventoryItem.Kind = .pantry, onSaved: ((InventoryItem) -> Void)? = nil) {
+        mode = .create(spaceID); self.onSaved = onSaved
+        var initial = TIK.InventoryFormState(); initial.kind = initialKind
+        _state = State(initialValue: initial)
+    }
     init(spotID: UUID, onSaved: ((InventoryItem) -> Void)? = nil) { mode = .inSpot(spotID); self.onSaved = onSaved }
     init(spareFor thing: Thing, onSaved: ((InventoryItem) -> Void)? = nil) { mode = .spare(thing); self.onSaved = onSaved }
     init(itemID: UUID, onSaved: ((InventoryItem) -> Void)? = nil) { mode = .edit(itemID); self.onSaved = onSaved }
@@ -54,7 +58,7 @@ struct InventoryForm: View {
                         ForEach(InventoryItem.Kind.knownCases, id: \.self) { Text(TIK.kindTitle($0)).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    TextField("Name", text: $state.name)
+                    TextField("Name", text: $state.name).accessibilityIdentifier("inventory.name")
                     categoryRow
                 }
                 Section("Owner") {
@@ -167,6 +171,7 @@ struct InventoryForm: View {
                     Text("Quantity")
                     Spacer()
                     TextField("1", value: $state.quantity, format: .number)
+                        .accessibilityIdentifier("inventory.quantity")
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 80)

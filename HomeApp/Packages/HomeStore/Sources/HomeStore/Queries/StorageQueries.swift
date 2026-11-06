@@ -113,7 +113,10 @@ enum StorageQueries {
             guard let id = r.uuidOpt("ref_id") else { return nil }
             return ShoppingLine(reason: .replacementDue, ref: .thing(id), label: r["label"] ?? "")
         }
-        return low + due
+        let chores = try ChoreStore.query(db, .init(propertyId: property))
+        let inventory = try InventoryItem.fetchAll(db, where: "property_id = ?", [property.db])
+        let things = try Thing.fetchAll(db, where: "property_id = ?", [property.db])
+        return ChoreShopping.merged(existing: low + due, supplies: ChoreShopping.lines(property: property, chores: chores, inventory: inventory, things: things))
     }
 
     /// Spot tree of one room (`InventoryLogic.tree`), with direct and subtree item counts.
