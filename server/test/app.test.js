@@ -150,6 +150,34 @@ test('no key required when HOME_API_KEY is unset', async () => {
   assert.equal((await get('/v1/templates')).status, 200);
 });
 
+test('public planning catalog preserves authorization, cache semantics and source scope', async () => {
+  const { base, get, upstreamCalls } = await start({ env: { HOME_API_KEY: 'catalog-key' } });
+  assert.equal((await get('/v1/catalog')).status, 401);
+  const headers = { 'X-Home-Key': 'catalog-key' };
+  const response = await get('/v1/catalog', headers);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'private, max-age=3600');
+  assert.equal(response.headers.get('vary'), 'X-Home-Key');
+  const body = await response.json();
+  assert.equal(body.recommendations.length, 6);
+  assert.deepEqual(body.referralPartners, []);
+  const filter = body.costGuides.find((g) => g.id === 'filter-professional');
+  assert.equal(filter.unit, 'hour');
+  assert.equal(filter.basis, 'labor');
+  assert.ok(filter.sources[0].reviewedOn);
+  const etag = response.headers.get('etag');
+  const cached = await get('/v1/catalog', { ...headers, 'If-None-Match': etag });
+  assert.equal(cached.status, 304);
+  assert.equal(await cached.text(), '');
+  assert.equal((await get('/v1/catalog', { 'If-None-Match': etag })).status, 401);
+  const head = await fetch(base + '/v1/catalog', { method: 'HEAD', headers });
+  assert.equal(head.status, 200);
+  assert.equal(head.headers.get('etag'), etag);
+  assert.equal(await head.text(), '');
+  assert.equal((await fetch(base + '/v1/catalog', { method: 'POST', headers })).status, 405);
+  assert.equal(upstreamCalls.length, 0);
+});
+
 test('unknown routes 404 and non-GET 405', async () => {
   const { base, get } = await start();
   assert.equal((await get('/nope')).status, 404);

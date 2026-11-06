@@ -21,6 +21,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: home_test
+          POSTGRES_PASSWORD: local_ci_test
+          POSTGRES_DB: home_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U home_test -d home_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      HOME_TEST_DATABASE_URL: postgres://home_test:local_ci_test@127.0.0.1:5432/home_test
     defaults:
       run:
         working-directory: server
@@ -30,4 +46,6 @@ jobs:
         with:
           node-version: 22
       - name: Run tests
-        run: node --test
+        run: |
+          npm ci --no-audit --no-fund
+          node --test

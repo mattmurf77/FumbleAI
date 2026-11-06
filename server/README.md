@@ -1,10 +1,12 @@
 # home-server
 
-Small helper for the Home Blueprint iPhone app. Node 22, one dependency (`pg`, pinned in `package-lock.json`).
-The map lookup and templates are stateless (an in-memory cache of public OpenStreetMap lookups, wiped on every
-restart). The one thing it stores is **in-app feedback** users choose to send, in Render Postgres: the category,
-the text they typed, the page name, app/iOS version, device model and a random install id. No screenshots,
-names, emails or locations.
+Backend helper for the Home Blueprint iPhone app. Node 22, one dependency (`pg`, pinned in `package-lock.json`).
+It serves public planning content, appliance templates, OpenStreetMap footprint lookups, privacy/support pages,
+and feedback users choose to send. Feedback is the only information persisted in Render Postgres. It includes
+the category, submitted text, page name, app/iOS version, device model, random installation identifier and
+optional random submission identifier. A submission identifier makes retries safe after a lost response.
+The service does not receive household tasks, project budgets, documents, OCR output or inventory for planning.
+Those workflows run in the app's repositories. See [backend coverage](../docs/homeowner-app/product/backend-coverage.md).
 Deploy: see `docs/setup/RENDER.md` (Blueprint in `/render.yaml`).
 
 ## Run and test
@@ -12,7 +14,7 @@ Deploy: see `docs/setup/RENDER.md` (Blueprint in `/render.yaml`).
 ```sh
 cd server
 npm ci               # installs pg
-node --test          # unit + HTTP tests; Overpass is mocked and feedback uses a fake database
+node --test          # unit + HTTP tests; Overpass is mocked
 PORT=10000 node src/index.js
 ```
 
@@ -31,6 +33,10 @@ PORT=10000 node src/index.js
 | `FEEDBACK_RATE_LIMIT` | optional | Feedback posts per install id per hour (default 30; per IP it's 2× this). |
 
 Local run with feedback: `DATABASE_URL=postgres://localhost/home HOME_ADMIN_KEY=dev node src/index.js`.
+
+Set `HOME_TEST_DATABASE_URL` to a disposable test database to also run the real PostgreSQL migration,
+concurrent retry and conflict tests. The tests use a temporary schema and remove it afterward. Never use a
+production database. GitHub's Server tests workflow provides a disposable PostgreSQL 17 service.
 
 ## Public privacy and support pages
 
@@ -81,6 +87,10 @@ Header `X-Home-Key` when `HOME_API_KEY` is set. JSON body (max 32 KB; unknown fi
 ```
 
 - `category` (required): `bug` | `polish` | `idea`. `message` (required): trimmed, 1–5,000 characters.
+- Optional `X-Home-Request-ID: <UUID>` identifies this submission. The iPhone queues and reuses the same UUID
+  on retries. Repeating the same normalized content returns the original `id` and `createdAt`, including
+  concurrent retries. Reusing the UUID with different content returns `409 idempotency_conflict`. Requests
+  from older apps without this header retain the original behavior. A request UUID grants no read access.
 - Optional strings: `page` (≤ 200), `appVersion`, `buildNumber`, `osVersion` (≤ 50), `deviceModel`, `installId` (≤ 100). `screenContext`: a JSON object (≤ 4 KB).
 - `201 {"id": "<uuid>", "createdAt": "<ISO 8601>"}` · `400 bad_request` · `401` · `413 payload_too_large` ·
   `429 rate_limited` (with `Retry-After`; 30/hour per install id, 60/hour per IP) · `503 feedback_unavailable`
@@ -98,3 +108,29 @@ Table (created with `CREATE TABLE IF NOT EXISTS` on startup; `gen_random_uuid()`
 `feedback(id uuid pk, created_at timestamptz, category text check in (bug, polish, idea), message text 1..5000,
 page text, screen_context jsonb, app_version text, build_number text, os_version text, device_model text,
 install_id text, status text default 'new' check in (new, triaged, done))`, index on `created_at desc`.
+The additive migration also creates nullable `request_id uuid` with a unique index, preserving existing rows.
+
+### `GET /v1/catalog`
+
+Versioned public planning content from `data/home-catalog.json`, validated before the service starts.
+`HEAD` is supported. Requests pass the same optional app-key gate as templates. Responses include a strong
+SHA-256 `ETag`, `Last-Modified`, `Cache-Control: private, max-age=3600` and `Vary: X-Home-Key`.
+Matching conditional requests return `304` without a body. A database is not required.
+
+Schema 1 contains six known recommendations, DIY supplies/equipment, 25 cost guides, source URLs and review
+dates, public contractor directories, and the existing scope-specific closet cost-recovery assumption.
+Prices use integer minor units, explicit units, country/currency, cost basis and scope. A professional hourly
+rate cannot replace a whole-job price. Maintenance has no numeric resale assumption. `referralPartners` must
+remain empty in this schema. No partner agreement, provider verification or homeowner lead is implied.
+
+The iPhone bundles the same file and refreshes recommendation guides in the background at most every six
+hours per process. It validates the complete response, rejects redirects/older publications/unsupported
+schemas, and retains its last valid cache or bundled fallback when offline. It sends no home data. Updated
+content never overwrites an owner's saved worksheet, budget, quote, actual spending or shopping selections.
+The custom worksheet engine currently uses its bundled scope/rate defaults; the corresponding 13 catalog
+guides expose the same definitions for future consumers without changing calculation behavior.
+
+To update content, retain the supported IDs and price units, verify the sources and scope, update each
+changed source's `reviewedOn`, advance the catalog `reviewedOn`, `publishedAt` and date/revision `version`, and
+run server plus Swift catalog parity/validation tests. Deploy the helper after checks pass. New calculation
+types or compensated referral integrations require an app/schema change; a content update cannot add them.

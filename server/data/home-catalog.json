@@ -1,0 +1,689 @@
+{
+  "schemaVersion": 1,
+  "version": "2026-11-05.1",
+  "publishedAt": "2026-11-05T00:00:00.000Z",
+  "reviewedOn": "2026-11-04",
+  "recommendations": [
+    {
+      "id": "gutters",
+      "title": "Clean the gutters",
+      "detail": "If your home has gutters, check for debris after leaf fall and before heavy rain. Height and access affect a professional quote.",
+      "symbol": "cloud.rain",
+      "diyTitle": "Check and clear reachable gutters",
+      "supplies": [
+        {
+          "name": "Work gloves",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        },
+        {
+          "name": "Garden hose",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        },
+        {
+          "name": "Telescoping gutter wand",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        },
+        {
+          "name": "Yard waste bags",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": false
+        }
+      ],
+      "professionalGuideID": "gutters-professional",
+      "diyGuideID": "gutters-diy",
+      "providerDirectoryID": "gutter-cleaners",
+      "resaleAssumptionID": null
+    },
+    {
+      "id": "furnace",
+      "title": "Schedule a furnace tune-up",
+      "detail": "If your home uses a furnace, arrange a check before the heating season. Ask which checks and cleaning the quote includes.",
+      "symbol": "flame",
+      "diyTitle": "Prepare for furnace service",
+      "supplies": [
+        {
+          "name": "Replacement HVAC filter",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": false
+        },
+        {
+          "name": "Flashlight",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        }
+      ],
+      "professionalGuideID": "furnace-professional",
+      "diyGuideID": "furnace-diy",
+      "providerDirectoryID": "hvac-contractors",
+      "resaleAssumptionID": null
+    },
+    {
+      "id": "cooling",
+      "title": "Check the cooling system",
+      "detail": "If you use air conditioning, arrange a preseason check. Routine service and repairs have different prices.",
+      "symbol": "snowflake",
+      "diyTitle": "Check the AC filter and service record",
+      "supplies": [
+        {
+          "name": "Replacement HVAC filter",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": false
+        },
+        {
+          "name": "Flashlight",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        }
+      ],
+      "professionalGuideID": "cooling-professional",
+      "diyGuideID": "cooling-diy",
+      "providerDirectoryID": "hvac-contractors",
+      "resaleAssumptionID": null
+    },
+    {
+      "id": "dryer",
+      "title": "Clean the dryer vent",
+      "detail": "If your home has a vented dryer, check its maintenance instructions. Vent length and access affect cleaning costs.",
+      "symbol": "wind",
+      "diyTitle": "Clean the dryer vent",
+      "supplies": [
+        {
+          "name": "Dryer vent cleaning kit",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        },
+        {
+          "name": "Vacuum cleaner",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        },
+        {
+          "name": "Work gloves",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        }
+      ],
+      "professionalGuideID": "dryer-professional",
+      "diyGuideID": "dryer-diy",
+      "providerDirectoryID": "thumbtack",
+      "resaleAssumptionID": null
+    },
+    {
+      "id": "filter",
+      "title": "Check the HVAC air filter",
+      "detail": "Check the filter used by your heating or cooling equipment. Use its condition and the manufacturer’s instructions to decide when to replace it.",
+      "symbol": "aqi.medium",
+      "diyTitle": "Check the HVAC air filter",
+      "supplies": [
+        {
+          "name": "Replacement HVAC filter",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": false
+        },
+        {
+          "name": "Flashlight",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        }
+      ],
+      "professionalGuideID": "filter-professional",
+      "diyGuideID": "filter-diy",
+      "providerDirectoryID": "hvac-contractors",
+      "resaleAssumptionID": null
+    },
+    {
+      "id": "closet",
+      "title": "Renovate a closet",
+      "detail": "Measure the space and choose a storage layout. Compare a self-installed kit with a contractor’s custom installation.",
+      "symbol": "cabinet",
+      "diyTitle": "Renovate a closet",
+      "supplies": [
+        {
+          "name": "Tape measure",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        },
+        {
+          "name": "Level",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        },
+        {
+          "name": "Closet organizer kit",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": false
+        },
+        {
+          "name": "Drill",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": true
+        },
+        {
+          "name": "Mounting hardware",
+          "quantity": 1,
+          "unit": "ea",
+          "isEquipment": false
+        }
+      ],
+      "professionalGuideID": "closet-professional",
+      "diyGuideID": "closet-diy",
+      "providerDirectoryID": "nari",
+      "resaleAssumptionID": "closet-renovation-2025"
+    }
+  ],
+  "costGuides": [
+    {
+      "id": "gutters-professional",
+      "lowMinor": 16300,
+      "highMinor": 33300,
+      "country": "US",
+      "currency": "USD",
+      "unit": "job",
+      "basis": "installed",
+      "scope": "If your home has gutters, check for debris after leaf fall and before heavy rain. Height and access affect a professional quote. National US guide. Get a written local quote for the exact scope.",
+      "sources": [
+        {
+          "label": "Thumbtack · March 2026",
+          "url": "https://www.thumbtack.com/p/gutter-cleaning-prices",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "gutters-diy",
+      "lowMinor": 0,
+      "highMinor": 5000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "item",
+      "basis": "materials",
+      "scope": "Assumes an existing hose. You may spend nothing if you own compatible ground tools. Arrange professional help for work at height.",
+      "sources": [
+        {
+          "label": "DIY price guide · Angi, 2026",
+          "url": "https://www.angi.com/articles/tools-keep-gutter-downspouts-clean.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "furnace-professional",
+      "lowMinor": 15000,
+      "highMinor": 20000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "job",
+      "basis": "installed",
+      "scope": "If your home uses a furnace, arrange a check before the heating season. Ask which checks and cleaning the quote includes. National US guide. Get a written local quote for the exact scope.",
+      "sources": [
+        {
+          "label": "Angi · 2026",
+          "url": "https://www.angi.com/articles/how-much-does-common-furnace-repair-cost.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "furnace-diy",
+      "lowMinor": 1000,
+      "highMinor": 5000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "item",
+      "basis": "materials",
+      "scope": "DIY covers checking an accessible filter and gathering service records. A professional performs the system tune-up. Confirm the filter size before buying.",
+      "sources": [
+        {
+          "label": "DIY price guide · Angi, 2026",
+          "url": "https://www.angi.com/articles/how-to-install-furnace-filter.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "cooling-professional",
+      "lowMinor": 7500,
+      "highMinor": 20000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "job",
+      "basis": "installed",
+      "scope": "If you use air conditioning, arrange a preseason check. Routine service and repairs have different prices. National US guide. Get a written local quote for the exact scope.",
+      "sources": [
+        {
+          "label": "Angi · 2026",
+          "url": "https://www.angi.com/articles/importance-annual-ac-tune.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "cooling-diy",
+      "lowMinor": 1000,
+      "highMinor": 5000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "item",
+      "basis": "materials",
+      "scope": "DIY covers checking an accessible filter and gathering service records. A professional performs the system tune-up. Confirm the filter size before buying.",
+      "sources": [
+        {
+          "label": "DIY price guide · Angi, 2026",
+          "url": "https://www.angi.com/articles/how-to-install-furnace-filter.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "dryer-professional",
+      "lowMinor": 10400,
+      "highMinor": 18800,
+      "country": "US",
+      "currency": "USD",
+      "unit": "job",
+      "basis": "installed",
+      "scope": "If your home has a vented dryer, check its maintenance instructions. Vent length and access affect cleaning costs. National US guide. Get a written local quote for the exact scope.",
+      "sources": [
+        {
+          "label": "Angi · 2026",
+          "url": "https://www.angi.com/articles/how-much-does-dryer-vent-cleaning-cost.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "dryer-diy",
+      "lowMinor": 2000,
+      "highMinor": 5000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "item",
+      "basis": "materials",
+      "scope": "The kit budget applies to an accessible vent. Check the manufacturer’s instructions; a long or inaccessible run needs a professional quote.",
+      "sources": [
+        {
+          "label": "DIY price guide · Angi, 2026",
+          "url": "https://www.angi.com/articles/hiring-vs-diy-dryer-vent-cleaning.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "filter-professional",
+      "lowMinor": 10000,
+      "highMinor": 25000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "hour",
+      "basis": "labor",
+      "scope": "Professional hourly labor only. Ask about a service minimum and price the replacement filter separately.",
+      "sources": [
+        {
+          "label": "Angi · 2026",
+          "url": "https://www.angi.com/articles/how-to-install-furnace-filter.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "filter-diy",
+      "lowMinor": 1000,
+      "highMinor": 5000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "item",
+      "basis": "materials",
+      "scope": "Inspection uses existing equipment. The guide covers a replacement if needed; confirm the model and size.",
+      "sources": [
+        {
+          "label": "DIY price guide · Angi, 2026",
+          "url": "https://www.angi.com/articles/how-to-install-furnace-filter.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "closet-professional",
+      "lowMinor": 104600,
+      "highMinor": 321000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "job",
+      "basis": "installed",
+      "scope": "Measure the space and choose a storage layout. Compare a self-installed kit with a contractor’s custom installation. National US guide. Get a written local quote for the exact scope.",
+      "sources": [
+        {
+          "label": "Angi · 2026",
+          "url": "https://www.angi.com/articles/how-much-do-custom-closets-cost.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "closet-diy",
+      "lowMinor": 11900,
+      "highMinor": 20900,
+      "country": "US",
+      "currency": "USD",
+      "unit": "item",
+      "basis": "retailExample",
+      "scope": "Two US retail examples are ShelfTrack models 2087 and 2091 at $119 and $209. Check fit and current local prices. Extra tools, taxes and labor are separate.",
+      "sources": [
+        {
+          "label": "Example kits · Home Depot, November 2026",
+          "url": "https://www.homedepot.com/b/Storage-Organization/ClosetMaid/Closet-Kits/N-5yc1vZas7eZd4Z1z0tur0",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "trade-handyman",
+      "lowMinor": 5000,
+      "highMinor": 8000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "hour",
+      "basis": "labor",
+      "scope": "Independent handyman hourly labor. Local rates vary. Budget for parts separately and ask whether a trip fee covers the first hour. Use your local quote when available.",
+      "sources": [
+        {
+          "label": "HomeGuide · Independent handyman",
+          "url": "https://homeguide.com/costs/handyman-prices",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "trade-carpenter",
+      "lowMinor": 4000,
+      "highMinor": 10000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "hour",
+      "basis": "labor",
+      "scope": "Carpenter hourly labor. Local rates vary. Budget for parts separately and ask whether a trip fee covers the first hour. Use your local quote when available.",
+      "sources": [
+        {
+          "label": "Angi · Carpenter",
+          "url": "https://www.angi.com/articles/carpenter-cost.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "trade-plumber",
+      "lowMinor": 4500,
+      "highMinor": 20000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "hour",
+      "basis": "labor",
+      "scope": "Plumber hourly labor. Local rates vary. Budget for parts separately and ask whether a trip fee covers the first hour. Use your local quote when available.",
+      "sources": [
+        {
+          "label": "Angi · Plumber",
+          "url": "https://www.angi.com/articles/plumber-cost.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "trade-electrician",
+      "lowMinor": 5000,
+      "highMinor": 13000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "hour",
+      "basis": "labor",
+      "scope": "Electrician hourly labor. Local rates vary. Budget for parts separately and ask whether a trip fee covers the first hour. Use your local quote when available.",
+      "sources": [
+        {
+          "label": "HomeGuide · Electrician",
+          "url": "https://homeguide.com/costs/electrician-cost-per-hour",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "scope-interior-paint-material",
+      "lowMinor": 2898,
+      "highMinor": 5398,
+      "country": "US",
+      "currency": "USD",
+      "unit": "gallon",
+      "basis": "retailExample",
+      "scope": "One-gallon retail examples. Estimate wall area times coats divided by 350 sq. ft. per gallon, deduct only confirmed compatible usable paint, then buy whole one-gallon packs. New tools, trim, ceilings, repairs, tax and labor are separate.",
+      "sources": [
+        {
+          "label": "Sherwin-Williams · paint coverage",
+          "url": "https://www.sherwin-williams.com/en-us/color/color-tools/paint-calculator",
+          "reviewedOn": "2026-11-04"
+        },
+        {
+          "label": "Home Depot · Glidden Premium gallon",
+          "url": "https://www.homedepot.com/p/202246794",
+          "reviewedOn": "2026-11-04"
+        },
+        {
+          "label": "Home Depot · Behr Marquee gallon",
+          "url": "https://www.homedepot.com/p/308214409",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "scope-interior-paint-professional",
+      "lowMinor": 200,
+      "highMinor": 600,
+      "country": "US",
+      "currency": "USD",
+      "unit": "squareFoot",
+      "basis": "wholeJob",
+      "scope": "Typical room with standard-height walls, materials and labor per square foot of FLOOR area. Get a quote for unusual height, coats or repairs. Do not add the DIY material guide to this whole-job comparison.",
+      "sources": [
+        {
+          "label": "Angi · professional room painting",
+          "url": "https://www.angi.com/articles/how-much-does-it-cost-paint-room.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "scope-vinyl-floor-material",
+      "lowMinor": 4020,
+      "highMinor": 8040,
+      "country": "US",
+      "currency": "USD",
+      "unit": "carton",
+      "basis": "materials",
+      "scope": "A 20.1 sq. ft. carton at the US material guide of $2–$4/sq. ft. Use floor area plus 10% for offcuts and buy full cartons. Removal, subfloor repair and transitions are separate.",
+      "sources": [
+        {
+          "label": "Home Depot · US vinyl plank cost guide",
+          "url": "https://www.homedepot.com/services/c/cost-install-vinyl-floors/c1e5c4c07",
+          "reviewedOn": "2026-11-04"
+        },
+        {
+          "label": "Home Depot · example 20.1 sq. ft. carton",
+          "url": "https://www.homedepot.com/p/309083456",
+          "reviewedOn": "2026-11-04"
+        },
+        {
+          "label": "Home Depot · measuring and offcuts",
+          "url": "https://www.homedepot.com/c/ah/how-to-install-vinyl-plank-flooring/9ba683603be9fa5395fab90188fe437f",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "scope-vinyl-floor-labor",
+      "lowMinor": 300,
+      "highMinor": 500,
+      "country": "US",
+      "currency": "USD",
+      "unit": "squareFoot",
+      "basis": "labor",
+      "scope": "Installation labor applied to actual floor area before offcuts. Removal, subfloor repair and transitions are separate.",
+      "sources": [
+        {
+          "label": "Home Depot · US vinyl plank cost guide",
+          "url": "https://www.homedepot.com/services/c/cost-install-vinyl-floors/c1e5c4c07",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "scope-mulch-material",
+      "lowMinor": 397,
+      "highMinor": 397,
+      "country": "US",
+      "currency": "USD",
+      "unit": "bag",
+      "basis": "retailExample",
+      "scope": "One 1.5 cu. ft. bag of Earthgro brown mulch. Measure bed length × width × depth in inches ÷ 12 for cubic feet and buy whole bags. Delivery, removal and minimum service charges are separate.",
+      "sources": [
+        {
+          "label": "Home Depot · Earthgro 1.5 cu. ft. mulch",
+          "url": "https://www.homedepot.com/b/Outdoors-Garden-Center-Landscaping-Supplies-Mulch-Wood-Mulch/Earthgro/Brown/N-5yc1vZc9nxZ37wZ1z0vl9p",
+          "reviewedOn": "2026-11-04"
+        },
+        {
+          "label": "Home Depot · mulch coverage",
+          "url": "https://www.homedepot.com/calculator/mulch",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "scope-mulch-labor",
+      "lowMinor": 2000,
+      "highMinor": 5000,
+      "country": "US",
+      "currency": "USD",
+      "unit": "cubicYard",
+      "basis": "labor",
+      "scope": "Spreading labor per cubic yard, which is 27 cubic feet. Delivery and any service minimum are separate.",
+      "sources": [
+        {
+          "label": "Angi · mulch installation labor",
+          "url": "https://www.angi.com/articles/how-much-does-mulch-delivery-and-install-cost.htm",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "scope-smallHandyman",
+      "lowMinor": 10100,
+      "highMinor": 25700,
+      "country": "US",
+      "currency": "USD",
+      "unit": "visit",
+      "basis": "wholeJob",
+      "scope": "Under 2 hours. US whole-visit comparison for general handyman work, including a mix of project costs. Use this as an alternative to itemizing the same work. Specialty trades require their own scope and quote. Confirm local minimum and what is included.",
+      "sources": [
+        {
+          "label": "Thumbtack · US handyman prices",
+          "url": "https://www.thumbtack.com/p/handyman-prices",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "scope-halfDayHandyman",
+      "lowMinor": 21200,
+      "highMinor": 56800,
+      "country": "US",
+      "currency": "USD",
+      "unit": "visit",
+      "basis": "wholeJob",
+      "scope": "2–5 hours. US whole-visit comparison for general handyman work, including a mix of project costs. Use this as an alternative to itemizing the same work. Specialty trades require their own scope and quote. Confirm local minimum and what is included.",
+      "sources": [
+        {
+          "label": "Thumbtack · US handyman prices",
+          "url": "https://www.thumbtack.com/p/handyman-prices",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    },
+    {
+      "id": "scope-fullDayHandyman",
+      "lowMinor": 65200,
+      "highMinor": 184200,
+      "country": "US",
+      "currency": "USD",
+      "unit": "visit",
+      "basis": "wholeJob",
+      "scope": "Full day. US whole-visit comparison for general handyman work, including a mix of project costs. Use this as an alternative to itemizing the same work. Specialty trades require their own scope and quote. Confirm local minimum and what is included.",
+      "sources": [
+        {
+          "label": "Thumbtack · US handyman prices",
+          "url": "https://www.thumbtack.com/p/handyman-prices",
+          "reviewedOn": "2026-11-04"
+        }
+      ]
+    }
+  ],
+  "providerDirectories": [
+    {
+      "id": "gutter-cleaners",
+      "name": "Thumbtack gutter cleaners",
+      "url": "https://www.thumbtack.com/k/gutter-cleaners/near-me",
+      "disclosure": "Public contractor directory. Compare qualifications, availability and written quotes. Home Blueprint does not verify these providers."
+    },
+    {
+      "id": "hvac-contractors",
+      "name": "Thumbtack HVAC contractors",
+      "url": "https://www.thumbtack.com/k/hvac-contractors/near-me",
+      "disclosure": "Public contractor directory. Compare qualifications, availability and written quotes. Home Blueprint does not verify these providers."
+    },
+    {
+      "id": "thumbtack",
+      "name": "Thumbtack",
+      "url": "https://www.thumbtack.com/",
+      "disclosure": "Public contractor directory. Compare qualifications, availability and written quotes. Home Blueprint does not verify these providers."
+    },
+    {
+      "id": "nari",
+      "name": "NARI remodeler directory",
+      "url": "https://remodelingdoneright.nari.org/find-a-remodeler/",
+      "disclosure": "Public contractor directory. Compare qualifications, availability and written quotes. Home Blueprint does not verify these providers."
+    }
+  ],
+  "resaleAssumptions": [
+    {
+      "id": "closet-renovation-2025",
+      "ratioBasisPoints": 8300,
+      "country": "US",
+      "currency": "USD",
+      "mode": "hirePro",
+      "costGuideID": "closet-professional",
+      "scope": "Illustrative cost recovery surveyed for a typical professionally installed closet renovation. This is not a property valuation, a forecast sale-price increase or evidence for a kit-only refresh. Scope, finish and local market determine whether it applies.",
+      "source": {
+        "label": "NAR/NARI · 2025 Remodeling Impact Report",
+        "url": "https://www.nar.realtor/research-and-statistics/research-reports/remodeling-impact",
+        "reviewedOn": "2026-11-04"
+      }
+    }
+  ],
+  "referralPartners": []
+}

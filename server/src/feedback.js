@@ -21,15 +21,30 @@ CREATE TABLE IF NOT EXISTS feedback (
   os_version     text,
   device_model   text,
   install_id     text,
+  request_id     uuid,
   status         text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'triaged', 'done'))
 );
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS request_id uuid;
+CREATE UNIQUE INDEX IF NOT EXISTS feedback_request_id_idx ON feedback (request_id);
 CREATE INDEX IF NOT EXISTS feedback_created_at_idx ON feedback (created_at DESC);
 `;
 
 export class ValidationError extends Error {}
+export class IdempotencyConflict extends Error {
+  constructor() {
+    super('This request identifier was already used for different feedback.');
+  }
+}
 
 export function isUuid(s) {
   return typeof s === 'string' && UUID_RE.test(s);
+}
+
+/** Optional stable identifier for one submission across network retries. Not an authentication token. */
+export function validateRequestId(value) {
+  if (value === undefined || value === null) return null;
+  if (!isUuid(value)) throw new ValidationError('X-Home-Request-ID must be a UUID.');
+  return value.toLowerCase();
 }
 
 function optionalString(body, key, max) {
@@ -119,15 +134,29 @@ export class FeedbackStore {
     return this.schemaPromise;
   }
 
-  async insert(f) {
+  async insert(f, { requestId = null } = {}) {
+    requestId = validateRequestId(requestId);
     await this.ensureSchema();
     const { rows } = await this.db.query(
-      `INSERT INTO feedback (category, message, page, screen_context, app_version, build_number, os_version, device_model, install_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO feedback (category, message, page, screen_context, app_version, build_number, os_version, device_model, install_id, request_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (request_id) DO UPDATE SET request_id = EXCLUDED.request_id
+       WHERE feedback.category IS NOT DISTINCT FROM EXCLUDED.category
+         AND feedback.message IS NOT DISTINCT FROM EXCLUDED.message
+         AND feedback.page IS NOT DISTINCT FROM EXCLUDED.page
+         AND feedback.screen_context IS NOT DISTINCT FROM EXCLUDED.screen_context
+         AND feedback.app_version IS NOT DISTINCT FROM EXCLUDED.app_version
+         AND feedback.build_number IS NOT DISTINCT FROM EXCLUDED.build_number
+         AND feedback.os_version IS NOT DISTINCT FROM EXCLUDED.os_version
+         AND feedback.device_model IS NOT DISTINCT FROM EXCLUDED.device_model
+         AND feedback.install_id IS NOT DISTINCT FROM EXCLUDED.install_id
        RETURNING id, created_at`,
       [f.category, f.message, f.page, f.screenContext === null ? null : JSON.stringify(f.screenContext),
-        f.appVersion, f.buildNumber, f.osVersion, f.deviceModel, f.installId],
+        f.appVersion, f.buildNumber, f.osVersion, f.deviceModel, f.installId, requestId],
     );
+    // The unique index serializes concurrent retries. A content mismatch neither overwrites
+    // the first report nor reveals its id, timestamp or message. Legacy NULL keys remain independent.
+    if (!rows.length) throw new IdempotencyConflict();
     return { id: rows[0].id, createdAt: rows[0].created_at instanceof Date ? rows[0].created_at.toISOString() : rows[0].created_at };
   }
 
@@ -185,27 +214,40 @@ export async function createPgPool(databaseUrl, env = process.env, log = console
     connectionTimeoutMillis: 10_000,
     ssl: useSsl ? { rejectUnauthorized: false } : undefined,
   });
-  pool.on('error', (err) => log(`postgres pool error: ${err.message}`));
+  pool.on('error', (err) => log(`postgres pool error: ${/^[A-Z0-9]{5}$/.test(err?.code ?? '') ? err.code : 'unavailable'}`));
   return pool;
 }
 
-/** Fixed-window counter per key (in memory; resets on restart, which is fine for 2–5 testers). */
+/** Bounded fixed-window counter for a single server instance. Resets on restart. */
 export class RateLimiter {
-  constructor({ limit = 30, windowMs = 60 * 60 * 1000, now = Date.now } = {}) {
+  constructor({ limit = 30, windowMs = 60 * 60 * 1000, maxKeys = 10_000, now = Date.now } = {}) {
+    if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(windowMs) || windowMs < 1
+        || !Number.isSafeInteger(maxKeys) || maxKeys < 1) {
+      throw new RangeError('Rate limiter limits, duration and capacity must be positive integers.');
+    }
     this.limit = limit;
     this.windowMs = windowMs;
+    this.maxKeys = maxKeys;
     this.now = now;
     this.windows = new Map();
+    this.lastNow = -Infinity;
   }
 
   /** Counts one hit. Returns { ok: true } or { ok: false, retryAfterS }. */
   hit(key) {
-    const t = this.now();
-    if (this.windows.size > 10_000) {
-      for (const [k, w] of this.windows) if (w.resetAt <= t) this.windows.delete(k);
+    // Keep creation/expiry order monotonic even if the wall clock moves backwards.
+    const t = this.lastNow = Math.max(this.lastNow, this.now());
+    for (const [k, w] of this.windows) {
+      if (w.resetAt > t) break;
+      this.windows.delete(k);
     }
     let w = this.windows.get(key);
-    if (!w || w.resetAt <= t) {
+    if (!w) {
+      if (this.windows.size >= this.maxKeys) {
+        // Do not evict an active limit: cycling forged identities must not reset old counters.
+        const nextExpiry = this.windows.values().next().value.resetAt;
+        return { ok: false, retryAfterS: Math.max(1, Math.ceil((nextExpiry - t) / 1000)) };
+      }
       w = { count: 0, resetAt: t + this.windowMs };
       this.windows.set(key, w);
     }
