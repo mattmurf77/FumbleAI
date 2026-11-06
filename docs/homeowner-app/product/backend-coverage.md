@@ -25,6 +25,8 @@ concurrent retry deduplication and conflicts against disposable PostgreSQL 17. S
 parity/validation/cache recovery, request privacy, cross-household sync rejection, attachment integrity and
 custom worksheet export. Existing iPhone journey, StoreKit and unsigned archive checks remain the release gate.
 
-Public content can deploy independently of Apple signing. New TestFlight distribution remains blocked until
-the Apple developer account holder accepts the updated Program License Agreement identified by the prior
-upload run. No new cloud data collection is enabled to work around that release requirement.
+Public content can deploy independently of Apple signing. The read-only TestFlight status workflow checks
+current certificate and bundle-registration access separately from build inventory. The account holder
+accepted the updated Apple agreement on November 6, 2026, and both signing access checks subsequently passed.
+The upload workflow still verifies signing, archives the app and waits for Apple transport acceptance;
+processing and tester availability are checked afterward.
