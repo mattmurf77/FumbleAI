@@ -1,17 +1,35 @@
+import StoreKit
 import StoreKitTest
 import XCTest
 @testable import Home
 
 final class HomeBriefBillingTests: XCTestCase {
+    private enum SessionSetupError: Error { case clearedTransactionsStillVisibleAfterRetryLimit }
+
     @MainActor
-    private func makeSession() throws -> SKTestSession {
+    private func makeSession() async throws -> SKTestSession {
         let config = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "HomeBrief", withExtension: "storekit"))
         XCTAssertEqual(BlueprintBilling.productID, "app.fumble.home.homebrief", "Simulator StoreKit tests use the default HOME_BUNDLE_ID.")
         let session = try SKTestSession(contentsOf: config)
         session.resetToDefaultState()
         session.clearTransactions()
         session.disableDialogs = true
-        return session
+        // StoreKit Test's reset can return before currentEntitlements stops exposing the
+        // previous test's approved purchase. Wait for the real StoreKit view to clear before
+        // constructing a billing observer; never force the app's entitlement state.
+        for _ in 0..<100 {
+            var hasHomeBrief = false
+            for await result in StoreKit.Transaction.currentEntitlements {
+                if case .verified(let transaction) = result,
+                   transaction.productID == BlueprintBilling.productID,
+                   transaction.revocationDate == nil {
+                    hasHomeBrief = true
+                }
+            }
+            if session.allTransactions().isEmpty && !hasHomeBrief { return session }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        throw SessionSetupError.clearedTransactionsStillVisibleAfterRetryLimit
     }
 
     @MainActor
@@ -25,7 +43,7 @@ final class HomeBriefBillingTests: XCTestCase {
 
     @MainActor
     func testPurchaseFreshInstanceEntitlementAndRefund() async throws {
-        let session = try makeSession()
+        let session = try await makeSession()
         defer { session.clearTransactions() }
         let store = BlueprintBilling()
         await store.refreshEntitlements()
@@ -47,7 +65,7 @@ final class HomeBriefBillingTests: XCTestCase {
 
     @MainActor
     func testPendingPurchaseUnlocksOnlyAfterApproval() async throws {
-        let session = try makeSession()
+        let session = try await makeSession()
         defer { session.clearTransactions() }
         session.askToBuyEnabled = true
         let store = BlueprintBilling()
@@ -63,7 +81,7 @@ final class HomeBriefBillingTests: XCTestCase {
 
     @MainActor
     func testFailedPaymentDoesNotGrantAccess() async throws {
-        let session = try makeSession()
+        let session = try await makeSession()
         defer { session.clearTransactions() }
         let store = BlueprintBilling()
         await store.loadProduct()

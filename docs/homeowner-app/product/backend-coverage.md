@@ -32,7 +32,9 @@ The [signed upload](https://github.com/mattmurf77/FumbleAI/actions/runs/42233333
 Home Blueprint **1.0 (24)**. A subsequent [Apple status check](https://github.com/mattmurf77/FumbleAI/actions/runs/42235292111)
 confirmed `VALID`, unexpired, and `IN_BETA_TESTING` for internal testers. External testing remains
 `READY_FOR_BETA_SUBMISSION`; neither external review nor public App Store submission has been performed.
-The app and iPhone test code match the [passing iOS run](https://github.com/mattmurf77/FumbleAI/actions/runs/42166253323).
+The production app code matches the [passing iOS run](https://github.com/mattmurf77/FumbleAI/actions/runs/42166253323).
+Subsequent StoreKit test setup waits for cleared transactions to disappear from actual current entitlements
+before constructing the next billing observer; purchase, restoration and refund assertions remain unchanged.
 
 Build 24 was [selected and verified](https://github.com/mattmurf77/FumbleAI/actions/runs/42235394001) on the existing
 1.0 draft. Home Brief's review screenshot and notes were [attached and verified](https://github.com/mattmurf77/FumbleAI/actions/runs/42233812847);
