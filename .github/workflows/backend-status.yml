@@ -1,0 +1,28 @@
+name: Backend production check
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Expected deployed commit (full SHA or first seven characters)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HOME_SERVER_URL: ${{ secrets.HOME_SERVER_URL }}
+      HOME_API_KEY: ${{ secrets.HOME_API_KEY }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify deployed backend without writing user data
+        run: node .github/scripts/check-backend.mjs
