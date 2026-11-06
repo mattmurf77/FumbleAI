@@ -29,7 +29,9 @@ class HomeStorefrontStatus
                    "reviewContact=#{contact}"
                  end
       @log.call("iOS version #{attrs.fetch('versionString')} | state=#{attrs.fetch('appVersionState')} | selectedBuild=#{number} | #{contacts}")
-      localization("/v1/appStoreVersions/#{version.fetch('id')}", "appStoreVersionLocalizations", "supportUrl")
+      localization("/v1/appStoreVersions/#{version.fetch('id')}", "appStoreVersionLocalizations", "supportUrl") do |locale|
+        screenshots(locale) if attrs.values_at("versionString", "appVersionState") == ["1.0", "PREPARE_FOR_SUBMISSION"]
+      end
     end
     inventory("app information", "#{@app}/appInfos", {"fields[appInfos]" => "state", "limit" => 200}) do |info, _|
       @log.call("App information | state=#{info.fetch('attributes').fetch('state')}")
@@ -68,10 +70,35 @@ class HomeStorefrontStatus
     matches = rows.select { |row| row.dig("attributes", "locale") == "en-US" }
     case matches.size
     when 0 then @log.call("  en-US localization=absent")
-    when 1 then @log.call("  en-US localization=present | #{field}Present=#{!matches.first.dig('attributes', field).to_s.strip.empty?}")
+    when 1
+      @log.call("  en-US localization=present | #{field}Present=#{!matches.first.dig('attributes', field).to_s.strip.empty?}")
+      yield matches.first if block_given?
     else @log.call("  en-US localization=ambiguous")
     end
   rescue HomeBriefCatalog::ApiError => error
     @log.call("  en-US localization=unknown (#{error.message})")
+  end
+
+  def screenshots(locale)
+    locale_id = locale["id"].to_s
+    unless /\A[A-Za-z0-9-]{1,100}\z/.match?(locale_id)
+      @log.call("  1.0 en-US screenshot inventory=unknown (localization ID unavailable)")
+      return
+    end
+    inventory("1.0 en-US screenshot sets", "/v1/appStoreVersionLocalizations/#{locale_id}/appScreenshotSets",
+      {"fields[appScreenshotSets]" => "screenshotDisplayType", "limit" => 200}) do |set, _|
+      set_id = set["id"].to_s
+      unless /\A[A-Za-z0-9-]{1,100}\z/.match?(set_id)
+        @log.call("  1.0 en-US screenshot inventory=unknown (set ID unavailable)")
+        next
+      end
+      display = set.fetch("attributes").fetch("screenshotDisplayType", "unknown")
+      @log.call("  Screenshot set=#{set_id} | display=#{display.inspect}")
+      inventory("1.0 en-US screenshot set #{set_id} assets", "/v1/appScreenshotSets/#{set_id}/appScreenshots",
+        {"fields[appScreenshots]" => "fileName,sourceFileChecksum,assetDeliveryState", "limit" => 20}) do |asset, _|
+        attrs = asset.fetch("attributes")
+        @log.call("    screenshot file=#{attrs['fileName'].inspect} | checksum=#{attrs['sourceFileChecksum'].inspect} | state=#{attrs.dig('assetDeliveryState', 'state').inspect}")
+      end
+    end
   end
 end

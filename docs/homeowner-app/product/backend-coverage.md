@@ -13,7 +13,7 @@ The embedded app key controls helper usage. It is not a homeowner identity or au
 | Documents, permits and OCR | Private originals and reviewed extracted facts on the device, linked records and source access | Property document originals and metadata remain device-only; no server OCR or unattended document upload |
 | Data portability | Existing home CSV export now includes both custom estimate worksheets and exact line/scope/source data | Export intentionally contains private notes; the owner controls sharing. This is distinct from the selective paid Home Brief |
 | Existing private iCloud sync | Household-zone and parent validation, immutable household ownership, safe numeric handling, downloaded asset hash/length/type checks and cold-cache transaction fix | TestFlight uses `HOME_CLOUD_SYNC=NO`; these checks do not enable production CloudKit or make device-only tables sync |
-| Home Brief billing | Verified StoreKit 2 entitlement, purchase/restore/refund handling; locally generated selected record PDF | Apple agreement, product review and physical-account release checks remain independent of the helper |
+| Home Brief billing | Verified StoreKit 2 entitlement, purchase/restore/refund handling; locally generated selected record PDF | Product review and physical-account release checks remain independent of the helper; the updated developer agreement was accepted November 6 |
 | Feedback | Durable on-device retry queue; server UUID idempotency, conflict detection, bounded request limiting and private admin access | Additive PostgreSQL migration preserves existing reports; original clients remain compatible |
 | Contractor and financing referrals | Public directories and owner-controlled quote requests; explicit name/URL/disclosure required for a configured partner | Paid agreements, underwriting/lead APIs and partner consent are not configured |
 | Redfin handoff | Owner-controlled export and Home Brief preserve useful evidence for a later seller conversation | No Redfin account/data API or automatic transfer is implemented. Connecting homes requires real account identity, scoped consent and partner access |
@@ -28,5 +28,13 @@ custom worksheet export. Existing iPhone journey, StoreKit and unsigned archive 
 Public content can deploy independently of Apple signing. The read-only TestFlight status workflow checks
 current certificate and bundle-registration access separately from build inventory. The account holder
 accepted the updated Apple agreement on November 6, 2026, and both signing access checks subsequently passed.
-The upload workflow still verifies signing, archives the app and waits for Apple transport acceptance;
-processing and tester availability are checked afterward.
+The [signed upload](https://github.com/mattmurf77/FumbleAI/actions/runs/42233333269) succeeded for
+Home Blueprint **1.0 (24)**. A subsequent [Apple status check](https://github.com/mattmurf77/FumbleAI/actions/runs/42235292111)
+confirmed `VALID`, unexpired, and `IN_BETA_TESTING` for internal testers. External testing remains
+`READY_FOR_BETA_SUBMISSION`; neither external review nor public App Store submission has been performed.
+The app and iPhone test code match the [passing iOS run](https://github.com/mattmurf77/FumbleAI/actions/runs/42166253323).
+
+Build 24 was [selected and verified](https://github.com/mattmurf77/FumbleAI/actions/runs/42235394001) on the existing
+1.0 draft. Home Brief's review screenshot and notes were [attached and verified](https://github.com/mattmurf77/FumbleAI/actions/runs/42233812847);
+Apple reports the $14.99 US non-consumable as `READY_TO_SUBMIT`, which is not production purchase approval.
+Review contact details and physical-account purchase/restore validation remain outstanding.

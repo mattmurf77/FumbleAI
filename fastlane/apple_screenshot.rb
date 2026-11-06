@@ -57,7 +57,9 @@ module AppleScreenshot
   end
 
   def self.wait_for_processing(client, path, id, checksum)
-    30.times do
+    # Apple can accept the upload but take several minutes to process the image.
+    # Keep the reservation intact if the bounded processing wait expires.
+    150.times do
       attrs = client.get("#{path}/#{id}").fetch("data").fetch("attributes")
       state = attrs.fetch("assetDeliveryState").fetch("state")
       if state == "COMPLETE"
