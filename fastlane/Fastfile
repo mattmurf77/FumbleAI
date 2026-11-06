@@ -235,6 +235,19 @@ platform :ios do
     end
     if app.id == HomeBriefCatalog::APP_ID
       client = HomeBriefCatalog::Client.new(Spaceship::ConnectAPI.token)
+      # Build inventory and signing-resource access are separate Apple capabilities.
+      # Probe current access with GET only; get_certificates can create a certificate.
+      {
+        "CI certificate access" => ["/v1/certificates", {"limit" => "1", "fields[certificates]" => "certificateType,expirationDate"}],
+        "CI bundle registration access" => ["/v1/bundleIds", {"filter[identifier]" => app.bundle_id, "limit" => "1"}]
+      }.each do |label, (path, params)|
+        begin
+          result = client.get(path, params)
+          UI.message("#{label}: available (returned records=#{result.fetch('data').length})")
+        rescue HomeBriefCatalog::ApiError => error
+          UI.important("#{label}: #{error.message}")
+        end
+      end
       HomeStorefrontStatus.new(client, app_id: app.id, log: ->(message) { UI.message(message) }).report
       begin
         HomeBriefCatalog::Product.new(client, app_id: app.id, bundle_id: app.bundle_id, log: ->(message) { UI.message(message) }).status
