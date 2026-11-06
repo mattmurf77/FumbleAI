@@ -231,7 +231,8 @@ platform :ios do
     builds = Spaceship::ConnectAPI::Build.all(app_id: app.id, sort: "-uploadedDate", limit: 10)
     UI.important("No builds found for this app.") if builds.empty?
     builds.each do |b|
-      UI.message("build #{b.version} | state=#{b.processing_state} | uploaded=#{b.uploaded_date} | expired=#{b.expired} | min_os=#{b.min_os_version}")
+      beta = b.build_beta_detail
+      UI.message("build #{b.app_version} (#{b.version}) | state=#{b.processing_state} | uploaded=#{b.uploaded_date} | expired=#{b.expired} | min_os=#{b.min_os_version} | internal=#{beta&.internal_build_state || 'not reported'} | external=#{beta&.external_build_state || 'not reported'}")
     end
     if app.id == HomeBriefCatalog::APP_ID
       client = HomeBriefCatalog::Client.new(Spaceship::ConnectAPI.token)
